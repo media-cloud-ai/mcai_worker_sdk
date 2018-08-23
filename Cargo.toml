@@ -8,7 +8,7 @@ license = "MIT"
 repository = "https://github.com/media-io/rs_amqp_worker"
 homepage = "https://github.com/media-io/rs_amqp_worker"
 documentation = "https://docs.rs/amqp_worker"
-readme = "../README.md"
+readme = "README.md"
 
 [dependencies]
 reqwest = "0.8.1"

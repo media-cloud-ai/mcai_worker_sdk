@@ -1,20 +1,18 @@
-
 use std::env;
 
 macro_rules! get_env_value {
-  ($key:expr, $default:expr) => (
-  {
+  ($key:expr, $default:expr) => {{
     let mut item = $default.to_string();
     for (key, value) in env::vars() {
       match key.as_ref() {
         $key => {
           item = value;
         }
-        _ => {},
+        _ => {}
       }
     }
     item
-  })
+  }};
 }
 
 pub fn get_amqp_hostname() -> String {

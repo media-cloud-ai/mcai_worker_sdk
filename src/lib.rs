@@ -1,4 +1,3 @@
-
 extern crate futures;
 extern crate lapin_futures as lapin;
 extern crate reqwest;
@@ -13,17 +12,19 @@ mod emitter;
 use config::*;
 use futures::future::Future;
 use futures::Stream;
-use lapin::types::FieldTable;
-use std::{thread, time};
-use std::net::ToSocketAddrs;
-use tokio_core::reactor::Core;
-use tokio_core::net::TcpStream;
-use lapin::client::ConnectionOptions;
 use lapin::channel::{BasicConsumeOptions, QueueDeclareOptions};
+use lapin::client::ConnectionOptions;
+use lapin::types::FieldTable;
+use std::net::ToSocketAddrs;
+use std::{thread, time};
+use tokio_core::net::TcpStream;
+use tokio_core::reactor::Core;
 
 pub trait MessageEvent {
   fn process(&self, _message: &str) -> Result<u64, MessageError>
-    where Self: std::marker::Sized {
+  where
+    Self: std::marker::Sized,
+  {
     Err(MessageError::NotImplemented())
   }
 }
@@ -60,67 +61,78 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
     let channel_name = amqp_queue;
 
     let state = core.run(
+      TcpStream::connect(&addr, &handle)
+        .and_then(|stream| {
+          lapin::client::Client::connect(
+            stream,
+            &ConnectionOptions {
+              username: amqp_username,
+              password: amqp_password,
+              vhost: amqp_vhost,
+              ..Default::default()
+            },
+          )
+        }).and_then(|(client, heartbeat_future_fn)| {
+          let heartbeat_client = client.clone();
+          handle.spawn(heartbeat_future_fn(&heartbeat_client).map_err(|_| ()));
 
-      TcpStream::connect(&addr, &handle).and_then(|stream| {
-        lapin::client::Client::connect(stream, &ConnectionOptions{
-          username: amqp_username,
-          password: amqp_password,
-          vhost: amqp_vhost,
-          ..Default::default()
-        })
-      }).and_then(|(client, heartbeat_future_fn)| {
-        let heartbeat_client = client.clone();
-        handle.spawn(heartbeat_future_fn(&heartbeat_client).map_err(|_| ()));
+          client.create_channel()
+        }).and_then(|channel| {
+          let id = channel.id;
+          println!("created channel with id: {}", id);
 
-        client.create_channel()
-      }).and_then(|channel| {
-        let id = channel.id;
-        println!("created channel with id: {}", id);
-        
-        let ch = channel.clone();
-        channel.queue_declare(&channel_name, &QueueDeclareOptions::default(), &FieldTable::new()).and_then(move |_| {
-          println!("channel {} declared queue {}", id, channel_name);
+          let ch = channel.clone();
+          channel
+            .queue_declare(
+              &channel_name,
+              &QueueDeclareOptions::default(),
+              &FieldTable::new(),
+            ).and_then(move |_| {
+              println!("channel {} declared queue {}", id, channel_name);
 
-          channel.basic_consume(&channel_name, "my_consumer", &BasicConsumeOptions::default(), &FieldTable::new())
-        }).and_then(|stream| {
-          stream.for_each(move |message| {
-            let data = std::str::from_utf8(&message.data).unwrap();
-            println!("got message: {}", data);
+              channel.basic_consume(
+                &channel_name,
+                "my_consumer",
+                &BasicConsumeOptions::default(),
+                &FieldTable::new(),
+              )
+            }).and_then(|stream| {
+              stream.for_each(move |message| {
+                let data = std::str::from_utf8(&message.data).unwrap();
+                println!("got message: {}", data);
 
-            match MessageEvent::process(message_event, data) {
-              Ok(job_id) => {
-                let msg = json!({
+                match MessageEvent::process(message_event, data) {
+                  Ok(job_id) => {
+                    let msg = json!({
                   "job_id": job_id,
                   "status": "completed"
                 });
-                emitter::publish(&amqp_completed_queue, msg.to_string());
-                ch.basic_ack(message.delivery_tag);
-              }
-              Err(error) => {
-                match error {
-                  MessageError::RequirementsError(msg) => {
-                    println!("{}", msg);
-                    ch.basic_reject(message.delivery_tag, true);
-                  },
-                  MessageError::NotImplemented() => {
-                    ch.basic_reject(message.delivery_tag, true);
-                  },
-                  MessageError::RuntimeError(msg) => {
-                    let content = json!({
+                    emitter::publish(&amqp_completed_queue, msg.to_string());
+                    ch.basic_ack(message.delivery_tag);
+                  }
+                  Err(error) => match error {
+                    MessageError::RequirementsError(msg) => {
+                      println!("{}", msg);
+                      ch.basic_reject(message.delivery_tag, true);
+                    }
+                    MessageError::NotImplemented() => {
+                      ch.basic_reject(message.delivery_tag, true);
+                    }
+                    MessageError::RuntimeError(msg) => {
+                      let content = json!({
                       "status": "error",
                       "message": msg
                     });
-                    emitter::publish(&amqp_error_queue, content.to_string());
-                    let requeue = false;
-                    ch.basic_reject(message.delivery_tag, requeue);
-                  }
+                      emitter::publish(&amqp_error_queue, content.to_string());
+                      let requeue = false;
+                      ch.basic_reject(message.delivery_tag, requeue);
+                    }
+                  },
                 }
-              }
-            }
-            Ok(())
-          })
-        })
-      })
+                Ok(())
+              })
+            })
+        }),
     );
 
     println!("{:?}", state);
