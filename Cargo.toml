@@ -1,7 +1,14 @@
 [package]
-name = "rs_amqp_worker"
+name = "amqp_worker"
 version = "0.1.0"
 authors = ["Marc-Antoine Arnaud <arnaud.marcantoine@gmail.com>"]
+description = "AMQP Worker to listen and provide trait to process message"
+keywords = ["AMQP", "micro-service"]
+license = "MIT"
+repository = "https://github.com/media-io/rs_amqp_worker"
+homepage = "https://github.com/media-io/rs_amqp_worker"
+documentation = "https://docs.rs/amqp_worker"
+readme = "../README.md"
 
 [dependencies]
 reqwest = "0.8.1"

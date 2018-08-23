@@ -1,1 +1,3 @@
-# rs_amqp_worker
+# Amqp Worker
+
+AMQP Worker to listen and provide trait to process message
