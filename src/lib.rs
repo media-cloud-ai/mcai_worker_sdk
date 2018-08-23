@@ -10,8 +10,8 @@ mod config;
 mod emitter;
 
 use config::*;
-use futures::future::Future;
 use futures::Stream;
+use futures::future::Future;
 use lapin::channel::{BasicConsumeOptions, QueueDeclareOptions};
 use lapin::client::ConnectionOptions;
 use lapin::types::FieldTable;
@@ -72,12 +72,14 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
               ..Default::default()
             },
           )
-        }).and_then(|(client, heartbeat_future_fn)| {
+        })
+        .and_then(|(client, heartbeat_future_fn)| {
           let heartbeat_client = client.clone();
           handle.spawn(heartbeat_future_fn(&heartbeat_client).map_err(|_| ()));
 
           client.create_channel()
-        }).and_then(|channel| {
+        })
+        .and_then(|channel| {
           let id = channel.id;
           println!("created channel with id: {}", id);
 
@@ -87,7 +89,8 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
               &channel_name,
               &QueueDeclareOptions::default(),
               &FieldTable::new(),
-            ).and_then(move |_| {
+            )
+            .and_then(move |_| {
               println!("channel {} declared queue {}", id, channel_name);
 
               channel.basic_consume(
@@ -96,7 +99,8 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
                 &BasicConsumeOptions::default(),
                 &FieldTable::new(),
               )
-            }).and_then(|stream| {
+            })
+            .and_then(|stream| {
               stream.for_each(move |message| {
                 let data = std::str::from_utf8(&message.data).unwrap();
                 println!("got message: {}", data);
