@@ -1,0 +1,1 @@
+# rs_amqp_worker
