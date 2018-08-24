@@ -33,13 +33,13 @@ pub fn get_amqp_vhost() -> String {
 }
 
 pub fn get_amqp_queue() -> String {
-  get_env_value!("AMQP_QUEUE", "job_http")
+  get_env_value!("AMQP_QUEUE", "job_undefined")
 }
 
 pub fn get_amqp_completed_queue() -> String {
-  get_env_value!("AMQP_COMPLETED_QUEUE", "job_http_completed")
+  get_env_value!("AMQP_COMPLETED_QUEUE", "job_undefined_completed")
 }
 
 pub fn get_amqp_error_queue() -> String {
-  get_env_value!("AMQP_ERROR_QUEUE", "job_http_error")
+  get_env_value!("AMQP_ERROR_QUEUE", "job_undefined_error")
 }
