@@ -37,7 +37,7 @@ pub fn publish(channel_name: &str, msg: String) {
         .and_then(|(client, _ /* heartbeat_future_fn */)| client.create_channel())
         .and_then(|channel| {
           let id = channel.id;
-          println!("created channel with id: {}", id);
+          debug!("created channel with id: {}", id);
 
           channel
             .queue_declare(
@@ -46,7 +46,7 @@ pub fn publish(channel_name: &str, msg: String) {
               &FieldTable::new(),
             )
             .and_then(move |_| {
-              println!("Publish message on {:?}", channel_name);
+              debug!("Publish message on {:?}", channel_name);
 
               channel
                 .basic_publish(
@@ -57,7 +57,7 @@ pub fn publish(channel_name: &str, msg: String) {
                   BasicProperties::default(),
                 )
                 .and_then(|result| {
-                  println!("{:?}", result);
+                  debug!("{:?}", result);
                   Ok(())
                 })
             })

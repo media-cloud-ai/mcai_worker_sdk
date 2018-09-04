@@ -1,4 +1,6 @@
 extern crate futures;
+#[macro_use]
+extern crate log;
 extern crate lapin_futures as lapin;
 extern crate reqwest;
 extern crate serde;
@@ -31,6 +33,7 @@ pub trait MessageEvent {
 
 pub enum MessageError {
   RuntimeError(String),
+  ProcessingError(u64, String),
   RequirementsError(String),
   NotImplemented(),
 }
@@ -46,12 +49,12 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
     let amqp_completed_queue = get_amqp_completed_queue();
     let amqp_error_queue = get_amqp_error_queue();
 
-    println!("Start connection with configuration:");
-    println!("AMQP HOSTNAME: {}", amqp_hostname);
-    println!("AMQP PORT: {}", amqp_port);
-    println!("AMQP USERNAME: {}", amqp_username);
-    println!("AMQP VHOST: {}", amqp_vhost);
-    println!("AMQP QUEUE: {}", amqp_queue);
+    info!("Start connection with configuration:");
+    debug!("AMQP HOSTNAME: {}", amqp_hostname);
+    debug!("AMQP PORT: {}", amqp_port);
+    debug!("AMQP USERNAME: {}", amqp_username);
+    debug!("AMQP VHOST: {}", amqp_vhost);
+    debug!("AMQP QUEUE: {}", amqp_queue);
 
     // create the reactor
     let mut core = Core::new().unwrap();
@@ -81,7 +84,7 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
         })
         .and_then(|channel| {
           let id = channel.id;
-          println!("created channel with id: {}", id);
+          debug!("created channel with id: {}", id);
 
           let ch = channel.clone();
           channel
@@ -91,7 +94,7 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
               &FieldTable::new(),
             )
             .and_then(move |_| {
-              println!("channel {} declared queue {}", id, channel_name);
+              debug!("channel {} declared queue {}", id, channel_name);
 
               channel.basic_consume(
                 &channel_name,
@@ -103,7 +106,7 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
             .and_then(|stream| {
               stream.for_each(move |message| {
                 let data = std::str::from_utf8(&message.data).unwrap();
-                println!("got message: {}", data);
+                debug!("got message: {}", data);
 
                 match MessageEvent::process(message_event, data) {
                   Ok(job_id) => {
@@ -116,11 +119,21 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
                   }
                   Err(error) => match error {
                     MessageError::RequirementsError(msg) => {
-                      println!("{}", msg);
+                      error!("{}", msg);
                       ch.basic_reject(message.delivery_tag, true);
                     }
                     MessageError::NotImplemented() => {
                       ch.basic_reject(message.delivery_tag, true);
+                    }
+                    MessageError::ProcessingError(job_id, msg) => {
+                      let content = json!({
+                      "status": "error",
+                      "job_id": job_id,
+                      "message": msg
+                    });
+                      emitter::publish(&amqp_error_queue, content.to_string());
+                      let requeue = false;
+                      ch.basic_reject(message.delivery_tag, requeue);
                     }
                     MessageError::RuntimeError(msg) => {
                       let content = json!({
@@ -139,7 +152,7 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
         }),
     );
 
-    println!("{:?}", state);
+    warn!("{:?}", state);
     let sleep_duration = time::Duration::new(1, 0);
     thread::sleep(sleep_duration);
   }
