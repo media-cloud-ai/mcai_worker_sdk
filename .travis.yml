@@ -1,9 +1,8 @@
 language: rust
 
 rust:
-  - 1.26.0
-  - 1.27.0
-  - 1.28.0
+  - 1.29.0
+  - 1.30.1
   - stable
   - beta
   - nightly
@@ -24,8 +23,8 @@ matrix:
         - cargo fmt -- --write-mode=diff
 
     # Clippy
-    - env: CLIPPY_VERSION="0.0.211"
-      rust: nightly-2018-06-29
+    - env: CLIPPY_VERSION="0.0.212"
+      rust: nightly
       install:
       - travis_wait cargo install clippy --force --version $CLIPPY_VERSION || echo "clippy already installed"
       script:
