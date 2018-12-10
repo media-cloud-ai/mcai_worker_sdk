@@ -9,12 +9,12 @@ extern crate serde_json;
 extern crate tokio_core;
 
 mod config;
-mod emitter;
 
 use config::*;
 use futures::Stream;
 use futures::future::Future;
-use lapin::channel::{BasicConsumeOptions, QueueDeclareOptions};
+
+use lapin::channel::{BasicConsumeOptions, BasicProperties, BasicPublishOptions, QueueDeclareOptions};
 use lapin::client::ConnectionOptions;
 use lapin::types::FieldTable;
 use std::net::ToSocketAddrs;
@@ -89,6 +89,21 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
           debug!("created channel with id: {}", id);
 
           let ch = channel.clone();
+
+          channel
+            .queue_declare(
+              &amqp_completed_queue,
+              &QueueDeclareOptions::default(),
+              &FieldTable::new(),
+            );
+
+          channel
+            .queue_declare(
+              &amqp_error_queue,
+              &QueueDeclareOptions::default(),
+              &FieldTable::new(),
+            );
+
           channel
             .queue_declare(
               &channel_name,
@@ -113,11 +128,22 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
                 match MessageEvent::process(message_event, data) {
                   Ok(job_id) => {
                     let msg = json!({
-                  "job_id": job_id,
-                  "status": "completed"
-                });
-                    emitter::publish(&amqp_completed_queue, msg.to_string());
-                    ch.basic_ack(message.delivery_tag);
+                      "job_id": job_id,
+                      "status": "completed"
+                    });
+
+                    if let Ok(_) = ch.basic_publish(
+                      "", // exchange
+                      &amqp_completed_queue,
+                      msg.to_string().as_str().as_bytes(),
+                      &BasicPublishOptions::default(),
+                      BasicProperties::default(),
+                    ).wait() {
+                      ch.basic_ack(message.delivery_tag);
+                    } else  {
+                      let requeue = true;
+                      ch.basic_reject(message.delivery_tag, requeue);
+                    };
                   }
                   Err(error) => match error {
                     MessageError::RequirementsError(msg) => {
@@ -133,18 +159,38 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
                       "job_id": job_id,
                       "message": msg
                     });
-                      emitter::publish(&amqp_error_queue, content.to_string());
-                      let requeue = false;
-                      ch.basic_reject(message.delivery_tag, requeue);
+                      if let Ok(_) = ch.basic_publish(
+                        "", // exchange
+                        &amqp_error_queue,
+                        content.to_string().as_str().as_bytes(),
+                        &BasicPublishOptions::default(),
+                        BasicProperties::default(),
+                      ).wait() {
+                        let requeue = false;
+                        ch.basic_reject(message.delivery_tag, requeue);
+                      } else  {
+                        let requeue = true;
+                        ch.basic_reject(message.delivery_tag, requeue);
+                      };
                     }
                     MessageError::RuntimeError(msg) => {
                       let content = json!({
                       "status": "error",
                       "message": msg
                     });
-                      emitter::publish(&amqp_error_queue, content.to_string());
-                      let requeue = false;
-                      ch.basic_reject(message.delivery_tag, requeue);
+                      if let Ok(_) = ch.basic_publish(
+                        "", // exchange
+                        &amqp_error_queue,
+                        content.to_string().as_str().as_bytes(),
+                        &BasicPublishOptions::default(),
+                        BasicProperties::default(),
+                      ).wait() {
+                        let requeue = false;
+                        ch.basic_reject(message.delivery_tag, requeue);
+                      } else  {
+                        let requeue = true;
+                        ch.basic_reject(message.delivery_tag, requeue);
+                      };
                     }
                   },
                 }
