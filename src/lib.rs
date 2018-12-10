@@ -40,6 +40,9 @@ pub enum MessageError {
 }
 
 pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
+  let mut core = Core::new().unwrap();
+  let handle = core.handle();
+
   loop {
     let amqp_hostname = get_amqp_hostname();
     let amqp_port = get_amqp_port();
@@ -58,8 +61,6 @@ pub fn start_worker<ME: MessageEvent>(message_event: &ME) {
     debug!("AMQP QUEUE: {}", amqp_queue);
 
     // create the reactor
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
     let address = amqp_hostname.clone() + ":" + amqp_port.as_str();
     let addr = address.to_socket_addrs().unwrap().next().unwrap();
     let channel_name = amqp_queue;
