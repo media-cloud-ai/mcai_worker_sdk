@@ -1,4 +1,3 @@
-
 extern crate failure;
 extern crate futures;
 #[macro_use]
@@ -16,7 +15,9 @@ use config::*;
 use failure::Error;
 use futures::future::Future;
 use futures::Stream;
-use lapin::channel::{BasicConsumeOptions, BasicProperties, BasicPublishOptions, QueueDeclareOptions};
+use lapin::channel::{
+  BasicConsumeOptions, BasicProperties, BasicPublishOptions, QueueDeclareOptions,
+};
 use lapin::client::ConnectionOptions;
 use lapin::types::FieldTable;
 use std::net::ToSocketAddrs;
@@ -42,7 +43,9 @@ pub enum MessageError {
 }
 
 pub fn start_worker<ME: MessageEvent>(message_event: &'static ME)
-  where ME: std::marker::Sync {
+where
+  ME: std::marker::Sync,
+{
   loop {
     let amqp_hostname = get_amqp_hostname();
     let amqp_port = get_amqp_port();
@@ -75,7 +78,8 @@ pub fn start_worker<ME: MessageEvent>(message_event: &'static ME)
               vhost: amqp_vhost,
               ..Default::default()
             },
-          ).map_err(Error::from)
+          )
+          .map_err(Error::from)
         })
         .and_then(|(client, heartbeat)| {
           tokio::spawn(heartbeat.map_err(|e| eprintln!("heartbeat error: {}", e)));
@@ -88,114 +92,127 @@ pub fn start_worker<ME: MessageEvent>(message_event: &'static ME)
           let ch = channel.clone();
 
           channel
-          .queue_declare(
-            &amqp_completed_queue,
-            QueueDeclareOptions::default(),
-            FieldTable::new(),
-          ).and_then(move |_queue| {
-            channel
             .queue_declare(
-              &amqp_error_queue,
+              &amqp_completed_queue,
               QueueDeclareOptions::default(),
               FieldTable::new(),
-            ).and_then(move |_queue| {
-
+            )
+            .and_then(move |_queue| {
               channel
                 .queue_declare(
-                  &amqp_queue,
+                  &amqp_error_queue,
                   QueueDeclareOptions::default(),
                   FieldTable::new(),
                 )
-                .and_then(move |queue| {
-                  info!("channel {} declared queue {}", id, amqp_queue);
+                .and_then(move |_queue| {
+                  channel
+                    .queue_declare(
+                      &amqp_queue,
+                      QueueDeclareOptions::default(),
+                      FieldTable::new(),
+                    )
+                    .and_then(move |queue| {
+                      info!("channel {} declared queue {}", id, amqp_queue);
 
-                  channel.basic_consume(
-                    &queue,
-                    "amqp_worker",
-                    BasicConsumeOptions::default(),
-                    FieldTable::new(),
-                  )
-                })
-                .and_then(move |stream| {
-                  warn!("start listening stream");
-                  stream.for_each(move |message| {
-                    info!("raw message: {:?}", message);
-                    let data = std::str::from_utf8(&message.data).unwrap();
-                    info!("got message: {}", data);
+                      channel.basic_consume(
+                        &queue,
+                        "amqp_worker",
+                        BasicConsumeOptions::default(),
+                        FieldTable::new(),
+                      )
+                    })
+                    .and_then(move |stream| {
+                      warn!("start listening stream");
+                      stream.for_each(move |message| {
+                        info!("raw message: {:?}", message);
+                        let data = std::str::from_utf8(&message.data).unwrap();
+                        info!("got message: {}", data);
 
-                    match MessageEvent::process(message_event, data) {
-                      Ok(job_id) => {
-                        let msg = json!({
-                          "job_id": job_id,
-                          "status": "completed"
-                        });
+                        match MessageEvent::process(message_event, data) {
+                          Ok(job_id) => {
+                            let msg = json!({
+                              "job_id": job_id,
+                              "status": "completed"
+                            });
 
-                        let result = ch.basic_publish(
-                            "", // exchange
-                            &amqp_completed_queue,
-                            msg.to_string().as_str().as_bytes().to_vec(),
-                            BasicPublishOptions::default(),
-                            BasicProperties::default(),
-                          ).wait();
+                            let result = ch
+                              .basic_publish(
+                                "", // exchange
+                                &amqp_completed_queue,
+                                msg.to_string().as_str().as_bytes().to_vec(),
+                                BasicPublishOptions::default(),
+                                BasicProperties::default(),
+                              )
+                              .wait();
 
-                        if result.is_ok() {
-                          ch.basic_ack(message.delivery_tag, false);
-                        } else  {
-                          ch.basic_reject(message.delivery_tag, true /*requeue*/);
+                            if result.is_ok() {
+                              ch.basic_ack(message.delivery_tag, false);
+                            } else {
+                              ch.basic_reject(message.delivery_tag, true /*requeue*/);
+                            }
+                          }
+                          Err(error) => match error {
+                            MessageError::RequirementsError(msg) => {
+                              error!("{}", msg);
+                              ch.basic_reject(message.delivery_tag, true /*requeue*/);
+                            }
+                            MessageError::NotImplemented() => {
+                              ch.basic_reject(message.delivery_tag, true /*requeue*/);
+                            }
+                            MessageError::ProcessingError(job_id, msg) => {
+                              let content = json!({
+                                "status": "error",
+                                "job_id": job_id,
+                                "message": msg
+                              });
+                              if ch
+                                .basic_publish(
+                                  "", // exchange
+                                  &amqp_error_queue,
+                                  content.to_string().as_str().as_bytes().to_vec(),
+                                  BasicPublishOptions::default(),
+                                  BasicProperties::default(),
+                                )
+                                .wait()
+                                .is_ok()
+                              {
+                                ch.basic_reject(message.delivery_tag, false /*not requeue*/);
+                              } else {
+                                ch.basic_reject(message.delivery_tag, true /*requeue*/);
+                              };
+                            }
+                            MessageError::RuntimeError(msg) => {
+                              let content = json!({
+                                "status": "error",
+                                "message": msg
+                              });
+                              if ch
+                                .basic_publish(
+                                  "", // exchange
+                                  &amqp_error_queue,
+                                  content.to_string().as_str().as_bytes().to_vec(),
+                                  BasicPublishOptions::default(),
+                                  BasicProperties::default(),
+                                )
+                                .wait()
+                                .is_ok()
+                              {
+                                ch.basic_reject(message.delivery_tag, false /*not requeue*/);
+                              } else {
+                                ch.basic_reject(message.delivery_tag, true /*requeue*/);
+                              };
+                            }
+                          },
                         }
-                      }
-                      Err(error) => match error {
-                        MessageError::RequirementsError(msg) => {
-                          error!("{}", msg);
-                          ch.basic_reject(message.delivery_tag, true /*requeue*/);
-                        }
-                        MessageError::NotImplemented() => {
-                          ch.basic_reject(message.delivery_tag, true /*requeue*/);
-                        }
-                        MessageError::ProcessingError(job_id, msg) => {
-                          let content = json!({
-                          "status": "error",
-                          "job_id": job_id,
-                          "message": msg
-                        });
-                          if ch.basic_publish(
-                            "", // exchange
-                            &amqp_error_queue,
-                            content.to_string().as_str().as_bytes().to_vec(),
-                            BasicPublishOptions::default(),
-                            BasicProperties::default(),
-                          ).wait().is_ok() {
-                            ch.basic_reject(message.delivery_tag, false /*not requeue*/);
-                          } else  {
-                            ch.basic_reject(message.delivery_tag, true /*requeue*/);
-                          };
-                        }
-                        MessageError::RuntimeError(msg) => {
-                          let content = json!({
-                          "status": "error",
-                          "message": msg
-                        });
-                          if ch.basic_publish(
-                            "", // exchange
-                            &amqp_error_queue,
-                            content.to_string().as_str().as_bytes().to_vec(),
-                            BasicPublishOptions::default(),
-                            BasicProperties::default(),
-                          ).wait().is_ok() {
-                            ch.basic_reject(message.delivery_tag, false /*not requeue*/);
-                          } else {
-                            ch.basic_reject(message.delivery_tag, true /*requeue*/);
-                          };
-                        }
-                      },
-                    }
 
-                    Ok(())
-                  })
+                        Ok(())
+                      })
+                    })
                 })
             })
-          }).map_err(Error::from)
-        }).map_err(Error::from)
+            .map_err(Error::from)
+        })
+        .map_err(Error::from),
     );
 
     warn!("{:?}", state);
