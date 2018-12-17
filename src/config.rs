@@ -37,9 +37,9 @@ pub fn get_amqp_queue() -> String {
 }
 
 pub fn get_amqp_completed_queue() -> String {
-  get_env_value!("AMQP_COMPLETED_QUEUE", "job_undefined_completed")
+  get_amqp_queue() + "_completed"
 }
 
 pub fn get_amqp_error_queue() -> String {
-  get_env_value!("AMQP_ERROR_QUEUE", "job_undefined_error")
+  get_amqp_queue() + "_error"
 }
