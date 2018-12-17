@@ -1,6 +1,6 @@
 [package]
 name = "amqp_worker"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Marc-Antoine Arnaud <arnaud.marcantoine@gmail.com>"]
 description = "AMQP Worker to listen and provide trait to process message"
 keywords = ["AMQP", "micro-service"]

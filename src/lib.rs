@@ -34,7 +34,7 @@ pub trait MessageEvent {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum MessageError {
   RuntimeError(String),
   ProcessingError(u64, String),
