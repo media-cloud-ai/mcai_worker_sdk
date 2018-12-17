@@ -96,22 +96,22 @@ where
               &amqp_completed_queue,
               QueueDeclareOptions::default(),
               FieldTable::new(),
+            );
+
+          channel
+            .queue_declare(
+              &amqp_error_queue,
+              QueueDeclareOptions::default(),
+              FieldTable::new(),
+            );
+
+          channel
+            .queue_declare(
+              &amqp_queue,
+              QueueDeclareOptions::default(),
+              FieldTable::new(),
             )
-            .and_then(move |_queue| {
-              channel
-                .queue_declare(
-                  &amqp_error_queue,
-                  QueueDeclareOptions::default(),
-                  FieldTable::new(),
-                )
-                .and_then(move |_queue| {
-                  channel
-                    .queue_declare(
-                      &amqp_queue,
-                      QueueDeclareOptions::default(),
-                      FieldTable::new(),
-                    )
-                    .and_then(move |queue| {
+            .and_then(move |queue| {
                       info!("channel {} declared queue {}", id, amqp_queue);
 
                       channel.basic_consume(
@@ -120,8 +120,8 @@ where
                         BasicConsumeOptions::default(),
                         FieldTable::new(),
                       )
-                    })
-                    .and_then(move |stream| {
+            })
+            .and_then(move |stream| {
                       warn!("start listening stream");
                       stream.for_each(move |message| {
                         info!("raw message: {:?}", message);
@@ -207,8 +207,6 @@ where
 
                         Ok(())
                       })
-                    })
-                })
             })
             .map_err(Error::from)
         })
