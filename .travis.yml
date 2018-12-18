@@ -3,6 +3,7 @@ language: rust
 rust:
   - 1.29.0
   - 1.30.1
+  - 1.31.0
   - stable
   - beta
   - nightly
@@ -12,21 +13,18 @@ matrix:
     - rust: nightly
   include:
     # Rustfmt
-    - env: RUSTFMT_VERSION="0.4.1"
-      rust: nightly-2018-04-01
+    - rust: stable
       install:
         - rustup component add rustfmt-preview
-        - cargo install rustfmt-nightly --force --version $RUSTFMT_VERSION || echo "rustfmt already installed"
       before_script:
-        - cargo-fmt fmt -- --version
+        - cargo fmt -- --version
       script:
-        - cargo fmt -- --write-mode=diff
+        - cargo fmt -- --check
 
     # Clippy
-    - env: CLIPPY_VERSION="0.0.212"
-      rust: nightly
+    - rust: stable
       install:
-      - travis_wait cargo install clippy --force --version $CLIPPY_VERSION || echo "clippy already installed"
+        - rustup component add clippy-preview
       script:
         # Fail if clippy output contains "error:" or "warning:"
         - cargo clippy 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
