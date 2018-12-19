@@ -53,10 +53,10 @@ impl Job {
 
   pub fn check_requirements(&self) -> Result<(), MessageError> {
     for param in self.parameters.iter() {
-      Parameter::RequirementParam { id, value, .. } = param {
+      if let Parameter::RequirementParam { id, value, default: _ } = param {
         if id == "requirements" {
           if let Some(Requirement { paths: Some(paths) }) = value {
-            for path in &paths.iter() {
+            for path in paths.iter() {
               let p = Path::new(path);
               if !p.exists() {
                 return Err(MessageError::RequirementsError(format!(
