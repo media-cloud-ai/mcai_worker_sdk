@@ -53,12 +53,7 @@ impl Job {
 
   pub fn check_requirements(&self) -> Result<(), MessageError> {
     for param in self.parameters.iter() {
-      if let Parameter::RequirementParam {
-        id,
-        value,
-        default: _,
-      } = param
-      {
+      if let Parameter::RequirementParam { id, value, .. } = param {
         if id == "requirements" {
           if let Some(Requirement { paths: Some(paths) }) = value {
             for path in paths.iter() {
