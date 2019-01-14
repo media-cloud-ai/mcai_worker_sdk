@@ -9,11 +9,23 @@ pub struct Requirement {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Parameter {
+  #[serde(rename = "boolean")]
+  BooleanParam {
+    id: String,
+    default: Option<bool>,
+    value: Option<bool>,
+  },
   #[serde(rename = "credential")]
   CredentialParam {
     id: String,
     default: Option<String>,
     value: Option<String>,
+  },
+  #[serde(rename = "integer")]
+  IntegerParam {
+    id: String,
+    default: Option<i64>,
+    value: Option<i64>,
   },
   #[serde(rename = "paths")]
   PathsParam {
@@ -47,9 +59,39 @@ impl Job {
     parsed.map_err(|e| MessageError::RuntimeError(format!("unable to parse input message: {:?}", e)))
   }
 
+  pub fn get_boolean_parameter(&self, key: &str) -> Option<bool> {
+    for param in self.parameters.iter() {
+      if let Parameter::BooleanParam { id, default, value } = param {
+        if id == key {
+          if let Some(ref v) = value {
+            return Some(v.clone());
+          } else {
+            return default.clone();
+          }
+        }
+      }
+    }
+    None
+  }
+
   pub fn get_credential_parameter(&self, key: &str) -> Option<String> {
     for param in self.parameters.iter() {
       if let Parameter::CredentialParam { id, default, value } = param {
+        if id == key {
+          if let Some(ref v) = value {
+            return Some(v.clone());
+          } else {
+            return default.clone();
+          }
+        }
+      }
+    }
+    None
+  }
+
+  pub fn get_integer_parameter(&self, key: &str) -> Option<i64> {
+    for param in self.parameters.iter() {
+      if let Parameter::IntegerParam { id, default, value } = param {
         if id == key {
           if let Some(ref v) = value {
             return Some(v.clone());
