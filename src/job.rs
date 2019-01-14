@@ -51,6 +51,21 @@ impl Job {
     None
   }
 
+  pub fn get_paths_parameter(&self, key: &str) -> Option<Vec<String>> {
+    for param in self.parameters.iter() {
+      if let Parameter::PathsParam { id, default, value } = param {
+        if id == key {
+          if let Some(ref v) = value {
+            return Some(v.clone());
+          } else {
+            return default.clone();
+          }
+        }
+      }
+    }
+    None
+  }
+
   pub fn check_requirements(&self) -> Result<(), MessageError> {
     for param in self.parameters.iter() {
       if let Parameter::RequirementParam { id, value, .. } = param {
