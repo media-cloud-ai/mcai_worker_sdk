@@ -177,7 +177,7 @@ where
                         .wait()
                         .is_ok()
                       {
-                        ch.basic_reject(message.delivery_tag, false /*not requeue*/);
+                        ch.basic_ack(message.delivery_tag, false /*not requeue*/);
                       } else {
                         ch.basic_reject(message.delivery_tag, true /*requeue*/);
                       };
@@ -198,7 +198,7 @@ where
                         .wait()
                         .is_ok()
                       {
-                        ch.basic_reject(message.delivery_tag, false /*not requeue*/);
+                        ch.basic_ack(message.delivery_tag, false /*not requeue*/);
                       } else {
                         ch.basic_reject(message.delivery_tag, true /*requeue*/);
                       };
