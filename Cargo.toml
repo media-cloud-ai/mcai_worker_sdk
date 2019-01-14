@@ -1,6 +1,6 @@
 [package]
 name = "amqp_worker"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Marc-Antoine Arnaud <arnaud.marcantoine@gmail.com>"]
 description = "AMQP Worker to listen and provide trait to process message"
 keywords = ["AMQP", "micro-service"]
@@ -15,7 +15,7 @@ failure = "^0.1"
 futures = "^0.1"
 lapin-futures = "^0.15"
 log = "0.4.5"
-reqwest = "0.8.1"
+reqwest = "0.9.8"
 serde = "^1.0"
 serde_derive = "^1.0"
 serde_json = "^1.0"
