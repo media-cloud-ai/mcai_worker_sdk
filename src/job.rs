@@ -9,8 +9,8 @@ pub struct Requirement {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Parameter {
-  #[serde(rename = "string")]
-  StringParam {
+  #[serde(rename = "credential")]
+  CredentialParam {
     id: String,
     default: Option<String>,
     value: Option<String>,
@@ -27,6 +27,12 @@ pub enum Parameter {
     default: Option<Requirement>,
     value: Option<Requirement>,
   },
+  #[serde(rename = "string")]
+  StringParam {
+    id: String,
+    default: Option<String>,
+    value: Option<String>,
+  },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,6 +42,26 @@ pub struct Job {
 }
 
 impl Job {
+  pub fn new(message: &str) -> Result<Self, MessageError> {
+    let parsed: Result<Job, _> = serde_json::from_str(message);
+    parsed.map_err(|e| MessageError::RuntimeError(format!("unable to parse input message: {:?}", e)))
+  }
+
+  pub fn get_credential_parameter(&self, key: &str) -> Option<String> {
+    for param in self.parameters.iter() {
+      if let Parameter::CredentialParam { id, default, value } = param {
+        if id == key {
+          if let Some(ref v) = value {
+            return Some(v.clone());
+          } else {
+            return default.clone();
+          }
+        }
+      }
+    }
+    None
+  }
+
   pub fn get_string_parameter(&self, key: &str) -> Option<String> {
     for param in self.parameters.iter() {
       if let Parameter::StringParam { id, default, value } = param {
