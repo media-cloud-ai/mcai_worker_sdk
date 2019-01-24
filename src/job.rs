@@ -56,7 +56,8 @@ pub struct Job {
 impl Job {
   pub fn new(message: &str) -> Result<Self, MessageError> {
     let parsed: Result<Job, _> = serde_json::from_str(message);
-    parsed.map_err(|e| MessageError::RuntimeError(format!("unable to parse input message: {:?}", e)))
+    parsed
+      .map_err(|e| MessageError::RuntimeError(format!("unable to parse input message: {:?}", e)))
   }
 
   pub fn get_boolean_parameter(&self, key: &str) -> Option<bool> {
@@ -64,9 +65,9 @@ impl Job {
       if let Parameter::BooleanParam { id, default, value } = param {
         if id == key {
           if let Some(ref v) = value {
-            return Some(v.clone());
+            return Some(*v);
           } else {
-            return default.clone();
+            return *default;
           }
         }
       }
@@ -79,9 +80,9 @@ impl Job {
       if let Parameter::CredentialParam { id, default, value } = param {
         if id == key {
           if let Some(ref v) = value {
-            return Some(v.clone());
+            return Some(*v);
           } else {
-            return default.clone();
+            return *default;
           }
         }
       }
@@ -94,9 +95,9 @@ impl Job {
       if let Parameter::IntegerParam { id, default, value } = param {
         if id == key {
           if let Some(ref v) = value {
-            return Some(v.clone());
+            return Some(*v);
           } else {
-            return default.clone();
+            return *default;
           }
         }
       }
@@ -109,9 +110,9 @@ impl Job {
       if let Parameter::StringParam { id, default, value } = param {
         if id == key {
           if let Some(ref v) = value {
-            return Some(v.clone());
+            return Some(*v);
           } else {
-            return default.clone();
+            return *default;
           }
         }
       }
