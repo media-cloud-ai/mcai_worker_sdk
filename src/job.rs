@@ -1,3 +1,4 @@
+use config;
 use std::path::Path;
 use MessageError;
 
@@ -53,6 +54,81 @@ pub struct Job {
   pub parameters: Vec<Parameter>,
 }
 
+#[derive(Debug)]
+pub struct Credential {
+  pub key: String,
+}
+
+#[derive(Debug, Serialize)]
+struct Session {
+  email: String,
+  password: String
+}
+
+#[derive(Debug, Serialize)]
+struct SessionBody {
+  session: Session
+}
+
+#[derive(Debug, Deserialize)]
+struct SessionResponseBody {
+  access_token: String
+}
+
+#[derive(Debug, Deserialize)]
+struct DataResponseBody {
+  id: u32,
+  key: String,
+  value: String,
+  inserted_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ValueResponseBody {
+  data: DataResponseBody
+}
+
+impl Credential {
+  pub fn request_value(&self, job: &Job) -> Result<String, MessageError> {
+    let client = reqwest::Client::builder().build().unwrap();
+    let backend_endpoint = config::get_backend_hostname();
+    let backend_username = config::get_backend_username();
+    let backend_password = config::get_backend_password();
+
+    let session_body = SessionBody {
+      session: Session {
+        email: backend_username,
+        password: backend_password
+      }
+    };
+
+    let mut response =
+      client
+      .post(&(backend_endpoint.clone() + "/sessions"))
+      .json(&session_body)
+      .send()
+      .map_err(|e|
+        MessageError::ProcessingError(job.job_id, e.to_string())
+      )?;
+
+    let r : SessionResponseBody = response.json().map_err(|e| MessageError::ProcessingError(job.job_id, e.to_string()))?;
+    let token = r.access_token;
+
+    let mut response =
+      client
+      .get(&(backend_endpoint + "/credentials/" + &self.key))
+      // .bearer_auth(token)
+      .header("Authorization", token)
+      .send()
+      .map_err(|e|
+        MessageError::ProcessingError(job.job_id, e.to_string())
+      )?;
+
+    let resp_value : ValueResponseBody = response.json().map_err(|e| MessageError::ProcessingError(job.job_id, e.to_string()))?;
+    Ok(resp_value.data.value)
+  }
+}
+
 impl Job {
   pub fn new(message: &str) -> Result<Self, MessageError> {
     let parsed: Result<Job, _> = serde_json::from_str(message);
@@ -75,14 +151,14 @@ impl Job {
     None
   }
 
-  pub fn get_credential_parameter(&self, key: &str) -> Option<String> {
+  pub fn get_credential_parameter(&self, key: &str) -> Option<Credential> {
     for param in self.parameters.iter() {
       if let Parameter::CredentialParam { id, default, value } = param {
         if id == key {
           if let Some(ref v) = value {
-            return Some(*v);
+            return Some(Credential{key: v.to_string()});
           } else {
-            return *default;
+            return default.clone().map(|key| Credential{key});
           }
         }
       }
@@ -110,9 +186,9 @@ impl Job {
       if let Parameter::StringParam { id, default, value } = param {
         if id == key {
           if let Some(ref v) = value {
-            return Some(*v);
+            return Some(v.to_string());
           } else {
-            return *default;
+            return default.clone();
           }
         }
       }

@@ -43,3 +43,15 @@ pub fn get_amqp_completed_queue() -> String {
 pub fn get_amqp_error_queue() -> String {
   get_amqp_queue() + "_error"
 }
+
+pub fn get_backend_hostname() -> String {
+  get_env_value!("BACKEND_HOSTNAME", "http://127.0.0.1:4000/api")
+}
+
+pub fn get_backend_username() -> String {
+  get_env_value!("BACKEND_USERNAME", "")
+}
+
+pub fn get_backend_password() -> String {
+  get_env_value!("BACKEND_PASSWORD", "")
+}
