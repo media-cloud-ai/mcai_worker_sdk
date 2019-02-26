@@ -62,17 +62,17 @@ pub struct Credential {
 #[derive(Debug, Serialize)]
 struct Session {
   email: String,
-  password: String
+  password: String,
 }
 
 #[derive(Debug, Serialize)]
 struct SessionBody {
-  session: Session
+  session: Session,
 }
 
 #[derive(Debug, Deserialize)]
 struct SessionResponseBody {
-  access_token: String
+  access_token: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -85,7 +85,7 @@ struct DataResponseBody {
 
 #[derive(Debug, Deserialize)]
 struct ValueResponseBody {
-  data: DataResponseBody
+  data: DataResponseBody,
 }
 
 impl Credential {
@@ -98,33 +98,31 @@ impl Credential {
     let session_body = SessionBody {
       session: Session {
         email: backend_username,
-        password: backend_password
-      }
+        password: backend_password,
+      },
     };
 
-    let mut response =
-      client
+    let mut response = client
       .post(&(backend_endpoint.clone() + "/sessions"))
       .json(&session_body)
       .send()
-      .map_err(|e|
-        MessageError::ProcessingError(job.job_id, e.to_string())
-      )?;
+      .map_err(|e| MessageError::ProcessingError(job.job_id, e.to_string()))?;
 
-    let r : SessionResponseBody = response.json().map_err(|e| MessageError::ProcessingError(job.job_id, e.to_string()))?;
+    let r: SessionResponseBody = response
+      .json()
+      .map_err(|e| MessageError::ProcessingError(job.job_id, e.to_string()))?;
     let token = r.access_token;
 
-    let mut response =
-      client
+    let mut response = client
       .get(&(backend_endpoint + "/credentials/" + &self.key))
       // .bearer_auth(token)
       .header("Authorization", token)
       .send()
-      .map_err(|e|
-        MessageError::ProcessingError(job.job_id, e.to_string())
-      )?;
+      .map_err(|e| MessageError::ProcessingError(job.job_id, e.to_string()))?;
 
-    let resp_value : ValueResponseBody = response.json().map_err(|e| MessageError::ProcessingError(job.job_id, e.to_string()))?;
+    let resp_value: ValueResponseBody = response
+      .json()
+      .map_err(|e| MessageError::ProcessingError(job.job_id, e.to_string()))?;
     Ok(resp_value.data.value)
   }
 }
@@ -156,9 +154,9 @@ impl Job {
       if let Parameter::CredentialParam { id, default, value } = param {
         if id == key {
           if let Some(ref v) = value {
-            return Some(Credential{key: v.to_string()});
+            return Some(Credential { key: v.to_string() });
           } else {
-            return default.clone().map(|key| Credential{key});
+            return default.clone().map(|key| Credential { key });
           }
         }
       }
