@@ -147,11 +147,17 @@ where
                       .wait();
 
                     if result.is_ok() {
-                      if let Err(msg) = ch.basic_ack(message.delivery_tag, false /*not requeue*/).wait() {
+                      if let Err(msg) = ch
+                        .basic_ack(message.delivery_tag, false /*not requeue*/)
+                        .wait()
+                      {
                         error!("Unable to ack message {:?}", msg);
                       }
                     } else {
-                      if let Err(msg) = ch.basic_reject(message.delivery_tag, true /*requeue*/).wait() {
+                      if let Err(msg) = ch
+                        .basic_reject(message.delivery_tag, true /*requeue*/)
+                        .wait()
+                      {
                         error!("Unable to reject message {:?}", msg);
                       }
                     }
@@ -159,12 +165,18 @@ where
                   Err(error) => match error {
                     MessageError::RequirementsError(msg) => {
                       error!("{}", msg);
-                      if let Err(msg) = ch.basic_reject(message.delivery_tag, true /*requeue*/).wait() {
+                      if let Err(msg) = ch
+                        .basic_reject(message.delivery_tag, true /*requeue*/)
+                        .wait()
+                      {
                         error!("Unable to reject message {:?}", msg);
                       }
                     }
                     MessageError::NotImplemented() => {
-                      if let Err(msg) = ch.basic_reject(message.delivery_tag, true /*requeue*/).wait() {
+                      if let Err(msg) = ch
+                        .basic_reject(message.delivery_tag, true /*requeue*/)
+                        .wait()
+                      {
                         error!("Unable to reject message {:?}", msg);
                       }
                     }
@@ -185,11 +197,17 @@ where
                         .wait()
                         .is_ok()
                       {
-                        if let Err(msg) = ch.basic_ack(message.delivery_tag, false /*not requeue*/).wait() {
+                        if let Err(msg) = ch
+                          .basic_ack(message.delivery_tag, false /*not requeue*/)
+                          .wait()
+                        {
                           error!("Unable to ack message {:?}", msg);
                         }
                       } else {
-                        if let Err(msg) = ch.basic_reject(message.delivery_tag, true /*requeue*/).wait() {
+                        if let Err(msg) = ch
+                          .basic_reject(message.delivery_tag, true /*requeue*/)
+                          .wait()
+                        {
                           error!("Unable to reject message {:?}", msg);
                         }
                       };
@@ -210,11 +228,17 @@ where
                         .wait()
                         .is_ok()
                       {
-                        if let Err(msg) = ch.basic_ack(message.delivery_tag, false /*not requeue*/).wait() {
+                        if let Err(msg) = ch
+                          .basic_ack(message.delivery_tag, false /*not requeue*/)
+                          .wait()
+                        {
                           error!("Unable to ack message {:?}", msg);
                         }
                       } else {
-                        if let Err(msg) = ch.basic_reject(message.delivery_tag, true /*requeue*/).wait() {
+                        if let Err(msg) = ch
+                          .basic_reject(message.delivery_tag, true /*requeue*/)
+                          .wait()
+                        {
                           error!("Unable to reject message {:?}", msg);
                         }
                       };
