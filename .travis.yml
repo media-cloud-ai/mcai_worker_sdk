@@ -36,7 +36,7 @@ matrix:
       sudo: true
       install:
         # - curl -sL https://github.com/xd009642/tarpaulin/releases/download/$TARPAULIN_VERSION/cargo-tarpaulin-$TARPAULIN_VERSION-travis.tar.gz | tar xvz -C $HOME/.cargo/bin
-        - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin
+        - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
         - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
 
