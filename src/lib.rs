@@ -92,11 +92,14 @@ where
           let id = channel.id;
           debug!("created channel with id: {}", id);
 
-          if let Err(msg) = channel.basic_qos(BasicQosOptions{
-            prefetch_size: 0,
-            prefetch_count: 1,
-            global: true,
-          }).wait() {
+          if let Err(msg) = channel
+            .basic_qos(BasicQosOptions {
+              prefetch_size: 0,
+              prefetch_count: 1,
+              global: true,
+            })
+            .wait()
+          {
             error!("Unable to set QoS on channels: {:?}", msg);
           }
 
