@@ -19,7 +19,7 @@ use failure::Error;
 use futures::future::Future;
 use futures::Stream;
 use lapin::channel::{
-  BasicConsumeOptions, BasicProperties, BasicPublishOptions, QueueDeclareOptions,
+  BasicConsumeOptions, BasicProperties, BasicPublishOptions, BasicQosOptions, QueueDeclareOptions,
 };
 use lapin::client::ConnectionOptions;
 use lapin::types::FieldTable;
@@ -91,6 +91,14 @@ where
         .and_then(move |channel| {
           let id = channel.id;
           debug!("created channel with id: {}", id);
+
+          if let Err(msg) = channel.basic_qos(BasicQosOptions{
+            prefetch_size: 0,
+            prefetch_count: 1,
+            global: true,
+          }).wait() {
+            error!("Unable to set QoS on channels: {:?}", msg);
+          }
 
           let ch = channel.clone();
 

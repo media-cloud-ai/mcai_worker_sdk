@@ -1,6 +1,6 @@
 [package]
 name = "amqp_worker"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["Marc-Antoine Arnaud <arnaud.marcantoine@gmail.com>"]
 description = "AMQP Worker to listen and provide trait to process message"
 keywords = ["AMQP", "micro-service"]
@@ -13,7 +13,7 @@ readme = "README.md"
 [dependencies]
 failure = "^0.1"
 futures = "^0.1"
-lapin-futures = "^0.17"
+lapin-futures = "^0.18"
 log = "0.4.5"
 reqwest = "0.9.8"
 serde = "^1.0"
