@@ -10,6 +10,12 @@ pub struct Requirement {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Parameter {
+  #[serde(rename = "array_of_strings")]
+  ArrayOfStringsParam {
+    id: String,
+    default: Option<Vec<String>>,
+    value: Option<Vec<String>>,
+  },
   #[serde(rename = "boolean")]
   BooleanParam {
     id: String,
@@ -27,12 +33,6 @@ pub enum Parameter {
     id: String,
     default: Option<i64>,
     value: Option<i64>,
-  },
-  #[serde(rename = "paths")]
-  PathsParam {
-    id: String,
-    default: Option<Vec<String>>,
-    value: Option<Vec<String>>,
   },
   #[serde(rename = "requirements")]
   RequirementParam {
@@ -194,9 +194,9 @@ impl Job {
     None
   }
 
-  pub fn get_paths_parameter(&self, key: &str) -> Option<Vec<String>> {
+  pub fn get_array_of_strings_parameter(&self, key: &str) -> Option<Vec<String>> {
     for param in self.parameters.iter() {
-      if let Parameter::PathsParam { id, default, value } = param {
+      if let Parameter::ArrayOfStringsParam { id, default, value } = param {
         if id == key {
           if let Some(ref v) = value {
             return Some(v.clone());
