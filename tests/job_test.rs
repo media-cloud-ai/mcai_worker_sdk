@@ -25,12 +25,12 @@ fn test_new_job_invalid_message() {
 
 #[test]
 fn test_new_job_invalid_parameter() {
-  let message = "{\
-    \"job_id\": 123,\
-    \"parameters\": [\
-      { \"key\":\"value\" },\
-    ]\
-  }";
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      { "key":"value" },
+    ]
+  }"#;
   let result = Job::new(message);
   assert!(result.is_err());
   let error = result.unwrap_err();
@@ -39,31 +39,31 @@ fn test_new_job_invalid_parameter() {
 
 #[test]
 fn test_new_job() {
-  let message = "{\
-    \"job_id\": 123,\
-    \"parameters\": [\
-      { \"id\":\"string_parameter\",\
-        \"type\":\"string\",\
-        \"default\":\"default_value\",\
-        \"value\":\"real_value\" },\
-      { \"id\":\"boolean_parameter\",\
-        \"type\":\"boolean\",\
-        \"default\": false,\
-        \"value\": true },\
-      { \"id\":\"integer_parameter\",\
-        \"type\":\"integer\",\
-        \"default\": 123456,\
-        \"value\": 654321 },\
-      { \"id\":\"credential_parameter\",\
-        \"type\":\"credential\",\
-        \"default\":\"default_credential_key\",\
-        \"value\":\"credential_key\" },\
-      { \"id\":\"array_of_string_parameter\",\
-        \"type\":\"array_of_strings\",\
-        \"default\": [\"default_value\"],\
-        \"value\": [\"real_value\"] }\
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      { "id":"string_parameter",
+        "type":"string",
+        "default":"default_value",
+        "value":"real_value" },
+      { "id":"boolean_parameter",
+        "type":"boolean",
+        "default": false,
+        "value": true },
+      { "id":"integer_parameter",
+        "type":"integer",
+        "default": 123456,
+        "value": 654321 },
+      { "id":"credential_parameter",
+        "type":"credential",
+        "default":"default_credential_key",
+        "value":"credential_key" },
+      { "id":"array_of_string_parameter",
+        "type":"array_of_strings",
+        "default": ["default_value"],
+        "value": ["real_value"] }
     ]
-  }";
+  }"#;
 
   let result = Job::new(message);
   assert!(result.is_ok());
@@ -97,22 +97,21 @@ fn test_new_job() {
   assert_eq!("real_value".to_string(), array_of_values[0]);
 }
 
-
 #[test]
 fn test_check_requirements() {
-  let message = "{\
-    \"job_id\": 123,\
-    \"parameters\": [\
-      { \"id\":\"requirements\",\
-        \"type\":\"requirements\",\
-        \"value\": {\
-          \"paths\": [\
-            \"./tests/job_test.rs\"\
-          ]\
-        }\
-      }\
-    ]\
-  }";
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      { "id":"requirements",
+        "type":"requirements",
+        "value": {
+          "paths": [
+            "./tests/job_test.rs"
+          ]
+        }
+      }
+    ]
+  }"#;
 
   let result = Job::new(message);
   assert!(result.is_ok());
@@ -125,19 +124,19 @@ fn test_check_requirements() {
 
 #[test]
 fn test_check_invalid_requirements() {
-  let message = "{\
-    \"job_id\": 123,\
-    \"parameters\": [\
-      { \"id\":\"requirements\",\
-        \"type\":\"requirements\",\
-        \"value\": {\
-          \"paths\": [\
-            \"nonexistent_file\"\
-          ]\
-        }\
-      }\
-    ]\
-  }";
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      { "id":"requirements",
+        "type":"requirements",
+        "value": {
+          "paths": [
+            "nonexistent_file"
+          ]
+        }
+      }
+    ]
+  }"#;
 
   let result = Job::new(message);
   assert!(result.is_ok());
