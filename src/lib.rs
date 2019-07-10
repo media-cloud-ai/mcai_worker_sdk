@@ -176,7 +176,7 @@ where
                 }
                 Err(error) => match error {
                   MessageError::RequirementsError(msg) => {
-                    error!("{}", msg);
+                    debug!("{}", msg);
                     if let Err(msg) = ch
                       .basic_reject(message.delivery_tag, BasicRejectOptions{requeue: true} /*requeue*/)
                       .wait()

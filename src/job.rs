@@ -1,6 +1,7 @@
 use crate::config;
 use crate::MessageError;
 use std::path::Path;
+use std::thread;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Requirement {
@@ -90,40 +91,50 @@ struct ValueResponseBody {
 
 impl Credential {
   pub fn request_value(&self, job: &Job) -> Result<String, MessageError> {
-    let client = reqwest::Client::builder().build().unwrap();
     let backend_endpoint = config::get_backend_hostname();
     let backend_username = config::get_backend_username();
     let backend_password = config::get_backend_password();
 
-    let session_body = SessionBody {
-      session: Session {
-        email: backend_username,
-        password: backend_password,
-      },
-    };
+    let session_url = format!("{}/sessions", backend_endpoint);
+    let credential_url = format!("{}/credentials/{}", backend_endpoint, self.key);
+    let job_id = job.job_id;
 
-    let mut response = client
-      .post(&(backend_endpoint.clone() + "/sessions"))
-      .json(&session_body)
-      .send()
-      .map_err(|e| MessageError::ProcessingError(job.job_id, e.to_string()))?;
+    let request_thread = thread::spawn(move || {
+      let client = reqwest::Client::builder().build().unwrap();
 
-    let r: SessionResponseBody = response
-      .json()
-      .map_err(|e| MessageError::ProcessingError(job.job_id, e.to_string()))?;
-    let token = r.access_token;
+      let session_body = SessionBody {
+        session: Session {
+          email: backend_username,
+          password: backend_password,
+        },
+      };
 
-    let mut response = client
-      .get(&(backend_endpoint + "/credentials/" + &self.key))
-      // .bearer_auth(token)
-      .header("Authorization", token)
-      .send()
-      .map_err(|e| MessageError::ProcessingError(job.job_id, e.to_string()))?;
+      let mut response = client
+        .post(&session_url)
+        .json(&session_body)
+        .send()
+        .map_err(|e| MessageError::ProcessingError(job_id, e.to_string()))?;
 
-    let resp_value: ValueResponseBody = response
-      .json()
-      .map_err(|e| MessageError::ProcessingError(job.job_id, e.to_string()))?;
-    Ok(resp_value.data.value)
+      let r: SessionResponseBody = response
+        .json()
+        .map_err(|e| MessageError::ProcessingError(job_id, e.to_string()))?;
+      let token = r.access_token;
+
+      let mut response = client
+        .get(&credential_url)
+        // .bearer_auth(token)
+        .header("Authorization", token)
+        .send()
+        .map_err(|e| MessageError::ProcessingError(job_id, e.to_string()))?;
+
+      let resp_value: ValueResponseBody = response
+        .json()
+        .map_err(|e| MessageError::ProcessingError(job_id, e.to_string()))?;
+
+      Ok(resp_value.data.value)
+    });
+
+    request_thread.join().map_err(|e| MessageError::ProcessingError(job.job_id, format!("{:?}", e)))?
   }
 }
 
