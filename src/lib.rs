@@ -73,8 +73,15 @@ where
     info!("AMQP VHOST: {}", amqp_vhost);
     info!("AMQP QUEUE: {}", amqp_queue);
 
+    let scheme =
+      if amqp_tls {
+        AMQPScheme::AMQPS
+      } else {
+        AMQPScheme::AMQP
+      };
+
     let amqp_uri = AMQPUri {
-      scheme: AMQPScheme::AMQP,
+      scheme,
       authority: AMQPAuthority {
         userinfo: AMQPUserInfo {
           username: amqp_username,
