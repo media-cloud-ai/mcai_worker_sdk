@@ -4,7 +4,7 @@ macro_rules! get_env_value {
   ($key:expr, $default:expr) => {
     match env::var($key) {
       Ok(value) => value,
-      _ => $default.to_string()
+      _ => $default.to_string(),
     }
   };
 }

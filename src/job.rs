@@ -134,7 +134,9 @@ impl Credential {
       Ok(resp_value.data.value)
     });
 
-    request_thread.join().map_err(|e| MessageError::ProcessingError(job.job_id, format!("{:?}", e)))?
+    request_thread
+      .join()
+      .map_err(|e| MessageError::ProcessingError(job.job_id, format!("{:?}", e)))?
   }
 }
 
