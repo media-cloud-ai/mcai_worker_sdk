@@ -164,16 +164,14 @@ where
                       {
                         error!("Unable to ack message {:?}", msg);
                       }
-                    } else {
-                      if let Err(msg) = ch
-                        .basic_reject(
-                          message.delivery_tag,
-                          BasicRejectOptions { requeue: true }, /*requeue*/
-                        )
-                        .wait()
-                      {
-                        error!("Unable to reject message {:?}", msg);
-                      }
+                    } else if let Err(msg) = ch
+                      .basic_reject(
+                        message.delivery_tag,
+                        BasicRejectOptions { requeue: true }, /*requeue*/
+                      )
+                      .wait()
+                    {
+                      error!("Unable to reject message {:?}", msg);
                     }
                   }
                   Err(error) => match error {
@@ -223,17 +221,15 @@ where
                         {
                           error!("Unable to ack message {:?}", msg);
                         }
-                      } else {
-                        if let Err(msg) = ch
-                          .basic_reject(
-                            message.delivery_tag,
-                            BasicRejectOptions { requeue: true }, /*requeue*/
-                          )
-                          .wait()
-                        {
-                          error!("Unable to reject message {:?}", msg);
-                        }
-                      };
+                      } else if let Err(msg) = ch
+                        .basic_reject(
+                          message.delivery_tag,
+                          BasicRejectOptions { requeue: true }, /*requeue*/
+                        )
+                        .wait()
+                      {
+                        error!("Unable to reject message {:?}", msg);
+                      }
                     }
                     MessageError::RuntimeError(msg) => {
                       let content = json!({
@@ -257,17 +253,15 @@ where
                         {
                           error!("Unable to ack message {:?}", msg);
                         }
-                      } else {
-                        if let Err(msg) = ch
-                          .basic_reject(
-                            message.delivery_tag,
-                            BasicRejectOptions { requeue: true }, /*requeue*/
-                          )
-                          .wait()
-                        {
-                          error!("Unable to reject message {:?}", msg);
-                        }
-                      };
+                      } else if let Err(msg) = ch
+                        .basic_reject(
+                          message.delivery_tag,
+                          BasicRejectOptions { requeue: true }, /*requeue*/
+                        )
+                        .wait()
+                      {
+                        error!("Unable to reject message {:?}", msg);
+                      }
                     }
                   },
                 }
