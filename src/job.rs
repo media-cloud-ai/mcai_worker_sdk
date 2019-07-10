@@ -1,6 +1,6 @@
-use config;
+use crate::config;
+use crate::MessageError;
 use std::path::Path;
-use MessageError;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Requirement {

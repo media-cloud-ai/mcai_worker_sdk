@@ -1,23 +1,32 @@
 use std::env;
 
 macro_rules! get_env_value {
-  ($key:expr, $default:expr) => {{
-    let mut item = $default.to_string();
-    for (key, value) in env::vars() {
-      if let $key = key.as_ref() {
-        item = value;
-      }
+  ($key:expr, $default:expr) => {
+    match env::var($key) {
+      Ok(value) => value,
+      _ => $default.to_string()
     }
-    item
-  }};
+  };
+}
+
+pub fn get_amqp_tls() -> bool {
+  let value = get_env_value!("AMQP_TLS", "true");
+  match value.as_str() {
+    "true" | "1" | "True" | "TRUE" => true,
+    _ => false,
+  }
 }
 
 pub fn get_amqp_hostname() -> String {
   get_env_value!("AMQP_HOSTNAME", "127.0.0.1")
 }
 
-pub fn get_amqp_port() -> String {
-  get_env_value!("AMQP_PORT", "5672")
+pub fn get_amqp_port() -> u16 {
+  let value = get_env_value!("AMQP_PORT", "5672");
+  match value.parse::<u16>() {
+    Ok(value) => value,
+    _ => 5672,
+  }
 }
 
 pub fn get_amqp_username() -> String {
