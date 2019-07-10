@@ -73,12 +73,11 @@ where
     info!("AMQP VHOST: {}", amqp_vhost);
     info!("AMQP QUEUE: {}", amqp_queue);
 
-    let scheme =
-      if amqp_tls {
-        AMQPScheme::AMQPS
-      } else {
-        AMQPScheme::AMQP
-      };
+    let scheme = if amqp_tls {
+      AMQPScheme::AMQPS
+    } else {
+      AMQPScheme::AMQP
+    };
 
     let amqp_uri = AMQPUri {
       scheme,
