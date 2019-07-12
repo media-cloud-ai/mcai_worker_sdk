@@ -238,6 +238,38 @@ impl ParametersContainer for JobResult {
   }
 }
 
+impl JobResult {
+  pub fn from_job_with_status(job: &Job, status: JobStatus) -> JobResult {
+    JobResult::new(job.job_id, status)
+  }
+
+  pub fn new(job_id: u64, status: JobStatus) -> JobResult {
+    JobResult::new_with_parameters(job_id, status, vec![])
+  }
+
+  pub fn new_with_parameters(
+    job_id: u64,
+    status: JobStatus,
+    parameters: Vec<Parameter>,
+  ) -> JobResult {
+    JobResult {
+      job_id,
+      status,
+      parameters,
+    }
+  }
+
+  pub fn new_with_message(job_id: u64, status: JobStatus, message: &str) -> JobResult {
+    let mut parameters = vec![];
+    parameters.push(Parameter::StringParam {
+      id: "message".to_string(),
+      default: None,
+      value: Some(message.to_string()),
+    });
+    JobResult::new_with_parameters(job_id, status, parameters)
+  }
+}
+
 pub fn get_boolean_parameter(container: &impl ParametersContainer, key: &str) -> Option<bool> {
   for param in container.get_parameters().iter() {
     if let Parameter::BooleanParam { id, default, value } = param {

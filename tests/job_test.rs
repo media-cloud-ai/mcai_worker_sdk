@@ -1,9 +1,10 @@
 extern crate amqp_worker;
 extern crate assert_matches;
 
-use amqp_worker::MessageError;
 use assert_matches::assert_matches;
+
 use amqp_worker::job::*;
+use amqp_worker::MessageError;
 
 #[test]
 fn test_new_job_empty_message() {
@@ -247,4 +248,65 @@ fn test_job_result_from_job() {
   assert_eq!(job_result.job_id, 123);
   assert_eq!(job_result.status, JobStatus::Unknown);
   assert_eq!(job_result.parameters.len(), 0);
+}
+
+#[test]
+fn test_job_result_from_job_with_status() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      { "id":"string_parameter",
+        "type":"string",
+        "default":"default_value",
+        "value":"real_value" },
+      { "id":"boolean_parameter",
+        "type":"boolean",
+        "default": false,
+        "value": true },
+      { "id":"integer_parameter",
+        "type":"integer",
+        "default": 123456,
+        "value": 654321 },
+      { "id":"credential_parameter",
+        "type":"credential",
+        "default":"default_credential_key",
+        "value":"credential_key" },
+      { "id":"array_of_string_parameter",
+        "type":"array_of_strings",
+        "default": ["default_value"],
+        "value": ["real_value"] }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  let job_result = JobResult::from_job_with_status(&job, JobStatus::Error);
+  assert_eq!(job_result.job_id, 123);
+  assert_eq!(job_result.status, JobStatus::Error);
+  assert_eq!(job_result.parameters.len(), 0);
+}
+
+#[test]
+fn test_new_job_result() {
+  let job_id = 123;
+  let job_result = JobResult::new(job_id, JobStatus::Completed);
+  assert_eq!(job_result.job_id, job_id);
+  assert_eq!(job_result.status, JobStatus::Completed);
+  assert_eq!(job_result.parameters.len(), 0);
+}
+
+#[test]
+fn test_new_job_result_with_message() {
+  let job_id = 123;
+  let message = "This is a message.";
+  let job_result = JobResult::new_with_message(job_id, JobStatus::Completed, message);
+  assert_eq!(job_result.job_id, job_id);
+  assert_eq!(job_result.status, JobStatus::Completed);
+  assert_eq!(job_result.parameters.len(), 1);
+
+  let optional_string = get_string_parameter(&job_result, "message");
+  assert!(optional_string.is_some());
+  let string_value = optional_string.unwrap();
+  assert_eq!(message.to_string(), string_value);
 }

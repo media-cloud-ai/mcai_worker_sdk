@@ -24,6 +24,8 @@ use config::*;
 use failure::Error;
 use futures::future::Future;
 use futures::Stream;
+use job::JobResult;
+use job::JobStatus;
 use lapin::options::{
   BasicConsumeOptions, BasicPublishOptions, BasicQosOptions, BasicRejectOptions,
   QueueDeclareOptions,
@@ -32,7 +34,6 @@ use lapin::types::FieldTable;
 use lapin::{BasicProperties, ConnectionProperties};
 use std::{thread, time};
 use tokio::runtime::Runtime;
-use job::JobResult;
 
 pub trait MessageEvent {
   fn process(&self, _message: &str) -> Result<JobResult, MessageError>
@@ -203,11 +204,11 @@ where
                       }
                     }
                     MessageError::ProcessingError(job_id, msg) => {
-                      let content = json!({
-                        "status": "error",
-                        "job_id": job_id,
-                        "message": msg
-                      });
+                      let content = json!(JobResult::new_with_message(
+                        job_id,
+                        JobStatus::Error,
+                        msg.as_str()
+                      ));
                       if ch
                         .basic_publish(
                           "", // exchange
