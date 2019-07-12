@@ -1,7 +1,6 @@
 extern crate amqp_worker;
 extern crate assert_matches;
 
-use amqp_worker::job::Job;
 use amqp_worker::MessageError;
 use assert_matches::assert_matches;
 use amqp_worker::job::*;
@@ -181,10 +180,37 @@ fn test_job_result_from_json() {
 
   let result = serde_json::from_str(json);
   assert!(result.is_ok());
-  let job_result : JobResult = result.unwrap();
+  let job_result: JobResult = result.unwrap();
   assert_eq!(job_result.job_id, 456);
   assert_eq!(job_result.status, JobStatus::Completed);
   assert_eq!(job_result.parameters.len(), 5);
+
+  let optional_string = get_string_parameter(&job_result, "string_parameter");
+  assert!(optional_string.is_some());
+  let string_value = optional_string.unwrap();
+  assert_eq!("real_value".to_string(), string_value);
+
+  let optional_boolean = get_boolean_parameter(&job_result, "boolean_parameter");
+  assert!(optional_boolean.is_some());
+  let boolean_value = optional_boolean.unwrap();
+  assert_eq!(true, boolean_value);
+
+  let optional_integer = get_integer_parameter(&job_result, "integer_parameter");
+  assert!(optional_integer.is_some());
+  let integer_value = optional_integer.unwrap();
+  assert_eq!(654321, integer_value);
+
+  let optional_credential = get_credential_parameter(&job_result, "credential_parameter");
+  assert!(optional_credential.is_some());
+  let credential_value = optional_credential.unwrap();
+  assert_eq!("credential_key", credential_value.key);
+
+  let option_array = get_array_of_strings_parameter(&job_result, "array_of_string_parameter");
+  assert!(option_array.is_some());
+  let array_of_values = option_array.unwrap();
+  assert_eq!(1, array_of_values.len());
+  assert_eq!("real_value".to_string(), array_of_values[0]);
+}
 
 #[test]
 fn test_job_result_from_job() {

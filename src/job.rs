@@ -1,14 +1,24 @@
-use crate::config;
-use crate::MessageError;
 use std::path::Path;
 use std::thread;
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+use crate::config;
+use crate::MessageError;
+
+pub trait ParametersContainer {
+  fn get_parameters(&self) -> Vec<Parameter>;
+  // fn get_boolean_parameter(&self, key: &str) -> Option<bool>;
+  // fn get_credential_parameter(&self, key: &str) -> Option<Credential>;
+  // fn get_integer_parameter(&self, key: &str) -> Option<i64>;
+  // fn get_string_parameter(&self, key: &str) -> Option<String>;
+  // fn get_array_of_strings_parameter(&self, key: &str) -> Option<Vec<String>>;
+}
+
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Requirement {
   paths: Option<Vec<String>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Parameter {
   #[serde(rename = "array_of_strings")]
@@ -140,6 +150,12 @@ impl Credential {
   }
 }
 
+impl ParametersContainer for Job {
+  fn get_parameters(&self) -> Vec<Parameter> {
+    self.parameters.clone()
+  }
+}
+
 impl Job {
   pub fn new(message: &str) -> Result<Self, MessageError> {
     let parsed: Result<Job, _> = serde_json::from_str(message);
@@ -148,78 +164,23 @@ impl Job {
   }
 
   pub fn get_boolean_parameter(&self, key: &str) -> Option<bool> {
-    for param in self.parameters.iter() {
-      if let Parameter::BooleanParam { id, default, value } = param {
-        if id == key {
-          if let Some(ref v) = value {
-            return Some(*v);
-          } else {
-            return *default;
-          }
-        }
-      }
-    }
-    None
+    get_boolean_parameter(self, key)
   }
 
   pub fn get_credential_parameter(&self, key: &str) -> Option<Credential> {
-    for param in self.parameters.iter() {
-      if let Parameter::CredentialParam { id, default, value } = param {
-        if id == key {
-          if let Some(ref v) = value {
-            return Some(Credential { key: v.to_string() });
-          } else {
-            return default.clone().map(|key| Credential { key });
-          }
-        }
-      }
-    }
-    None
+    get_credential_parameter(self, key)
   }
 
   pub fn get_integer_parameter(&self, key: &str) -> Option<i64> {
-    for param in self.parameters.iter() {
-      if let Parameter::IntegerParam { id, default, value } = param {
-        if id == key {
-          if let Some(ref v) = value {
-            return Some(*v);
-          } else {
-            return *default;
-          }
-        }
-      }
-    }
-    None
+    get_integer_parameter(self, key)
   }
 
   pub fn get_string_parameter(&self, key: &str) -> Option<String> {
-    for param in self.parameters.iter() {
-      if let Parameter::StringParam { id, default, value } = param {
-        if id == key {
-          if let Some(ref v) = value {
-            return Some(v.to_string());
-          } else {
-            return default.clone();
-          }
-        }
-      }
-    }
-    None
+    get_string_parameter(self, key)
   }
 
   pub fn get_array_of_strings_parameter(&self, key: &str) -> Option<Vec<String>> {
-    for param in self.parameters.iter() {
-      if let Parameter::ArrayOfStringsParam { id, default, value } = param {
-        if id == key {
-          if let Some(ref v) = value {
-            return Some(v.clone());
-          } else {
-            return default.clone();
-          }
-        }
-      }
-    }
-    None
+    get_array_of_strings_parameter(self, key)
   }
 
   pub fn check_requirements(&self) -> Result<(), MessageError> {
@@ -271,3 +232,83 @@ impl From<Job> for JobResult {
   }
 }
 
+impl ParametersContainer for JobResult {
+  fn get_parameters(&self) -> Vec<Parameter> {
+    self.parameters.clone()
+  }
+}
+
+pub fn get_boolean_parameter(container: &impl ParametersContainer, key: &str) -> Option<bool> {
+  for param in container.get_parameters().iter() {
+    if let Parameter::BooleanParam { id, default, value } = param {
+      if id == key {
+        if let Some(ref v) = value {
+          return Some(*v);
+        } else {
+          return *default;
+        }
+      }
+    }
+  }
+  None
+}
+
+pub fn get_credential_parameter(container: &impl ParametersContainer, key: &str) -> Option<Credential> {
+  for param in container.get_parameters().iter() {
+    if let Parameter::CredentialParam { id, default, value } = param {
+      if id == key {
+        if let Some(ref v) = value {
+          return Some(Credential { key: v.to_string() });
+        } else {
+          return default.clone().map(|key| Credential { key });
+        }
+      }
+    }
+  }
+  None
+}
+
+pub fn get_integer_parameter(container: &impl ParametersContainer, key: &str) -> Option<i64> {
+  for param in container.get_parameters().iter() {
+    if let Parameter::IntegerParam { id, default, value } = param {
+      if id == key {
+        if let Some(ref v) = value {
+          return Some(*v);
+        } else {
+          return *default;
+        }
+      }
+    }
+  }
+  None
+}
+
+pub fn get_string_parameter(container: &impl ParametersContainer, key: &str) -> Option<String> {
+  for param in container.get_parameters().iter() {
+    if let Parameter::StringParam { id, default, value } = param {
+      if id == key {
+        if let Some(ref v) = value {
+          return Some(v.to_string());
+        } else {
+          return default.clone();
+        }
+      }
+    }
+  }
+  None
+}
+
+pub fn get_array_of_strings_parameter(container: &impl ParametersContainer, key: &str) -> Option<Vec<String>> {
+  for param in container.get_parameters().iter() {
+    if let Parameter::ArrayOfStringsParam { id, default, value } = param {
+      if id == key {
+        if let Some(ref v) = value {
+          return Some(v.clone());
+        } else {
+          return default.clone();
+        }
+      }
+    }
+  }
+  None
+}
