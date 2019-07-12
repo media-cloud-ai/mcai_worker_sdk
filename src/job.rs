@@ -285,7 +285,10 @@ pub fn get_boolean_parameter(container: &impl ParametersContainer, key: &str) ->
   None
 }
 
-pub fn get_credential_parameter(container: &impl ParametersContainer, key: &str) -> Option<Credential> {
+pub fn get_credential_parameter(
+  container: &impl ParametersContainer,
+  key: &str,
+) -> Option<Credential> {
   for param in container.get_parameters().iter() {
     if let Parameter::CredentialParam { id, default, value } = param {
       if id == key {
@@ -330,7 +333,10 @@ pub fn get_string_parameter(container: &impl ParametersContainer, key: &str) -> 
   None
 }
 
-pub fn get_array_of_strings_parameter(container: &impl ParametersContainer, key: &str) -> Option<Vec<String>> {
+pub fn get_array_of_strings_parameter(
+  container: &impl ParametersContainer,
+  key: &str,
+) -> Option<Vec<String>> {
   for param in container.get_parameters().iter() {
     if let Parameter::ArrayOfStringsParam { id, default, value } = param {
       if id == key {
