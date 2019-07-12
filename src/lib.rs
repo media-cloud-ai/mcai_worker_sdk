@@ -47,7 +47,7 @@ pub trait MessageEvent {
 #[derive(Debug, PartialEq)]
 pub enum MessageError {
   RuntimeError(String),
-  ProcessingError(u64, String),
+  ProcessingError(JobResult),
   RequirementsError(String),
   NotImplemented(),
 }
@@ -203,12 +203,12 @@ where
                         error!("Unable to reject message {:?}", msg);
                       }
                     }
-                    MessageError::ProcessingError(job_id, msg) => {
-                      let content = json!(JobResult::new_with_message(
-                        job_id,
-                        JobStatus::Error,
-                        msg.as_str()
-                      ));
+                    MessageError::ProcessingError(job_result) => {
+                      let content = json!(JobResult {
+                        job_id: job_result.job_id,
+                        status: JobStatus::Error,
+                        parameters: job_result.parameters,
+                      });
                       if ch
                         .basic_publish(
                           "", // exchange

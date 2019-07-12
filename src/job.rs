@@ -1,24 +1,95 @@
 use std::path::Path;
 use std::thread;
 
+use reqwest::Error;
+
 use crate::config;
 use crate::MessageError;
 
 pub trait ParametersContainer {
-  fn get_parameters(&self) -> Vec<Parameter>;
-  // fn get_boolean_parameter(&self, key: &str) -> Option<bool>;
-  // fn get_credential_parameter(&self, key: &str) -> Option<Credential>;
-  // fn get_integer_parameter(&self, key: &str) -> Option<i64>;
-  // fn get_string_parameter(&self, key: &str) -> Option<String>;
-  // fn get_array_of_strings_parameter(&self, key: &str) -> Option<Vec<String>>;
+  fn get_parameters(&self) -> &Vec<Parameter>;
+  fn get_boolean_parameter(&self, key: &str) -> Option<bool> {
+    for param in self.get_parameters() {
+      if let Parameter::BooleanParam { id, default, value } = param {
+        if id == key {
+          if let Some(ref v) = value {
+            return Some(*v);
+          } else {
+            return *default;
+          }
+        }
+      }
+    }
+    None
+  }
+
+  fn get_credential_parameter(&self, key: &str) -> Option<Credential> {
+    for param in self.get_parameters() {
+      if let Parameter::CredentialParam { id, default, value } = param {
+        if id == key {
+          if let Some(ref v) = value {
+            return Some(Credential { key: v.to_string() });
+          } else {
+            return default.clone().map(|key| Credential { key });
+          }
+        }
+      }
+    }
+    None
+  }
+
+  fn get_integer_parameter(&self, key: &str) -> Option<i64> {
+    for param in self.get_parameters() {
+      if let Parameter::IntegerParam { id, default, value } = param {
+        if id == key {
+          if let Some(ref v) = value {
+            return Some(*v);
+          } else {
+            return *default;
+          }
+        }
+      }
+    }
+    None
+  }
+
+  fn get_string_parameter(&self, key: &str) -> Option<String> {
+    for param in self.get_parameters() {
+      if let Parameter::StringParam { id, default, value } = param {
+        if id == key {
+          if let Some(ref v) = value {
+            return Some(v.to_string());
+          } else {
+            return default.clone();
+          }
+        }
+      }
+    }
+    None
+  }
+
+  fn get_array_of_strings_parameter(&self, key: &str) -> Option<Vec<String>> {
+    for param in self.get_parameters() {
+      if let Parameter::ArrayOfStringsParam { id, default, value } = param {
+        if id == key {
+          if let Some(ref v) = value {
+            return Some(v.clone());
+          } else {
+            return default.clone();
+          }
+        }
+      }
+    }
+    None
+  }
 }
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Requirement {
   paths: Option<Vec<String>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum Parameter {
   #[serde(rename = "array_of_strings")]
@@ -100,14 +171,14 @@ struct ValueResponseBody {
 }
 
 impl Credential {
-  pub fn request_value(&self, job: &Job) -> Result<String, MessageError> {
+  pub fn request_value(&self, job: &'static Job) -> Result<String, MessageError> {
     let backend_endpoint = config::get_backend_hostname();
     let backend_username = config::get_backend_username();
     let backend_password = config::get_backend_password();
 
     let session_url = format!("{}/sessions", backend_endpoint);
     let credential_url = format!("{}/credentials/{}", backend_endpoint, self.key);
-    let job_id = job.job_id;
+    let job_clone = job.clone();
 
     let request_thread = thread::spawn(move || {
       let client = reqwest::Client::builder().build().unwrap();
@@ -123,11 +194,19 @@ impl Credential {
         .post(&session_url)
         .json(&session_body)
         .send()
-        .map_err(|e| MessageError::ProcessingError(job_id, e.to_string()))?;
+        .map_err(|e| {
+          let job_result = JobResult::from(job_clone)
+            .with_status(JobStatus::Error)
+            .with_error(e);
+          MessageError::ProcessingError(job_result)
+        })?;
 
-      let r: SessionResponseBody = response
-        .json()
-        .map_err(|e| MessageError::ProcessingError(job_id, e.to_string()))?;
+      let r: SessionResponseBody = response.json().map_err(|e| {
+        let job_result = JobResult::from(job_clone)
+          .with_status(JobStatus::Error)
+          .with_error(e);
+        MessageError::ProcessingError(job_result)
+      })?;
       let token = r.access_token;
 
       let mut response = client
@@ -135,24 +214,35 @@ impl Credential {
         // .bearer_auth(token)
         .header("Authorization", token)
         .send()
-        .map_err(|e| MessageError::ProcessingError(job_id, e.to_string()))?;
+        .map_err(|e| {
+          let job_result = JobResult::from(job_clone)
+            .with_status(JobStatus::Error)
+            .with_error(e);
+          MessageError::ProcessingError(job_result)
+        })?;
 
-      let resp_value: ValueResponseBody = response
-        .json()
-        .map_err(|e| MessageError::ProcessingError(job_id, e.to_string()))?;
+      let resp_value: ValueResponseBody = response.json().map_err(|e| {
+        let job_result = JobResult::from(job_clone)
+          .with_status(JobStatus::Error)
+          .with_error(e);
+        MessageError::ProcessingError(job_result)
+      })?;
 
       Ok(resp_value.data.value)
     });
 
-    request_thread
-      .join()
-      .map_err(|e| MessageError::ProcessingError(job.job_id, format!("{:?}", e)))?
+    request_thread.join().map_err(|e| {
+      let job_result = JobResult::from(job_clone)
+        .with_status(JobStatus::Error)
+        .with_message(format!("{:?}", e));
+      MessageError::ProcessingError(job_result)
+    })?
   }
 }
 
 impl ParametersContainer for Job {
-  fn get_parameters(&self) -> Vec<Parameter> {
-    self.parameters.clone()
+  fn get_parameters(&self) -> &Vec<Parameter> {
+    &self.parameters
   }
 }
 
@@ -161,26 +251,6 @@ impl Job {
     let parsed: Result<Job, _> = serde_json::from_str(message);
     parsed
       .map_err(|e| MessageError::RuntimeError(format!("unable to parse input message: {:?}", e)))
-  }
-
-  pub fn get_boolean_parameter(&self, key: &str) -> Option<bool> {
-    get_boolean_parameter(self, key)
-  }
-
-  pub fn get_credential_parameter(&self, key: &str) -> Option<Credential> {
-    get_credential_parameter(self, key)
-  }
-
-  pub fn get_integer_parameter(&self, key: &str) -> Option<i64> {
-    get_integer_parameter(self, key)
-  }
-
-  pub fn get_string_parameter(&self, key: &str) -> Option<String> {
-    get_string_parameter(self, key)
-  }
-
-  pub fn get_array_of_strings_parameter(&self, key: &str) -> Option<Vec<String>> {
-    get_array_of_strings_parameter(self, key)
   }
 
   pub fn check_requirements(&self) -> Result<(), MessageError> {
@@ -215,7 +285,7 @@ pub enum JobStatus {
   Error,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct JobResult {
   pub job_id: u64,
   pub status: JobStatus,
@@ -224,34 +294,24 @@ pub struct JobResult {
 
 impl From<Job> for JobResult {
   fn from(job: Job) -> JobResult {
-    JobResult {
-      job_id: job.job_id,
-      status: JobStatus::Unknown,
-      parameters: vec![],
-    }
+    JobResult::new(job.job_id, JobStatus::Unknown, vec![])
+  }
+}
+
+impl From<&Job> for JobResult {
+  fn from(job: &Job) -> JobResult {
+    JobResult::new(job.job_id, JobStatus::Unknown, vec![])
   }
 }
 
 impl ParametersContainer for JobResult {
-  fn get_parameters(&self) -> Vec<Parameter> {
-    self.parameters.clone()
+  fn get_parameters(&self) -> &Vec<Parameter> {
+    &self.parameters
   }
 }
 
 impl JobResult {
-  pub fn from_job_with_status(job: &Job, status: JobStatus) -> JobResult {
-    JobResult::new(job.job_id, status)
-  }
-
-  pub fn new(job_id: u64, status: JobStatus) -> JobResult {
-    JobResult::new_with_parameters(job_id, status, vec![])
-  }
-
-  pub fn new_with_parameters(
-    job_id: u64,
-    status: JobStatus,
-    parameters: Vec<Parameter>,
-  ) -> JobResult {
+  pub fn new(job_id: u64, status: JobStatus, parameters: Vec<Parameter>) -> JobResult {
     JobResult {
       job_id,
       status,
@@ -259,94 +319,26 @@ impl JobResult {
     }
   }
 
-  pub fn new_with_message(job_id: u64, status: JobStatus, message: &str) -> JobResult {
-    let mut parameters = vec![];
-    parameters.push(Parameter::StringParam {
+  pub fn with_status(mut self, status: JobStatus) -> Self {
+    self.status = status;
+    self
+  }
+
+  pub fn with_error(mut self, error: Error) -> Self {
+    self.parameters.push(Parameter::StringParam {
       id: "message".to_string(),
       default: None,
-      value: Some(message.to_string()),
+      value: Some(error.to_string()),
     });
-    JobResult::new_with_parameters(job_id, status, parameters)
+    self
   }
-}
 
-pub fn get_boolean_parameter(container: &impl ParametersContainer, key: &str) -> Option<bool> {
-  for param in container.get_parameters().iter() {
-    if let Parameter::BooleanParam { id, default, value } = param {
-      if id == key {
-        if let Some(ref v) = value {
-          return Some(*v);
-        } else {
-          return *default;
-        }
-      }
-    }
+  pub fn with_message(mut self, message: String) -> Self {
+    self.parameters.push(Parameter::StringParam {
+      id: "message".to_string(),
+      default: None,
+      value: Some(message),
+    });
+    self
   }
-  None
-}
-
-pub fn get_credential_parameter(
-  container: &impl ParametersContainer,
-  key: &str,
-) -> Option<Credential> {
-  for param in container.get_parameters().iter() {
-    if let Parameter::CredentialParam { id, default, value } = param {
-      if id == key {
-        if let Some(ref v) = value {
-          return Some(Credential { key: v.to_string() });
-        } else {
-          return default.clone().map(|key| Credential { key });
-        }
-      }
-    }
-  }
-  None
-}
-
-pub fn get_integer_parameter(container: &impl ParametersContainer, key: &str) -> Option<i64> {
-  for param in container.get_parameters().iter() {
-    if let Parameter::IntegerParam { id, default, value } = param {
-      if id == key {
-        if let Some(ref v) = value {
-          return Some(*v);
-        } else {
-          return *default;
-        }
-      }
-    }
-  }
-  None
-}
-
-pub fn get_string_parameter(container: &impl ParametersContainer, key: &str) -> Option<String> {
-  for param in container.get_parameters().iter() {
-    if let Parameter::StringParam { id, default, value } = param {
-      if id == key {
-        if let Some(ref v) = value {
-          return Some(v.to_string());
-        } else {
-          return default.clone();
-        }
-      }
-    }
-  }
-  None
-}
-
-pub fn get_array_of_strings_parameter(
-  container: &impl ParametersContainer,
-  key: &str,
-) -> Option<Vec<String>> {
-  for param in container.get_parameters().iter() {
-    if let Parameter::ArrayOfStringsParam { id, default, value } = param {
-      if id == key {
-        if let Some(ref v) = value {
-          return Some(v.clone());
-        } else {
-          return default.clone();
-        }
-      }
-    }
-  }
-  None
 }
