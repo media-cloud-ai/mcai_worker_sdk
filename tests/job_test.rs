@@ -4,6 +4,7 @@ extern crate assert_matches;
 use amqp_worker::job::Job;
 use amqp_worker::MessageError;
 use assert_matches::assert_matches;
+use amqp_worker::job::*;
 
 #[test]
 fn test_new_job_empty_message() {
@@ -147,4 +148,77 @@ fn test_check_invalid_requirements() {
   assert!(requirement_result.is_err());
   let error = requirement_result.unwrap_err();
   assert_matches!(error, MessageError::RequirementsError(_));
+}
+
+#[test]
+fn test_job_result_from_json() {
+  let json = r#"{
+    "job_id": 456,
+    "status": "completed",
+    "parameters": [
+      { "id":"string_parameter",
+        "type":"string",
+        "default":"default_value",
+        "value":"real_value" },
+      { "id":"boolean_parameter",
+        "type":"boolean",
+        "default": false,
+        "value": true },
+      { "id":"integer_parameter",
+        "type":"integer",
+        "default": 123456,
+        "value": 654321 },
+      { "id":"credential_parameter",
+        "type":"credential",
+        "default":"default_credential_key",
+        "value":"credential_key" },
+      { "id":"array_of_string_parameter",
+        "type":"array_of_strings",
+        "default": ["default_value"],
+        "value": ["real_value"] }
+    ]
+  }"#;
+
+  let result = serde_json::from_str(json);
+  assert!(result.is_ok());
+  let job_result : JobResult = result.unwrap();
+  assert_eq!(job_result.job_id, 456);
+  assert_eq!(job_result.status, JobStatus::Completed);
+  assert_eq!(job_result.parameters.len(), 5);
+
+#[test]
+fn test_job_result_from_job() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      { "id":"string_parameter",
+        "type":"string",
+        "default":"default_value",
+        "value":"real_value" },
+      { "id":"boolean_parameter",
+        "type":"boolean",
+        "default": false,
+        "value": true },
+      { "id":"integer_parameter",
+        "type":"integer",
+        "default": 123456,
+        "value": 654321 },
+      { "id":"credential_parameter",
+        "type":"credential",
+        "default":"default_credential_key",
+        "value":"credential_key" },
+      { "id":"array_of_string_parameter",
+        "type":"array_of_strings",
+        "default": ["default_value"],
+        "value": ["real_value"] }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  let job_result = JobResult::from(job);
+  assert_eq!(job_result.job_id, 123);
+  assert_eq!(job_result.status, JobStatus::Unknown);
+  assert_eq!(job_result.parameters.len(), 0);
 }

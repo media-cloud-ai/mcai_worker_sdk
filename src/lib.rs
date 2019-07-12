@@ -32,9 +32,10 @@ use lapin::types::FieldTable;
 use lapin::{BasicProperties, ConnectionProperties};
 use std::{thread, time};
 use tokio::runtime::Runtime;
+use job::JobResult;
 
 pub trait MessageEvent {
-  fn process(&self, _message: &str) -> Result<u64, MessageError>
+  fn process(&self, _message: &str) -> Result<JobResult, MessageError>
   where
     Self: std::marker::Sized,
   {
@@ -147,11 +148,8 @@ where
                 info!("got message: {}", data);
 
                 match MessageEvent::process(message_event, data) {
-                  Ok(job_id) => {
-                    let msg = json!({
-                      "job_id": job_id,
-                      "status": "completed"
-                    });
+                  Ok(job_result) => {
+                    let msg = json!(job_result);
 
                     let result = ch
                       .basic_publish(

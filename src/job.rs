@@ -243,3 +243,31 @@ impl Job {
     Ok(())
   }
 }
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub enum JobStatus {
+  #[serde(rename = "unknown")]
+  Unknown,
+  #[serde(rename = "completed")]
+  Completed,
+  #[serde(rename = "error")]
+  Error,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JobResult {
+  pub job_id: u64,
+  pub status: JobStatus,
+  pub parameters: Vec<Parameter>,
+}
+
+impl From<Job> for JobResult {
+  fn from(job: Job) -> JobResult {
+    JobResult {
+      job_id: job.job_id,
+      status: JobStatus::Unknown,
+      parameters: vec![],
+    }
+  }
+}
+
