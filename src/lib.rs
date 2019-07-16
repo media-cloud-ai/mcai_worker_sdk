@@ -24,6 +24,8 @@ use config::*;
 use failure::Error;
 use futures::future::Future;
 use futures::Stream;
+use job::JobResult;
+use job::JobStatus;
 use lapin::options::{
   BasicConsumeOptions, BasicPublishOptions, BasicQosOptions, BasicRejectOptions,
   QueueDeclareOptions,
@@ -34,7 +36,7 @@ use std::{thread, time};
 use tokio::runtime::Runtime;
 
 pub trait MessageEvent {
-  fn process(&self, _message: &str) -> Result<u64, MessageError>
+  fn process(&self, _message: &str) -> Result<JobResult, MessageError>
   where
     Self: std::marker::Sized,
   {
@@ -45,7 +47,7 @@ pub trait MessageEvent {
 #[derive(Debug, PartialEq)]
 pub enum MessageError {
   RuntimeError(String),
-  ProcessingError(u64, String),
+  ProcessingError(JobResult),
   RequirementsError(String),
   NotImplemented(),
 }
@@ -147,11 +149,8 @@ where
                 info!("got message: {}", data);
 
                 match MessageEvent::process(message_event, data) {
-                  Ok(job_id) => {
-                    let msg = json!({
-                      "job_id": job_id,
-                      "status": "completed"
-                    });
+                  Ok(job_result) => {
+                    let msg = json!(job_result);
 
                     let result = ch
                       .basic_publish(
@@ -204,11 +203,11 @@ where
                         error!("Unable to reject message {:?}", msg);
                       }
                     }
-                    MessageError::ProcessingError(job_id, msg) => {
-                      let content = json!({
-                        "status": "error",
-                        "job_id": job_id,
-                        "message": msg
+                    MessageError::ProcessingError(job_result) => {
+                      let content = json!(JobResult {
+                        job_id: job_result.job_id,
+                        status: JobStatus::Error,
+                        parameters: job_result.parameters,
                       });
                       if ch
                         .basic_publish(
