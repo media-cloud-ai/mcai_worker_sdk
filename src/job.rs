@@ -197,7 +197,7 @@ impl Credential {
       let mut response = check_error(request, &thread_job)?;
 
       let r: SessionResponseBody = response.json().map_err(|e| {
-        let job_result = JobResult::from(thread_job.clone())
+        let job_result = JobResult::from(&thread_job)
           .with_status(JobStatus::Error)
           .with_error(e);
         MessageError::ProcessingError(job_result)
@@ -330,7 +330,7 @@ impl JobResult {
 
 fn check_error<T>(item: Result<T, Error>, job: &Job) -> Result<T, MessageError> {
   item.map_err(|e| {
-    let job_result = JobResult::from(job.clone())
+    let job_result = JobResult::from(job)
       .with_status(JobStatus::Error)
       .with_error(e);
     MessageError::ProcessingError(job_result)
@@ -339,7 +339,7 @@ fn check_error<T>(item: Result<T, Error>, job: &Job) -> Result<T, MessageError> 
 
 fn parse_json(mut body: reqwest::Response, job: &Job) -> Result<ValueResponseBody, MessageError> {
   body.json().map_err(|e| {
-    let job_result = JobResult::from(job.clone())
+    let job_result = JobResult::from(job)
       .with_status(JobStatus::Error)
       .with_error(e);
     MessageError::ProcessingError(job_result)
