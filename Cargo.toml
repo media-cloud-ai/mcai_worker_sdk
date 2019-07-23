@@ -1,6 +1,6 @@
 [package]
 name = "amqp_worker"
-version = "0.5.4"
+version = "0.5.5"
 authors = [
   "Marc-Antoine Arnaud <arnaud.marcantoine@gmail.com>",
   "Valentin Noel <valentin.noel@media-io.com>"
@@ -16,6 +16,8 @@ edition = "2018"
 
 [dependencies]
 amq-protocol-uri = "^2.1"
+chrono = "0.4"
+env_logger = "^0.6"
 failure = "^0.1"
 futures = "^0.1"
 lapin-futures = "^0.25"
