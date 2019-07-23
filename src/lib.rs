@@ -3,6 +3,8 @@
 #![doc(html_no_source)]
 
 extern crate amq_protocol_uri;
+extern crate chrono;
+extern crate env_logger;
 extern crate failure;
 extern crate futures;
 #[macro_use]
@@ -20,7 +22,9 @@ mod config;
 pub mod job;
 
 use amq_protocol_uri::*;
+use chrono::prelude::*;
 use config::*;
+use env_logger::Builder;
 use failure::Error;
 use futures::future::Future;
 use futures::Stream;
@@ -32,6 +36,8 @@ use lapin::options::{
 };
 use lapin::types::FieldTable;
 use lapin::{BasicProperties, ConnectionProperties};
+use std::fs;
+use std::io::Write;
 use std::{thread, time};
 use tokio::runtime::Runtime;
 
@@ -52,10 +58,60 @@ pub enum MessageError {
   NotImplemented(),
 }
 
+fn load_docker_container_id(filename: &str) -> String {
+  match fs::read_to_string(filename) {
+    Ok(content) => {
+      let lines: Vec<&str> = content.split("\n").collect();
+      if lines.is_empty() {
+        return "unknown".to_string();
+      }
+      let items: Vec<&str> = lines[0].split(":").collect();
+      if items.len() != 3 {
+        return "unknown".to_string();
+      }
+
+      let long_identifier: Vec<&str> = items[2].split("/docker/").collect();
+      if long_identifier.len() != 2 {
+        return "unknown".to_string();
+      }
+      let mut identifier = long_identifier[1].to_string();
+      identifier.truncate(12);
+      identifier
+    }
+    Err(_msg) => "unknown".to_string(),
+  }
+}
+
+#[test]
+fn test_load_docker_container_id() {
+  assert_eq!(
+    load_docker_container_id("./tests/cgroup.sample"),
+    "da9002cb1553".to_string()
+  );
+}
+
 pub fn start_worker<ME: MessageEvent>(message_event: &'static ME)
 where
   ME: std::marker::Sync,
 {
+  let mut builder = Builder::from_default_env();
+  let container_id = load_docker_container_id("/proc/self/cgroup");
+  let queue = get_amqp_queue();
+
+  builder
+    .format(move |stream, record| {
+      writeln!(
+        stream,
+        "{} - {} - {} - {} - {}",
+        Utc::now(),
+        &container_id,
+        record.level(),
+        queue,
+        record.args()
+      )
+    })
+    .init();
+
   loop {
     let amqp_tls = get_amqp_tls();
     let amqp_hostname = get_amqp_hostname();
@@ -144,7 +200,7 @@ where
             .and_then(move |stream| {
               warn!("start listening stream");
               stream.for_each(move |message| {
-                info!("raw message: {:?}", message);
+                trace!("raw message: {:?}", message);
                 let data = std::str::from_utf8(&message.data).unwrap();
                 info!("got message: {}", data);
 
