@@ -1,6 +1,6 @@
 [package]
 name = "amqp_worker"
-version = "0.5.4"
+version = "0.5.5"
 authors = [
   "Marc-Antoine Arnaud <arnaud.marcantoine@gmail.com>",
   "Valentin Noel <valentin.noel@media-io.com>"
