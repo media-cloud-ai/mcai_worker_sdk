@@ -21,6 +21,7 @@ extern crate tokio;
 
 mod config;
 pub mod job;
+mod message_helpers;
 
 use amq_protocol_types::AMQPValue;
 use amq_protocol_uri::*;
@@ -28,12 +29,17 @@ use chrono::prelude::*;
 use config::*;
 use env_logger::Builder;
 use failure::Error;
-use futures::future::Future;
-use futures::Stream;
+use futures::{
+  future::Future,
+  Stream
+};
 use job::{JobResult, JobStatus};
-use lapin::options::*;
-use lapin::types::FieldTable;
-use lapin::{BasicProperties, ConnectionProperties};
+use lapin::{
+  BasicProperties,
+  ConnectionProperties,
+  options::*,
+  types::FieldTable
+};
 use std::{
   env,
   fs,
@@ -254,8 +260,10 @@ where
               warn!("start listening stream");
               stream.for_each(move |message| {
                 trace!("raw message: {:?}", message);
+
+                let count = crate::message_helpers::get_message_death_count(&message);
                 let data = std::str::from_utf8(&message.data).unwrap();
-                info!("got message: {}", data);
+                info!("got message: {} (iteration: {})", data, count.unwrap_or(0));
 
                 match MessageEvent::process(message_event, data) {
                   Ok(job_result) => {
