@@ -29,24 +29,10 @@ use chrono::prelude::*;
 use config::*;
 use env_logger::Builder;
 use failure::Error;
-use futures::{
-  future::Future,
-  Stream
-};
+use futures::{future::Future, Stream};
 use job::{JobResult, JobStatus};
-use lapin::{
-  BasicProperties,
-  ConnectionProperties,
-  options::*,
-  types::FieldTable
-};
-use std::{
-  env,
-  fs,
-  io::Write,
-  thread,
-  time,
-};
+use lapin::{options::*, types::FieldTable, BasicProperties, ConnectionProperties};
+use std::{env, fs, io::Write, thread, time};
 use tokio::runtime::Runtime;
 
 pub trait MessageEvent {
@@ -191,61 +177,79 @@ where
               exchange_type,
               ExchangeDeclareOptions::default(),
               FieldTable::default(),
-            ).wait()
+            )
+            .wait()
           {
             error!("Unable to create exchange {}: {:?}", delayed_name, msg);
           }
 
           let mut delaying_queue_fields = FieldTable::default();
-          delaying_queue_fields.insert("x-dead-letter-exchange".into(), AMQPValue::LongString("".into()));
+          delaying_queue_fields.insert(
+            "x-dead-letter-exchange".into(),
+            AMQPValue::LongString("".into()),
+          );
           delaying_queue_fields.insert("x-message-ttl".into(), AMQPValue::ShortInt(5000));
 
-          if let Err(msg) = channel.queue_declare(
-            &delayed_name,
-            QueueDeclareOptions::default(),
-            delaying_queue_fields,
-          ).wait() {
+          if let Err(msg) = channel
+            .queue_declare(
+              &delayed_name,
+              QueueDeclareOptions::default(),
+              delaying_queue_fields,
+            )
+            .wait()
+          {
             error!("Unable to create queue {}: {:?}", delayed_name, msg);
           }
 
           let routing_key = "*";
 
-          if let Err(msg) = channel.queue_bind(
-            &delayed_name,
-            &delayed_name,
-            routing_key,
-            QueueBindOptions::default(),
-            FieldTable::default()
-          ).wait() {
+          if let Err(msg) = channel
+            .queue_bind(
+              &delayed_name,
+              &delayed_name,
+              routing_key,
+              QueueBindOptions::default(),
+              FieldTable::default(),
+            )
+            .wait()
+          {
             error!("Unable to create queue {}: {:?}", delayed_name, msg);
           }
 
-          if let Err(msg) = channel.queue_declare(
-            &amqp_completed_queue,
-            QueueDeclareOptions::default(),
-            FieldTable::default(),
-          ).wait() {
+          if let Err(msg) = channel
+            .queue_declare(
+              &amqp_completed_queue,
+              QueueDeclareOptions::default(),
+              FieldTable::default(),
+            )
+            .wait()
+          {
             error!("Unable to create queue {}: {:?}", amqp_completed_queue, msg);
           }
 
-          if let Err(msg) = channel.queue_declare(
-            &amqp_error_queue,
-            QueueDeclareOptions::default(),
-            FieldTable::default(),
-          ).wait() {
+          if let Err(msg) = channel
+            .queue_declare(
+              &amqp_error_queue,
+              QueueDeclareOptions::default(),
+              FieldTable::default(),
+            )
+            .wait()
+          {
             error!("Unable to create queue {}: {:?}", amqp_error_queue, msg);
           }
 
           let mut queue_fields = FieldTable::default();
-          queue_fields.insert("x-dead-letter-exchange".into(), AMQPValue::LongString(delayed_name.into()));
-          queue_fields.insert("x-dead-letter-routing-key".into(), AMQPValue::LongString(amqp_queue.clone().into()));
+          queue_fields.insert(
+            "x-dead-letter-exchange".into(),
+            AMQPValue::LongString(delayed_name.into()),
+          );
+          queue_fields.insert(
+            "x-dead-letter-routing-key".into(),
+            AMQPValue::LongString(amqp_queue.clone().into()),
+          );
 
           channel
-            .queue_declare(
-              &amqp_queue,
-              QueueDeclareOptions::default(),
-              queue_fields,
-            )
+            .queue_declare(&amqp_queue, QueueDeclareOptions::default(), queue_fields)
             .and_then(move |queue| {
               info!("channel {} declared queue {}", id, amqp_queue);
 
@@ -300,10 +304,7 @@ where
                     MessageError::RequirementsError(msg) => {
                       debug!("{}", msg);
                       if let Err(msg) = ch
-                        .basic_reject(
-                          message.delivery_tag,
-                          BasicRejectOptions::default(),
-                        )
+                        .basic_reject(message.delivery_tag, BasicRejectOptions::default())
                         .wait()
                       {
                         error!("Unable to reject message {:?}", msg);

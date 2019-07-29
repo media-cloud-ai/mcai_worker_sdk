@@ -1,4 +1,3 @@
-
 use amq_protocol_types::AMQPValue;
 use lapin_futures::message::Delivery;
 
@@ -11,7 +10,7 @@ pub fn get_message_death_count(message: &Delivery) -> Option<i64> {
         let pouet = array.as_slice();
         if let AMQPValue::FieldTable(params) = &pouet[0] {
           if let Some(AMQPValue::LongLongInt(value)) = params.inner().get("count") {
-            return Some(*value)
+            return Some(*value);
           }
         }
       }
