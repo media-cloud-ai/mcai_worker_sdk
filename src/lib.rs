@@ -114,6 +114,11 @@ where
     })
     .init();
 
+  let queue = env::var("AMQP_QUEUE").expect("missing AMQP queue");
+  let version = env::var("VERSION").expect("missing software version");
+
+  info!("Worker: {}, version: {}", queue, version);
+
   loop {
     let amqp_tls = get_amqp_tls();
     let amqp_hostname = get_amqp_hostname();
