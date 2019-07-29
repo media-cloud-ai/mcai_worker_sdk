@@ -149,7 +149,10 @@ fn test_check_invalid_requirements() {
   let error = requirement_result.unwrap_err();
   assert_matches!(error, MessageError::RequirementsError(_));
   if let MessageError::RequirementsError(msg) = error {
-    assert_matches!(msg.as_str(), "Warning: Required file does not exists: \"nonexistent_file\"");
+    assert_matches!(
+      msg.as_str(),
+      "Warning: Required file does not exists: \"nonexistent_file\""
+    );
   }
 }
 
@@ -349,7 +352,6 @@ fn test_job_result_with_setters() {
   assert!(optional_string.is_some());
   let string_value = optional_string.unwrap();
   assert_eq!(hello.to_string(), string_value.to_string());
-
 
   // let mut job_result = JobResult::new(job_id, JobStatus::Unknown, vec![]);
 
