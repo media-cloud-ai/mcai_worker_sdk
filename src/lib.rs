@@ -196,14 +196,14 @@ where
             error!("Unable to create exchange {}: {:?}", delayed_name, msg);
           }
 
-          let mut fields_delayed = FieldTable::default();
-          fields_delayed.insert("x-dead-letter-exchange".into(), AMQPValue::LongString("".into()));
-          fields_delayed.insert("x-message-ttl".into(), AMQPValue::ShortInt(5000));
+          let mut delaying_queue_fields = FieldTable::default();
+          delaying_queue_fields.insert("x-dead-letter-exchange".into(), AMQPValue::LongString("".into()));
+          delaying_queue_fields.insert("x-message-ttl".into(), AMQPValue::ShortInt(5000));
 
           if let Err(msg) = channel.queue_declare(
             &delayed_name,
             QueueDeclareOptions::default(),
-            fields_delayed,
+            delaying_queue_fields,
           ).wait() {
             error!("Unable to create queue {}: {:?}", delayed_name, msg);
           }
@@ -236,15 +236,15 @@ where
             error!("Unable to create queue {}: {:?}", amqp_error_queue, msg);
           }
 
-          let mut fields_queue = FieldTable::default();
-          fields_queue.insert("x-dead-letter-exchange".into(), AMQPValue::LongString(delayed_name.into()));
-          fields_queue.insert("x-dead-letter-routing-key".into(), AMQPValue::LongString(amqp_queue.clone().into()));
+          let mut queue_fields = FieldTable::default();
+          queue_fields.insert("x-dead-letter-exchange".into(), AMQPValue::LongString(delayed_name.into()));
+          queue_fields.insert("x-dead-letter-routing-key".into(), AMQPValue::LongString(amqp_queue.clone().into()));
 
           channel
             .queue_declare(
               &amqp_queue,
               QueueDeclareOptions::default(),
-              fields_queue,
+              queue_fields,
             )
             .and_then(move |queue| {
               info!("channel {} declared queue {}", id, amqp_queue);
