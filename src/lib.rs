@@ -2,6 +2,7 @@
 #![doc(html_logo_url = "https://media-io.com/images/mediaio_logo.png")]
 #![doc(html_no_source)]
 
+extern crate amq_protocol_types;
 extern crate amq_protocol_uri;
 extern crate chrono;
 extern crate env_logger;
@@ -21,6 +22,7 @@ extern crate tokio;
 mod config;
 pub mod job;
 
+use amq_protocol_types::AMQPValue;
 use amq_protocol_uri::*;
 use chrono::prelude::*;
 use config::*;
@@ -28,17 +30,17 @@ use env_logger::Builder;
 use failure::Error;
 use futures::future::Future;
 use futures::Stream;
-use job::JobResult;
-use job::JobStatus;
-use lapin::options::{
-  BasicConsumeOptions, BasicPublishOptions, BasicQosOptions, BasicRejectOptions,
-  QueueDeclareOptions,
-};
+use job::{JobResult, JobStatus};
+use lapin::options::*;
 use lapin::types::FieldTable;
 use lapin::{BasicProperties, ConnectionProperties};
-use std::fs;
-use std::io::Write;
-use std::{thread, time};
+use std::{
+  env,
+  fs,
+  io::Write,
+  thread,
+  time,
+};
 use tokio::runtime::Runtime;
 
 pub trait MessageEvent {
@@ -105,8 +107,8 @@ where
         "{} - {} - {} - {} - {}",
         Utc::now(),
         &container_id,
-        record.level(),
         queue,
+        record.level(),
         record.args()
       )
     })
@@ -169,23 +171,69 @@ where
 
           let ch = channel.clone();
 
-          channel.queue_declare(
+          let delayed_name = amqp_queue.clone() + "_delayed";
+          let exchange_type = "fanout";
+
+          if let Err(msg) = channel
+            .exchange_declare(
+              &delayed_name,
+              exchange_type,
+              ExchangeDeclareOptions::default(),
+              FieldTable::default(),
+            ).wait()
+          {
+            error!("Unable to create exchange {}: {:?}", delayed_name, msg);
+          }
+
+          let mut fields_delayed = FieldTable::default();
+          fields_delayed.insert("x-dead-letter-exchange".into(), AMQPValue::LongString("".into()));
+          fields_delayed.insert("x-message-ttl".into(), AMQPValue::ShortInt(5000));
+
+          if let Err(msg) = channel.queue_declare(
+            &delayed_name,
+            QueueDeclareOptions::default(),
+            fields_delayed,
+          ).wait() {
+            error!("Unable to create queue {}: {:?}", delayed_name, msg);
+          }
+
+          let routing_key = "*";
+
+          if let Err(msg) = channel.queue_bind(
+            &delayed_name,
+            &delayed_name,
+            routing_key,
+            QueueBindOptions::default(),
+            FieldTable::default()
+          ).wait() {
+            error!("Unable to create queue {}: {:?}", delayed_name, msg);
+          }
+
+          if let Err(msg) = channel.queue_declare(
             &amqp_completed_queue,
             QueueDeclareOptions::default(),
             FieldTable::default(),
-          );
+          ).wait() {
+            error!("Unable to create queue {}: {:?}", amqp_completed_queue, msg);
+          }
 
-          channel.queue_declare(
+          if let Err(msg) = channel.queue_declare(
             &amqp_error_queue,
             QueueDeclareOptions::default(),
             FieldTable::default(),
-          );
+          ).wait() {
+            error!("Unable to create queue {}: {:?}", amqp_error_queue, msg);
+          }
+
+          let mut fields_queue = FieldTable::default();
+          fields_queue.insert("x-dead-letter-exchange".into(), AMQPValue::LongString(delayed_name.into()));
+          fields_queue.insert("x-dead-letter-routing-key".into(), AMQPValue::LongString(amqp_queue.clone().into()));
 
           channel
             .queue_declare(
               &amqp_queue,
               QueueDeclareOptions::default(),
-              FieldTable::default(),
+              fields_queue,
             )
             .and_then(move |queue| {
               info!("channel {} declared queue {}", id, amqp_queue);
@@ -241,7 +289,7 @@ where
                       if let Err(msg) = ch
                         .basic_reject(
                           message.delivery_tag,
-                          BasicRejectOptions { requeue: true }, /*requeue*/
+                          BasicRejectOptions::default(),
                         )
                         .wait()
                       {
