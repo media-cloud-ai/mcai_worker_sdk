@@ -64,3 +64,19 @@ pub fn get_backend_username() -> String {
 pub fn get_backend_password() -> String {
   get_env_value!("BACKEND_PASSWORD", "")
 }
+
+#[test]
+fn configuration() {
+  assert!(get_amqp_tls() == true);
+  assert!(get_amqp_hostname() == "127.0.0.1".to_string());
+  assert!(get_amqp_port() == 5672);
+  assert!(get_amqp_username() == "guest".to_string());
+  assert!(get_amqp_password() == "guest".to_string());
+  assert!(get_amqp_vhost() == "/".to_string());
+  assert!(get_amqp_queue() == "job_undefined".to_string());
+  assert!(get_amqp_completed_queue() == "job_undefined_completed".to_string());
+  assert!(get_amqp_error_queue() == "job_undefined_error".to_string());
+  assert!(get_backend_hostname() == "http://127.0.0.1:4000/api".to_string());
+  assert!(get_backend_username() == "".to_string());
+  assert!(get_backend_password() == "".to_string());
+}
