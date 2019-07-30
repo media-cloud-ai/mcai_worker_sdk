@@ -54,13 +54,10 @@ pub enum MessageError {
 
 fn load_docker_container_id(filename: &str) -> String {
   match fs::read_to_string(filename) {
-    Ok(content) => {
-      parse_docker_container_id(&content)
-    }
+    Ok(content) => parse_docker_container_id(&content),
     Err(_msg) => "unknown".to_string(),
   }
 }
-
 
 fn parse_docker_container_id(content: &str) -> String {
   let lines: Vec<&str> = content.split("\n").collect();
@@ -93,18 +90,9 @@ fn test_load_docker_container_id() {
     "unknown".to_string()
   );
 
-  assert_eq!(
-    parse_docker_container_id(""),
-    "unknown".to_string()
-  );
-  assert_eq!(
-    parse_docker_container_id("\n"),
-    "unknown".to_string()
-  );
-  assert_eq!(
-    parse_docker_container_id("a:b:c\n"),
-    "unknown".to_string()
-  );
+  assert_eq!(parse_docker_container_id(""), "unknown".to_string());
+  assert_eq!(parse_docker_container_id("\n"), "unknown".to_string());
+  assert_eq!(parse_docker_container_id("a:b:c\n"), "unknown".to_string());
 }
 
 pub fn start_worker<ME: MessageEvent>(message_event: &'static ME)
@@ -428,12 +416,10 @@ where
 
 #[test]
 fn empty_message_event_impl() {
-
   #[derive(Debug)]
   struct CustomEvent {}
 
-  impl MessageEvent for CustomEvent {
-  }
+  impl MessageEvent for CustomEvent {}
 
   let custom_event = CustomEvent {};
 
