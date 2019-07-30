@@ -55,25 +55,30 @@ pub enum MessageError {
 fn load_docker_container_id(filename: &str) -> String {
   match fs::read_to_string(filename) {
     Ok(content) => {
-      let lines: Vec<&str> = content.split("\n").collect();
-      if lines.is_empty() {
-        return "unknown".to_string();
-      }
-      let items: Vec<&str> = lines[0].split(":").collect();
-      if items.len() != 3 {
-        return "unknown".to_string();
-      }
-
-      let long_identifier: Vec<&str> = items[2].split("/docker/").collect();
-      if long_identifier.len() != 2 {
-        return "unknown".to_string();
-      }
-      let mut identifier = long_identifier[1].to_string();
-      identifier.truncate(12);
-      identifier
+      parse_docker_container_id(&content)
     }
     Err(_msg) => "unknown".to_string(),
   }
+}
+
+
+fn parse_docker_container_id(content: &str) -> String {
+  let lines: Vec<&str> = content.split("\n").collect();
+  if lines.is_empty() {
+    return "unknown".to_string();
+  }
+  let items: Vec<&str> = lines[0].split(":").collect();
+  if items.len() != 3 {
+    return "unknown".to_string();
+  }
+
+  let long_identifier: Vec<&str> = items[2].split("/docker/").collect();
+  if long_identifier.len() != 2 {
+    return "unknown".to_string();
+  }
+  let mut identifier = long_identifier[1].to_string();
+  identifier.truncate(12);
+  identifier
 }
 
 #[test]
@@ -81,6 +86,24 @@ fn test_load_docker_container_id() {
   assert_eq!(
     load_docker_container_id("./tests/cgroup.sample"),
     "da9002cb1553".to_string()
+  );
+
+  assert_eq!(
+    load_docker_container_id("/tmp/file_not_exists"),
+    "unknown".to_string()
+  );
+
+  assert_eq!(
+    parse_docker_container_id(""),
+    "unknown".to_string()
+  );
+  assert_eq!(
+    parse_docker_container_id("\n"),
+    "unknown".to_string()
+  );
+  assert_eq!(
+    parse_docker_container_id("a:b:c\n"),
+    "unknown".to_string()
   );
 }
 
@@ -401,4 +424,19 @@ where
     let sleep_duration = time::Duration::new(1, 0);
     thread::sleep(sleep_duration);
   }
+}
+
+#[test]
+fn empty_message_event_impl() {
+
+  #[derive(Debug)]
+  struct CustomEvent {}
+
+  impl MessageEvent for CustomEvent {
+  }
+
+  let custom_event = CustomEvent {};
+
+  let result = custom_event.process("test");
+  assert!(result == Err(MessageError::NotImplemented()));
 }
