@@ -118,7 +118,7 @@ where
     .init();
 
   let queue = env::var("AMQP_QUEUE").expect("missing AMQP queue");
-  let version = env::var("VERSION").unwrap_or("unknown");
+  let version = env::var("VERSION").unwrap_or("unknown".to_string());
 
   info!("Worker: {}, version: {}", queue, version);
 
