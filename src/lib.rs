@@ -2,6 +2,7 @@
 #![doc(html_logo_url = "https://media-io.com/images/mediaio_logo.png")]
 #![doc(html_no_source)]
 
+extern crate amq_protocol_types;
 extern crate amq_protocol_uri;
 extern crate chrono;
 extern crate env_logger;
@@ -20,25 +21,18 @@ extern crate tokio;
 
 mod config;
 pub mod job;
+mod message_helpers;
 
+use amq_protocol_types::AMQPValue;
 use amq_protocol_uri::*;
 use chrono::prelude::*;
 use config::*;
 use env_logger::Builder;
 use failure::Error;
-use futures::future::Future;
-use futures::Stream;
-use job::JobResult;
-use job::JobStatus;
-use lapin::options::{
-  BasicConsumeOptions, BasicPublishOptions, BasicQosOptions, BasicRejectOptions,
-  QueueDeclareOptions,
-};
-use lapin::types::FieldTable;
-use lapin::{BasicProperties, ConnectionProperties};
-use std::fs;
-use std::io::Write;
-use std::{thread, time};
+use futures::{future::Future, Stream};
+use job::{JobResult, JobStatus};
+use lapin::{options::*, types::FieldTable, BasicProperties, ConnectionProperties};
+use std::{env, fs, io::Write, thread, time};
 use tokio::runtime::Runtime;
 
 pub trait MessageEvent {
@@ -60,26 +54,28 @@ pub enum MessageError {
 
 fn load_docker_container_id(filename: &str) -> String {
   match fs::read_to_string(filename) {
-    Ok(content) => {
-      let lines: Vec<&str> = content.split("\n").collect();
-      if lines.is_empty() {
-        return "unknown".to_string();
-      }
-      let items: Vec<&str> = lines[0].split(":").collect();
-      if items.len() != 3 {
-        return "unknown".to_string();
-      }
-
-      let long_identifier: Vec<&str> = items[2].split("/docker/").collect();
-      if long_identifier.len() != 2 {
-        return "unknown".to_string();
-      }
-      let mut identifier = long_identifier[1].to_string();
-      identifier.truncate(12);
-      identifier
-    }
+    Ok(content) => parse_docker_container_id(&content),
     Err(_msg) => "unknown".to_string(),
   }
+}
+
+fn parse_docker_container_id(content: &str) -> String {
+  let lines: Vec<&str> = content.split("\n").collect();
+  if lines.is_empty() {
+    return "unknown".to_string();
+  }
+  let items: Vec<&str> = lines[0].split(":").collect();
+  if items.len() != 3 {
+    return "unknown".to_string();
+  }
+
+  let long_identifier: Vec<&str> = items[2].split("/docker/").collect();
+  if long_identifier.len() != 2 {
+    return "unknown".to_string();
+  }
+  let mut identifier = long_identifier[1].to_string();
+  identifier.truncate(12);
+  identifier
 }
 
 #[test]
@@ -88,6 +84,15 @@ fn test_load_docker_container_id() {
     load_docker_container_id("./tests/cgroup.sample"),
     "da9002cb1553".to_string()
   );
+
+  assert_eq!(
+    load_docker_container_id("/tmp/file_not_exists"),
+    "unknown".to_string()
+  );
+
+  assert_eq!(parse_docker_container_id(""), "unknown".to_string());
+  assert_eq!(parse_docker_container_id("\n"), "unknown".to_string());
+  assert_eq!(parse_docker_container_id("a:b:c\n"), "unknown".to_string());
 }
 
 pub fn start_worker<ME: MessageEvent>(message_event: &'static ME)
@@ -105,12 +110,17 @@ where
         "{} - {} - {} - {} - {}",
         Utc::now(),
         &container_id,
-        record.level(),
         queue,
+        record.level(),
         record.args()
       )
     })
     .init();
+
+  let queue = env::var("AMQP_QUEUE").expect("missing AMQP queue");
+  let version = env::var("VERSION").expect("missing software version");
+
+  info!("Worker: {}, version: {}", queue, version);
 
   loop {
     let amqp_tls = get_amqp_tls();
@@ -169,24 +179,88 @@ where
 
           let ch = channel.clone();
 
-          channel.queue_declare(
-            &amqp_completed_queue,
-            QueueDeclareOptions::default(),
-            FieldTable::default(),
-          );
+          let delayed_name = amqp_queue.clone() + "_delayed";
+          let exchange_type = "fanout";
 
-          channel.queue_declare(
-            &amqp_error_queue,
-            QueueDeclareOptions::default(),
-            FieldTable::default(),
-          );
+          if let Err(msg) = channel
+            .exchange_declare(
+              &delayed_name,
+              exchange_type,
+              ExchangeDeclareOptions::default(),
+              FieldTable::default(),
+            )
+            .wait()
+          {
+            error!("Unable to create exchange {}: {:?}", delayed_name, msg);
+          }
 
-          channel
+          let mut delaying_queue_fields = FieldTable::default();
+          delaying_queue_fields.insert(
+            "x-dead-letter-exchange".into(),
+            AMQPValue::LongString("".into()),
+          );
+          delaying_queue_fields.insert("x-message-ttl".into(), AMQPValue::ShortInt(5000));
+
+          if let Err(msg) = channel
             .queue_declare(
-              &amqp_queue,
+              &delayed_name,
+              QueueDeclareOptions::default(),
+              delaying_queue_fields,
+            )
+            .wait()
+          {
+            error!("Unable to create queue {}: {:?}", delayed_name, msg);
+          }
+
+          let routing_key = "*";
+
+          if let Err(msg) = channel
+            .queue_bind(
+              &delayed_name,
+              &delayed_name,
+              routing_key,
+              QueueBindOptions::default(),
+              FieldTable::default(),
+            )
+            .wait()
+          {
+            error!("Unable to create queue {}: {:?}", delayed_name, msg);
+          }
+
+          if let Err(msg) = channel
+            .queue_declare(
+              &amqp_completed_queue,
               QueueDeclareOptions::default(),
               FieldTable::default(),
             )
+            .wait()
+          {
+            error!("Unable to create queue {}: {:?}", amqp_completed_queue, msg);
+          }
+
+          if let Err(msg) = channel
+            .queue_declare(
+              &amqp_error_queue,
+              QueueDeclareOptions::default(),
+              FieldTable::default(),
+            )
+            .wait()
+          {
+            error!("Unable to create queue {}: {:?}", amqp_error_queue, msg);
+          }
+
+          let mut queue_fields = FieldTable::default();
+          queue_fields.insert(
+            "x-dead-letter-exchange".into(),
+            AMQPValue::LongString(delayed_name.into()),
+          );
+          queue_fields.insert(
+            "x-dead-letter-routing-key".into(),
+            AMQPValue::LongString(amqp_queue.clone().into()),
+          );
+
+          channel
+            .queue_declare(&amqp_queue, QueueDeclareOptions::default(), queue_fields)
             .and_then(move |queue| {
               info!("channel {} declared queue {}", id, amqp_queue);
 
@@ -201,8 +275,10 @@ where
               warn!("start listening stream");
               stream.for_each(move |message| {
                 trace!("raw message: {:?}", message);
+
+                let count = crate::message_helpers::get_message_death_count(&message);
                 let data = std::str::from_utf8(&message.data).unwrap();
-                info!("got message: {}", data);
+                info!("got message: {} (iteration: {})", data, count.unwrap_or(0));
 
                 match MessageEvent::process(message_event, data) {
                   Ok(job_result) => {
@@ -239,10 +315,7 @@ where
                     MessageError::RequirementsError(msg) => {
                       debug!("{}", msg);
                       if let Err(msg) = ch
-                        .basic_reject(
-                          message.delivery_tag,
-                          BasicRejectOptions { requeue: true }, /*requeue*/
-                        )
+                        .basic_reject(message.delivery_tag, BasicRejectOptions::default())
                         .wait()
                       {
                         error!("Unable to reject message {:?}", msg);
@@ -339,4 +412,17 @@ where
     let sleep_duration = time::Duration::new(1, 0);
     thread::sleep(sleep_duration);
   }
+}
+
+#[test]
+fn empty_message_event_impl() {
+  #[derive(Debug)]
+  struct CustomEvent {}
+
+  impl MessageEvent for CustomEvent {}
+
+  let custom_event = CustomEvent {};
+
+  let result = custom_event.process("test");
+  assert!(result == Err(MessageError::NotImplemented()));
 }
