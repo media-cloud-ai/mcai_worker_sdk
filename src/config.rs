@@ -79,4 +79,9 @@ fn configuration() {
   assert!(get_backend_hostname() == "http://127.0.0.1:4000/api".to_string());
   assert!(get_backend_username() == "".to_string());
   assert!(get_backend_password() == "".to_string());
+
+  env::set_var("AMQP_TLS", "False");
+  assert!(get_amqp_tls() == false);
+  env::set_var("AMQP_PORT", "BAD_VALUE");
+  assert!(get_amqp_port() == 5672);
 }

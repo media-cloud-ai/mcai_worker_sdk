@@ -153,6 +153,8 @@ fn test_check_invalid_requirements() {
       msg.as_str(),
       "Warning: Required file does not exists: \"nonexistent_file\""
     );
+  } else {
+    assert!(false);
   }
 }
 
