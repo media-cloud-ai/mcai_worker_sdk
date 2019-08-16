@@ -5,6 +5,7 @@ use reqwest::Error;
 
 use crate::config;
 use crate::MessageError;
+use std::collections::HashMap;
 
 pub trait ParametersContainer {
   fn get_parameters(&self) -> &Vec<Parameter>;
@@ -82,6 +83,14 @@ pub trait ParametersContainer {
     }
     None
   }
+
+  fn get_parameters_as_map(&self) -> HashMap<String, Option<String>> {
+    let mut map = HashMap::new();
+    for param in self.get_parameters() {
+      map.insert(param.get_id(), param.get_value_as_string());
+    }
+    map
+  }
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq)]
@@ -128,6 +137,78 @@ pub enum Parameter {
     default: Option<String>,
     value: Option<String>,
   },
+}
+
+impl Parameter {
+  pub fn get_id(&self) -> String {
+    match self {
+      Parameter::ArrayOfStringsParam { id, ..} |
+      Parameter::BooleanParam { id, ..} |
+      Parameter::CredentialParam { id, ..} |
+      Parameter::IntegerParam { id, ..} |
+      Parameter::RequirementParam { id, ..} |
+      Parameter::StringParam { id, ..} => id.clone()
+    }
+  }
+
+  pub fn get_value_as_string(&self) -> Option<String> {
+    match self {
+      Parameter::ArrayOfStringsParam { value, default, .. } => {
+        if let Some(value) = value {
+          Some(format!("{:?}", value))
+        } else if let Some(default) = default {
+          Some(format!("{:?}", default))
+        } else {
+          None
+        }
+      },
+      Parameter::BooleanParam { value, default, .. } => {
+        if let Some(value) = value {
+          Some(format!("{}", value))
+        } else if let Some(default) = default {
+          Some(format!("{}", default))
+        } else {
+          None
+        }
+      },
+      Parameter::CredentialParam { value, default, .. } => {
+        if let Some(value) = value {
+          Some(format!("{}", value))
+        } else if let Some(default) = default {
+          Some(format!("{}", default))
+        } else {
+          None
+        }
+      },
+      Parameter::IntegerParam {  value, default, .. } => {
+        if let Some(value) = value {
+          Some(format!("{}", value))
+        } else if let Some(default) = default {
+          Some(format!("{}", default))
+        } else {
+          None
+        }
+      },
+      Parameter::RequirementParam {  value, default, .. } => {
+        if let Some(value) = value {
+          Some(format!("{:?}", value))
+        } else if let Some(default) = default {
+          Some(format!("{:?}", default))
+        } else {
+          None
+        }
+      },
+      Parameter::StringParam { value, default, .. } => {
+        if let Some(value) = value {
+          Some(format!("{}", value))
+        } else if let Some(default) = default {
+          Some(format!("{}", default))
+        } else {
+          None
+        }
+      }
+    }
+  }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
