@@ -142,12 +142,12 @@ pub enum Parameter {
 impl Parameter {
   pub fn get_id(&self) -> String {
     match self {
-      Parameter::ArrayOfStringsParam { id, ..} |
-      Parameter::BooleanParam { id, ..} |
-      Parameter::CredentialParam { id, ..} |
-      Parameter::IntegerParam { id, ..} |
-      Parameter::RequirementParam { id, ..} |
-      Parameter::StringParam { id, ..} => id.clone()
+      Parameter::ArrayOfStringsParam { id, .. }
+      | Parameter::BooleanParam { id, .. }
+      | Parameter::CredentialParam { id, .. }
+      | Parameter::IntegerParam { id, .. }
+      | Parameter::RequirementParam { id, .. }
+      | Parameter::StringParam { id, .. } => id.clone(),
     }
   }
 
@@ -161,7 +161,7 @@ impl Parameter {
         } else {
           None
         }
-      },
+      }
       Parameter::BooleanParam { value, default, .. } => {
         if let Some(value) = value {
           Some(format!("{}", value))
@@ -170,7 +170,7 @@ impl Parameter {
         } else {
           None
         }
-      },
+      }
       Parameter::CredentialParam { value, default, .. } => {
         if let Some(value) = value {
           Some(format!("{}", value))
@@ -179,8 +179,8 @@ impl Parameter {
         } else {
           None
         }
-      },
-      Parameter::IntegerParam {  value, default, .. } => {
+      }
+      Parameter::IntegerParam { value, default, .. } => {
         if let Some(value) = value {
           Some(format!("{}", value))
         } else if let Some(default) = default {
@@ -188,8 +188,8 @@ impl Parameter {
         } else {
           None
         }
-      },
-      Parameter::RequirementParam {  value, default, .. } => {
+      }
+      Parameter::RequirementParam { value, default, .. } => {
         if let Some(value) = value {
           Some(format!("{:?}", value))
         } else if let Some(default) = default {
@@ -197,7 +197,7 @@ impl Parameter {
         } else {
           None
         }
-      },
+      }
       Parameter::StringParam { value, default, .. } => {
         if let Some(value) = value {
           Some(format!("{}", value))
