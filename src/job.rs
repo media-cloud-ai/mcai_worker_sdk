@@ -87,7 +87,7 @@ pub trait ParametersContainer {
   fn get_parameters_as_map(&self) -> HashMap<String, String> {
     let mut map = HashMap::new();
     for param in self.get_parameters() {
-      if param.as_value_or_default() {
+      if param.has_value_or_default() {
         map.insert(param.get_id(), param.to_string());
       }
     }
@@ -153,7 +153,7 @@ impl Parameter {
     }
   }
 
-  pub fn as_value_or_default(&self) -> bool {
+  pub fn has_value_or_default(&self) -> bool {
     match self {
       Parameter::ArrayOfStringsParam { value, default, .. } => value.is_some() || default.is_some(),
       Parameter::BooleanParam { value, default, .. } => value.is_some() || default.is_some(),
