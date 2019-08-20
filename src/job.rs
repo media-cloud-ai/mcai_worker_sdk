@@ -84,10 +84,12 @@ pub trait ParametersContainer {
     None
   }
 
-  fn get_parameters_as_map(&self) -> HashMap<String, Option<String>> {
+  fn get_parameters_as_map(&self) -> HashMap<String, String> {
     let mut map = HashMap::new();
     for param in self.get_parameters() {
-      map.insert(param.get_id(), param.get_value_as_string());
+      if param.as_value_or_default() {
+        map.insert(param.get_id(), param.to_string());
+      }
     }
     map
   }
@@ -151,64 +153,43 @@ impl Parameter {
     }
   }
 
-  pub fn get_value_as_string(&self) -> Option<String> {
+  pub fn as_value_or_default(&self) -> bool {
     match self {
-      Parameter::ArrayOfStringsParam { value, default, .. } => {
-        if let Some(value) = value {
-          Some(format!("{:?}", value))
-        } else if let Some(default) = default {
-          Some(format!("{:?}", default))
-        } else {
-          None
-        }
-      }
-      Parameter::BooleanParam { value, default, .. } => {
-        if let Some(value) = value {
-          Some(format!("{}", value))
-        } else if let Some(default) = default {
-          Some(format!("{}", default))
-        } else {
-          None
-        }
-      }
-      Parameter::CredentialParam { value, default, .. } => {
-        if let Some(value) = value {
-          Some(format!("{}", value))
-        } else if let Some(default) = default {
-          Some(format!("{}", default))
-        } else {
-          None
-        }
-      }
-      Parameter::IntegerParam { value, default, .. } => {
-        if let Some(value) = value {
-          Some(format!("{}", value))
-        } else if let Some(default) = default {
-          Some(format!("{}", default))
-        } else {
-          None
-        }
-      }
-      Parameter::RequirementParam { value, default, .. } => {
-        if let Some(value) = value {
-          Some(format!("{:?}", value))
-        } else if let Some(default) = default {
-          Some(format!("{:?}", default))
-        } else {
-          None
-        }
-      }
-      Parameter::StringParam { value, default, .. } => {
-        if let Some(value) = value {
-          Some(format!("{}", value))
-        } else if let Some(default) = default {
-          Some(format!("{}", default))
-        } else {
-          None
-        }
-      }
+      Parameter::ArrayOfStringsParam { value, default, .. } => {value.is_some() || default.is_some()}
+      Parameter::BooleanParam { value, default, .. } => {value.is_some() || default.is_some()}
+      Parameter::CredentialParam { value, default, .. } => {value.is_some() || default.is_some()}
+      Parameter::IntegerParam { value, default, .. } => {value.is_some() || default.is_some()}
+      Parameter::RequirementParam { value, default, .. } => {value.is_some() || default.is_some()}
+      Parameter::StringParam { value, default, .. } => {value.is_some() || default.is_some()}
     }
   }
+}
+
+macro_rules! parameter_to_string {
+  ($default:tt, $value:tt, $pattern:tt) => {{
+    let current_value =
+      if let Some(value) = $value {
+        value
+      } else if let Some(default) = $default {
+        default
+      } else {
+        return "".to_string();
+      };
+    format!($pattern, current_value)
+  }}
+}
+
+impl ToString for Parameter {
+    fn to_string(&self) -> String {
+      match self {
+        Parameter::ArrayOfStringsParam { default, value, .. } => {parameter_to_string!(default, value, "{:?}")},
+        Parameter::RequirementParam { default, value, .. } => {parameter_to_string!(default, value, "{:?}")},
+        Parameter::BooleanParam { default, value, .. } => {parameter_to_string!(default, value, "{}")},
+        Parameter::CredentialParam { default, value, .. } => {parameter_to_string!(default, value, "{}")},
+        Parameter::IntegerParam { default, value, .. } => {parameter_to_string!(default, value, "{}")},
+        Parameter::StringParam { default, value, .. } => {parameter_to_string!(default, value, "{}")},
+      }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
