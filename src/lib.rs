@@ -60,11 +60,11 @@ fn load_docker_container_id(filename: &str) -> String {
 }
 
 fn parse_docker_container_id(content: &str) -> String {
-  let lines: Vec<&str> = content.split("\n").collect();
+  let lines: Vec<&str> = content.split('\n').collect();
   if lines.is_empty() {
     return "unknown".to_string();
   }
-  let items: Vec<&str> = lines[0].split(":").collect();
+  let items: Vec<&str> = lines[0].split(':').collect();
   if items.len() != 3 {
     return "unknown".to_string();
   }
@@ -118,7 +118,7 @@ where
     .init();
 
   let queue = env::var("AMQP_QUEUE").expect("missing AMQP queue");
-  let version = env::var("VERSION").unwrap_or("unknown".to_string());
+  let version = env::var("VERSION").unwrap_or_else(|_| "unknown".to_string());
 
   info!("Worker: {}, version: {}", queue, version);
 
