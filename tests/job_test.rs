@@ -6,6 +6,8 @@ use assert_matches::assert_matches;
 use amqp_worker::job::*;
 use amqp_worker::MessageError;
 
+use std::collections::HashMap;
+
 #[test]
 fn test_new_job_empty_message() {
   let message = "";
@@ -96,6 +98,40 @@ fn test_new_job() {
   let array_of_values = option_array.unwrap();
   assert_eq!(1, array_of_values.len());
   assert_eq!("real_value".to_string(), array_of_values[0]);
+
+  let map = job.get_parameters_as_map();
+  let mut reference_map = HashMap::new();
+  reference_map.insert(
+    "credential_parameter".to_string(),
+    "credential_key".to_string(),
+  );
+  reference_map.insert("boolean_parameter".to_string(), "true".to_string());
+  reference_map.insert(
+    "array_of_string_parameter".to_string(),
+    "[\"real_value\"]".to_string(),
+  );
+  reference_map.insert("integer_parameter".to_string(), "654321".to_string());
+  reference_map.insert("string_parameter".to_string(), "real_value".to_string());
+  assert_eq!(
+    reference_map.get("credential_parameter"),
+    map.get("credential_parameter")
+  );
+  assert_eq!(
+    reference_map.get("boolean_parameter"),
+    map.get("boolean_parameter")
+  );
+  assert_eq!(
+    reference_map.get("array_of_string_parameter"),
+    map.get("array_of_string_parameter")
+  );
+  assert_eq!(
+    reference_map.get("integer_parameter"),
+    map.get("integer_parameter")
+  );
+  assert_eq!(
+    reference_map.get("string_parameter"),
+    map.get("string_parameter")
+  );
 }
 
 #[test]
@@ -219,6 +255,40 @@ fn test_job_result_from_json() {
   let array_of_values = option_array.unwrap();
   assert_eq!(1, array_of_values.len());
   assert_eq!("real_value".to_string(), array_of_values[0]);
+
+  let map = job_result.get_parameters_as_map();
+  let mut reference_map = HashMap::new();
+  reference_map.insert(
+    "credential_parameter".to_string(),
+    "credential_key".to_string(),
+  );
+  reference_map.insert("boolean_parameter".to_string(), "true".to_string());
+  reference_map.insert(
+    "array_of_string_parameter".to_string(),
+    "[\"real_value\"]".to_string(),
+  );
+  reference_map.insert("integer_parameter".to_string(), "654321".to_string());
+  reference_map.insert("string_parameter".to_string(), "real_value".to_string());
+  assert_eq!(
+    reference_map.get("credential_parameter"),
+    map.get("credential_parameter")
+  );
+  assert_eq!(
+    reference_map.get("boolean_parameter"),
+    map.get("boolean_parameter")
+  );
+  assert_eq!(
+    reference_map.get("array_of_string_parameter"),
+    map.get("array_of_string_parameter")
+  );
+  assert_eq!(
+    reference_map.get("integer_parameter"),
+    map.get("integer_parameter")
+  );
+  assert_eq!(
+    reference_map.get("string_parameter"),
+    map.get("string_parameter")
+  );
 }
 
 #[test]
@@ -277,6 +347,40 @@ fn test_job_result_from_json_without_value() {
   let array_of_values = option_array.unwrap();
   assert_eq!(1, array_of_values.len());
   assert_eq!("default_value".to_string(), array_of_values[0]);
+
+  let map = job_result.get_parameters_as_map();
+  let mut reference_map = HashMap::new();
+  reference_map.insert(
+    "credential_parameter".to_string(),
+    "default_credential_key".to_string(),
+  );
+  reference_map.insert("boolean_parameter".to_string(), "false".to_string());
+  reference_map.insert(
+    "array_of_string_parameter".to_string(),
+    "[\"default_value\"]".to_string(),
+  );
+  reference_map.insert("integer_parameter".to_string(), "123456".to_string());
+  reference_map.insert("string_parameter".to_string(), "default_value".to_string());
+  assert_eq!(
+    reference_map.get("credential_parameter"),
+    map.get("credential_parameter")
+  );
+  assert_eq!(
+    reference_map.get("boolean_parameter"),
+    map.get("boolean_parameter")
+  );
+  assert_eq!(
+    reference_map.get("array_of_string_parameter"),
+    map.get("array_of_string_parameter")
+  );
+  assert_eq!(
+    reference_map.get("integer_parameter"),
+    map.get("integer_parameter")
+  );
+  assert_eq!(
+    reference_map.get("string_parameter"),
+    map.get("string_parameter")
+  );
 }
 
 #[test]
