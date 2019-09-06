@@ -11,6 +11,8 @@ rust:
 matrix:
   allow_failures:
     - rust: nightly
+    - env: ALLOW_FAILURE=TRUE
+
   include:
     # Rustfmt
     - rust: stable
@@ -36,7 +38,8 @@ matrix:
       install:
         - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
-        - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+        - cargo tarpaulin -v --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+      env: ALLOW_FAILURE=TRUE
 
 script:
   - cargo test

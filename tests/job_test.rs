@@ -464,3 +464,230 @@ fn test_job_result_with_setters() {
   // let e = std::io::Error::new(std::io::ErrorKind::Other, "oh no!");
   // let job_result = job_result.with_error(reqwest::Error::from(e));
 }
+
+#[test]
+fn test_credential_request_value() {
+  std::env::set_var("BACKEND_HOSTNAME", mockito::server_url());
+  use mockito::mock;
+
+  let _m = mock("POST", "/sessions")
+    .with_header("content-type", "application/json")
+    .with_body(r#"{"access_token": "fake_access_token"}"#)
+    .create();
+
+  let _m = mock("GET", "/credentials/TEST_CREDENTIAL_KEY")
+    .with_header("content-type", "application/json")
+    .with_body(
+      r#"{"data": {
+        "id": 666,
+        "key": "TEST_CREDENTIAL_KEY",
+        "value": "TEST_CREDENTIAL_VALUE",
+        "inserted_at": "today"
+      }}"#,
+    )
+    .create();
+
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      { "id":"test_credential",
+        "type":"credential",
+        "value":"TEST_CREDENTIAL_KEY"
+      }
+    ]
+  }"#;
+
+  let message_parsing = Job::new(message);
+  assert!(message_parsing.is_ok());
+  let job = message_parsing.unwrap();
+  let optional_credential = job.get_credential_parameter("test_credential");
+  assert!(optional_credential.is_some());
+  let credential = optional_credential.unwrap();
+  assert_eq!("TEST_CREDENTIAL_KEY".to_string(), credential.key);
+  let request_result = credential.request_value(&job);
+  assert!(request_result.is_ok());
+  let credential_value = request_result.unwrap();
+  assert_eq!("TEST_CREDENTIAL_VALUE".to_string(), credential_value);
+}
+
+#[test]
+fn test_credential_request_value_no_session() {
+  std::env::set_var("BACKEND_HOSTNAME", mockito::server_url());
+  use mockito::mock;
+
+  let _m = mock("POST", "/sessions").with_status(404).create();
+
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      { "id":"test_credential",
+        "type":"credential",
+        "value":"TEST_CREDENTIAL_KEY"
+      }
+    ]
+  }"#;
+
+  let message_parsing = Job::new(message);
+  assert!(message_parsing.is_ok());
+  let job = message_parsing.unwrap();
+  let optional_credential = job.get_credential_parameter("test_credential");
+  assert!(optional_credential.is_some());
+  let credential = optional_credential.unwrap();
+  assert_eq!("TEST_CREDENTIAL_KEY".to_string(), credential.key);
+  let request_result = credential.request_value(&job);
+  assert!(request_result.is_err());
+  let error = request_result.unwrap_err();
+  assert_eq!(
+    MessageError::ProcessingError(JobResult {
+      job_id: 123,
+      status: JobStatus::Error,
+      parameters: vec![Parameter::StringParam {
+        id: "message".to_string(),
+        default: None,
+        value: Some("EOF while parsing a value at line 1 column 0".to_string())
+      }]
+    }),
+    error
+  );
+}
+
+#[test]
+fn test_credential_request_value_invalid_session() {
+  std::env::set_var("BACKEND_HOSTNAME", mockito::server_url());
+  use mockito::mock;
+
+  let _m = mock("POST", "/sessions")
+    .with_header("content-type", "application/json")
+    .with_body(r#"{"bad_token_key": "token"}"#)
+    .create();
+
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      { "id":"test_credential",
+        "type":"credential",
+        "value":"TEST_CREDENTIAL_KEY"
+      }
+    ]
+  }"#;
+
+  let message_parsing = Job::new(message);
+  assert!(message_parsing.is_ok());
+  let job = message_parsing.unwrap();
+  let optional_credential = job.get_credential_parameter("test_credential");
+  assert!(optional_credential.is_some());
+  let credential = optional_credential.unwrap();
+  assert_eq!("TEST_CREDENTIAL_KEY".to_string(), credential.key);
+  let request_result = credential.request_value(&job);
+  assert!(request_result.is_err());
+  let error = request_result.unwrap_err();
+  assert_eq!(
+    MessageError::ProcessingError(JobResult {
+      job_id: 123,
+      status: JobStatus::Error,
+      parameters: vec![Parameter::StringParam {
+        id: "message".to_string(),
+        default: None,
+        value: Some("missing field `access_token` at line 1 column 26".to_string())
+      }]
+    }),
+    error
+  );
+}
+
+#[test]
+fn test_credential_request_value_no_credential() {
+  std::env::set_var("BACKEND_HOSTNAME", mockito::server_url());
+  use mockito::mock;
+
+  let _m = mock("POST", "/sessions")
+    .with_header("content-type", "application/json")
+    .with_body(r#"{"access_token": "fake_access_token"}"#)
+    .create();
+
+  let _m = mock("GET", "/credentials/TEST_CREDENTIAL_KEY")
+    .with_status(404)
+    .create();
+
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      { "id":"test_credential",
+        "type":"credential",
+        "value":"TEST_CREDENTIAL_KEY"
+      }
+    ]
+  }"#;
+
+  let message_parsing = Job::new(message);
+  assert!(message_parsing.is_ok());
+  let job = message_parsing.unwrap();
+  let optional_credential = job.get_credential_parameter("test_credential");
+  assert!(optional_credential.is_some());
+  let credential = optional_credential.unwrap();
+  assert_eq!("TEST_CREDENTIAL_KEY".to_string(), credential.key);
+  let request_result = credential.request_value(&job);
+  assert!(request_result.is_err());
+  let error = request_result.unwrap_err();
+  assert_eq!(
+    MessageError::ProcessingError(JobResult {
+      job_id: 123,
+      status: JobStatus::Error,
+      parameters: vec![Parameter::StringParam {
+        id: "message".to_string(),
+        default: None,
+        value: Some("EOF while parsing a value at line 1 column 0".to_string())
+      }]
+    }),
+    error
+  );
+}
+
+#[test]
+fn test_credential_request_value_invalid_credential() {
+  std::env::set_var("BACKEND_HOSTNAME", mockito::server_url());
+  use mockito::mock;
+
+  let _m = mock("POST", "/sessions")
+    .with_header("content-type", "application/json")
+    .with_body(r#"{"access_token": "fake_access_token"}"#)
+    .create();
+
+  let _m = mock("GET", "/credentials/TEST_CREDENTIAL_KEY")
+    .with_header("content-type", "application/json")
+    .with_body(r#"{"data": {}}"#)
+    .create();
+
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      { "id":"test_credential",
+        "type":"credential",
+        "value":"TEST_CREDENTIAL_KEY"
+      }
+    ]
+  }"#;
+
+  let message_parsing = Job::new(message);
+  assert!(message_parsing.is_ok());
+  let job = message_parsing.unwrap();
+  let optional_credential = job.get_credential_parameter("test_credential");
+  assert!(optional_credential.is_some());
+  let credential = optional_credential.unwrap();
+  assert_eq!("TEST_CREDENTIAL_KEY".to_string(), credential.key);
+  let request_result = credential.request_value(&job);
+  assert!(request_result.is_err());
+  let error = request_result.unwrap_err();
+  assert_eq!(
+    MessageError::ProcessingError(JobResult {
+      job_id: 123,
+      status: JobStatus::Error,
+      parameters: vec![Parameter::StringParam {
+        id: "message".to_string(),
+        default: None,
+        value: Some("missing field `id` at line 1 column 11".to_string())
+      }]
+    }),
+    error
+  );
+}
