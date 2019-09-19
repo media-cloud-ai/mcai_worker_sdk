@@ -370,7 +370,7 @@ where
                       }
                     }
                     MessageError::RuntimeError(msg) => {
-                      error!("An error occured: {:?}", msg);
+                      error!("An error occurred: {:?}", msg);
                       let content = json!({
                         "status": "error",
                         "message": msg
