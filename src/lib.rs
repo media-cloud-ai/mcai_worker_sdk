@@ -283,6 +283,7 @@ where
 
                 match MessageEvent::process(message_event, data) {
                   Ok(job_result) => {
+                    info!(target: &job_result.job_id.to_string(), "Completed");
                     let msg = json!(job_result);
 
                     let result = ch
@@ -300,7 +301,7 @@ where
                         .basic_ack(message.delivery_tag, false /*not requeue*/)
                         .wait()
                       {
-                        error!("Unable to ack message {:?}", msg);
+                        error!(target: &job_result.job_id.to_string(), "Unable to ack message {:?}", msg);
                       }
                     } else if let Err(msg) = ch
                       .basic_reject(
@@ -309,7 +310,7 @@ where
                       )
                       .wait()
                     {
-                      error!("Unable to reject message {:?}", msg);
+                      error!(target: &job_result.job_id.to_string(), "Unable to reject message {:?}", msg);
                     }
                   }
                   Err(error) => match error {
@@ -323,6 +324,7 @@ where
                       }
                     }
                     MessageError::NotImplemented() => {
+                      error!("Not implemented feature");
                       if let Err(msg) = ch
                         .basic_reject(
                           message.delivery_tag,
@@ -334,6 +336,7 @@ where
                       }
                     }
                     MessageError::ProcessingError(job_result) => {
+                      error!(target: &job_result.job_id.to_string(), "Job returned in error: {:?}", job_result.parameters);
                       let content = json!(JobResult {
                         job_id: job_result.job_id,
                         status: JobStatus::Error,
@@ -354,7 +357,7 @@ where
                           .basic_ack(message.delivery_tag, false /*not requeue*/)
                           .wait()
                         {
-                          error!("Unable to ack message {:?}", msg);
+                          error!(target: &job_result.job_id.to_string(), "Unable to ack message {:?}", msg);
                         }
                       } else if let Err(msg) = ch
                         .basic_reject(
@@ -363,10 +366,11 @@ where
                         )
                         .wait()
                       {
-                        error!("Unable to reject message {:?}", msg);
+                        error!(target: &job_result.job_id.to_string(), "Unable to reject message {:?}", msg);
                       }
                     }
                     MessageError::RuntimeError(msg) => {
+                      error!("An error occured: {:?}", msg);
                       let content = json!({
                         "status": "error",
                         "message": msg
