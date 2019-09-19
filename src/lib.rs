@@ -107,12 +107,13 @@ where
     .format(move |stream, record| {
       writeln!(
         stream,
-        "{} - {} - {} - {} - {}",
+        "{} - {} - {} - {} - {} - {}",
         Utc::now(),
         &container_id,
         queue,
+        record.target().parse::<i64>().unwrap_or(-1),
         record.level(),
-        record.args()
+        record.args(),
       )
     })
     .init();
