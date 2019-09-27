@@ -31,7 +31,10 @@ use env_logger::Builder;
 use failure::Error;
 use futures::{future::Future, Stream};
 use job::{JobResult, JobStatus};
-use lapin::{options::*, types::FieldTable, BasicProperties, ConnectionProperties};
+use lapin::{
+  message::Delivery, options::*, types::FieldTable, BasicProperties, Channel, ConnectionProperties,
+};
+use serde_json::Value;
 use std::{env, fs, io::Write, thread, time};
 use tokio::runtime::Runtime;
 
@@ -273,138 +276,12 @@ where
               )
             })
             .and_then(move |stream| {
+              // process_stream(message_event, channel, stream);
               warn!("start listening stream");
+
               stream.for_each(move |message| {
                 trace!("raw message: {:?}", message);
-
-                let count = crate::message_helpers::get_message_death_count(&message);
-                let data = std::str::from_utf8(&message.data).unwrap();
-                info!("got message: {} (iteration: {})", data, count.unwrap_or(0));
-
-                match MessageEvent::process(message_event, data) {
-                  Ok(job_result) => {
-                    info!(target: &job_result.job_id.to_string(), "Completed");
-                    let msg = json!(job_result);
-
-                    let result = ch
-                      .basic_publish(
-                        "", // exchange
-                        &amqp_completed_queue,
-                        msg.to_string().as_str().as_bytes().to_vec(),
-                        BasicPublishOptions::default(),
-                        BasicProperties::default(),
-                      )
-                      .wait();
-
-                    if result.is_ok() {
-                      if let Err(msg) = ch
-                        .basic_ack(message.delivery_tag, false /*not requeue*/)
-                        .wait()
-                      {
-                        error!(target: &job_result.job_id.to_string(), "Unable to ack message {:?}", msg);
-                      }
-                    } else if let Err(msg) = ch
-                      .basic_reject(
-                        message.delivery_tag,
-                        BasicRejectOptions { requeue: true }, /*requeue*/
-                      )
-                      .wait()
-                    {
-                      error!(target: &job_result.job_id.to_string(), "Unable to reject message {:?}", msg);
-                    }
-                  }
-                  Err(error) => match error {
-                    MessageError::RequirementsError(msg) => {
-                      debug!("{}", msg);
-                      if let Err(msg) = ch
-                        .basic_reject(message.delivery_tag, BasicRejectOptions::default())
-                        .wait()
-                      {
-                        error!("Unable to reject message {:?}", msg);
-                      }
-                    }
-                    MessageError::NotImplemented() => {
-                      error!("Not implemented feature");
-                      if let Err(msg) = ch
-                        .basic_reject(
-                          message.delivery_tag,
-                          BasicRejectOptions { requeue: true }, /*requeue*/
-                        )
-                        .wait()
-                      {
-                        error!("Unable to reject message {:?}", msg);
-                      }
-                    }
-                    MessageError::ProcessingError(job_result) => {
-                      error!(target: &job_result.job_id.to_string(), "Job returned in error: {:?}", job_result.parameters);
-                      let content = json!(JobResult {
-                        job_id: job_result.job_id,
-                        status: JobStatus::Error,
-                        parameters: job_result.parameters,
-                      });
-                      if ch
-                        .basic_publish(
-                          "", // exchange
-                          &amqp_error_queue,
-                          content.to_string().as_str().as_bytes().to_vec(),
-                          BasicPublishOptions::default(),
-                          BasicProperties::default(),
-                        )
-                        .wait()
-                        .is_ok()
-                      {
-                        if let Err(msg) = ch
-                          .basic_ack(message.delivery_tag, false /*not requeue*/)
-                          .wait()
-                        {
-                          error!(target: &job_result.job_id.to_string(), "Unable to ack message {:?}", msg);
-                        }
-                      } else if let Err(msg) = ch
-                        .basic_reject(
-                          message.delivery_tag,
-                          BasicRejectOptions { requeue: true }, /*requeue*/
-                        )
-                        .wait()
-                      {
-                        error!(target: &job_result.job_id.to_string(), "Unable to reject message {:?}", msg);
-                      }
-                    }
-                    MessageError::RuntimeError(msg) => {
-                      error!("An error occurred: {:?}", msg);
-                      let content = json!({
-                        "status": "error",
-                        "message": msg
-                      });
-                      if ch
-                        .basic_publish(
-                          "", // exchange
-                          &amqp_error_queue,
-                          content.to_string().as_str().as_bytes().to_vec(),
-                          BasicPublishOptions::default(),
-                          BasicProperties::default(),
-                        )
-                        .wait()
-                        .is_ok()
-                      {
-                        if let Err(msg) = ch
-                          .basic_ack(message.delivery_tag, false /*not requeue*/)
-                          .wait()
-                        {
-                          error!("Unable to ack message {:?}", msg);
-                        }
-                      } else if let Err(msg) = ch
-                        .basic_reject(
-                          message.delivery_tag,
-                          BasicRejectOptions { requeue: true }, /*requeue*/
-                        )
-                        .wait()
-                      {
-                        error!("Unable to reject message {:?}", msg);
-                      }
-                    }
-                  },
-                }
-
+                process_message(message_event, message, &ch);
                 Ok(())
               })
             })
@@ -416,6 +293,166 @@ where
     warn!("{:?}", state);
     let sleep_duration = time::Duration::new(1, 0);
     thread::sleep(sleep_duration);
+  }
+}
+
+fn process_message<ME: MessageEvent>(message_event: &'static ME, message: Delivery, ch: &Channel) {
+  let count = crate::message_helpers::get_message_death_count(&message);
+  let message_data = std::str::from_utf8(&message.data).unwrap();
+  info!(
+    "got message: {} (iteration: {})",
+    message_data,
+    count.unwrap_or(0)
+  );
+
+  match MessageEvent::process(message_event, message_data) {
+    Ok(job_result) => {
+      info!(target: &job_result.job_id.to_string(), "Completed");
+      let msg = json!(job_result);
+
+      publish_completed_job(ch, message, job_result, msg);
+    }
+    Err(error) => match error {
+      MessageError::RequirementsError(details) => {
+        publish_missing_requirements(ch, message, &details);
+      }
+      MessageError::NotImplemented() => {
+        publish_not_implemented(ch, message);
+      }
+      MessageError::ProcessingError(job_result) => {
+        publish_processing_error(ch, message, job_result);
+      }
+      MessageError::RuntimeError(error_message) => {
+        publish_runtime_error(ch, message, &error_message);
+      }
+    },
+  }
+}
+
+fn publish_completed_job(ch: &Channel, message: Delivery, job_result: JobResult, msg: Value) {
+  let amqp_completed_queue = get_amqp_completed_queue();
+  let result = ch
+    .basic_publish(
+      "", // exchange
+      &amqp_completed_queue,
+      msg.to_string().as_str().as_bytes().to_vec(),
+      BasicPublishOptions::default(),
+      BasicProperties::default(),
+    )
+    .wait()
+    .is_ok();
+
+  if result {
+    if let Err(msg) = ch
+      .basic_ack(message.delivery_tag, false /*not requeue*/)
+      .wait()
+    {
+      error!(target: &job_result.job_id.to_string(), "Unable to ack message {:?}", msg);
+    }
+  } else if let Err(msg) = ch
+    .basic_reject(
+      message.delivery_tag,
+      BasicRejectOptions { requeue: true }, /*requeue*/
+    )
+    .wait()
+  {
+    error!(target: &job_result.job_id.to_string(), "Unable to reject message {:?}", msg);
+  }
+}
+
+fn publish_missing_requirements(ch: &Channel, message: Delivery, details: &str) {
+  debug!("{}", details);
+  if let Err(msg) = ch
+    .basic_reject(message.delivery_tag, BasicRejectOptions::default())
+    .wait()
+  {
+    error!("Unable to reject message {:?}", msg);
+  }
+}
+
+fn publish_not_implemented(ch: &Channel, message: Delivery) {
+  error!("Not implemented feature");
+  if let Err(msg) = ch
+    .basic_reject(
+      message.delivery_tag,
+      BasicRejectOptions { requeue: true }, /*requeue*/
+    )
+    .wait()
+  {
+    error!("Unable to reject message {:?}", msg);
+  }
+}
+
+fn publish_processing_error(ch: &Channel, message: Delivery, job_result: JobResult) {
+  let amqp_error_queue = get_amqp_error_queue();
+
+  error!(target: &job_result.job_id.to_string(), "Job returned in error: {:?}", job_result.parameters);
+  let content = json!(JobResult {
+    job_id: job_result.job_id,
+    status: JobStatus::Error,
+    parameters: job_result.parameters,
+  });
+  if ch
+    .basic_publish(
+      "", // exchange
+      &amqp_error_queue,
+      content.to_string().as_str().as_bytes().to_vec(),
+      BasicPublishOptions::default(),
+      BasicProperties::default(),
+    )
+    .wait()
+    .is_ok()
+  {
+    if let Err(msg) = ch
+      .basic_ack(message.delivery_tag, false /*not requeue*/)
+      .wait()
+    {
+      error!(target: &job_result.job_id.to_string(), "Unable to ack message {:?}", msg);
+    }
+  } else if let Err(msg) = ch
+    .basic_reject(
+      message.delivery_tag,
+      BasicRejectOptions { requeue: true }, /*requeue*/
+    )
+    .wait()
+  {
+    error!(target: &job_result.job_id.to_string(), "Unable to reject message {:?}", msg);
+  }
+}
+
+fn publish_runtime_error(ch: &Channel, message: Delivery, details: &str) {
+  let amqp_error_queue = get_amqp_error_queue();
+
+  error!("An error occurred: {:?}", details);
+  let content = json!({
+    "status": "error",
+    "message": details
+  });
+  if ch
+    .basic_publish(
+      "", // exchange
+      &amqp_error_queue,
+      content.to_string().as_str().as_bytes().to_vec(),
+      BasicPublishOptions::default(),
+      BasicProperties::default(),
+    )
+    .wait()
+    .is_ok()
+  {
+    if let Err(msg) = ch
+      .basic_ack(message.delivery_tag, false /*not requeue*/)
+      .wait()
+    {
+      error!("Unable to ack message {:?}", msg);
+    }
+  } else if let Err(msg) = ch
+    .basic_reject(
+      message.delivery_tag,
+      BasicRejectOptions { requeue: true }, /*requeue*/
+    )
+    .wait()
+  {
+    error!("Unable to reject message {:?}", msg);
   }
 }
 
