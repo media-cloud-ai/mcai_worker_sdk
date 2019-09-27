@@ -22,6 +22,8 @@ extern crate tokio;
 mod config;
 pub mod job;
 mod message;
+mod worker;
+pub use worker::{WorkerConfiguration, Version};
 
 use amq_protocol_types::AMQPValue;
 use amq_protocol_uri::*;
