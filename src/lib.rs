@@ -296,7 +296,11 @@ where
   }
 }
 
-fn process_message<ME: MessageEvent>(message_event: &'static ME, message: Delivery, ch: &Channel) {
+fn process_message<ME: MessageEvent>(
+  message_event: &'static ME,
+  message: Delivery,
+  channel: &Channel,
+) {
   let count = crate::message_helpers::get_message_death_count(&message);
   let message_data = std::str::from_utf8(&message.data).unwrap();
   info!(
@@ -310,28 +314,28 @@ fn process_message<ME: MessageEvent>(message_event: &'static ME, message: Delive
       info!(target: &job_result.job_id.to_string(), "Completed");
       let msg = json!(job_result);
 
-      publish_completed_job(ch, message, job_result, msg);
+      publish_completed_job(channel, message, job_result, msg);
     }
     Err(error) => match error {
       MessageError::RequirementsError(details) => {
-        publish_missing_requirements(ch, message, &details);
+        publish_missing_requirements(channel, message, &details);
       }
       MessageError::NotImplemented() => {
-        publish_not_implemented(ch, message);
+        publish_not_implemented(channel, message);
       }
       MessageError::ProcessingError(job_result) => {
-        publish_processing_error(ch, message, job_result);
+        publish_processing_error(channel, message, job_result);
       }
       MessageError::RuntimeError(error_message) => {
-        publish_runtime_error(ch, message, &error_message);
+        publish_runtime_error(channel, message, &error_message);
       }
     },
   }
 }
 
-fn publish_completed_job(ch: &Channel, message: Delivery, job_result: JobResult, msg: Value) {
+fn publish_completed_job(channel: &Channel, message: Delivery, job_result: JobResult, msg: Value) {
   let amqp_completed_queue = get_amqp_completed_queue();
-  let result = ch
+  let result = channel
     .basic_publish(
       "", // exchange
       &amqp_completed_queue,
@@ -343,13 +347,13 @@ fn publish_completed_job(ch: &Channel, message: Delivery, job_result: JobResult,
     .is_ok();
 
   if result {
-    if let Err(msg) = ch
+    if let Err(msg) = channel
       .basic_ack(message.delivery_tag, false /*not requeue*/)
       .wait()
     {
       error!(target: &job_result.job_id.to_string(), "Unable to ack message {:?}", msg);
     }
-  } else if let Err(msg) = ch
+  } else if let Err(msg) = channel
     .basic_reject(
       message.delivery_tag,
       BasicRejectOptions { requeue: true }, /*requeue*/
@@ -360,9 +364,9 @@ fn publish_completed_job(ch: &Channel, message: Delivery, job_result: JobResult,
   }
 }
 
-fn publish_missing_requirements(ch: &Channel, message: Delivery, details: &str) {
+fn publish_missing_requirements(channel: &Channel, message: Delivery, details: &str) {
   debug!("{}", details);
-  if let Err(msg) = ch
+  if let Err(msg) = channel
     .basic_reject(message.delivery_tag, BasicRejectOptions::default())
     .wait()
   {
@@ -370,9 +374,9 @@ fn publish_missing_requirements(ch: &Channel, message: Delivery, details: &str) 
   }
 }
 
-fn publish_not_implemented(ch: &Channel, message: Delivery) {
+fn publish_not_implemented(channel: &Channel, message: Delivery) {
   error!("Not implemented feature");
-  if let Err(msg) = ch
+  if let Err(msg) = channel
     .basic_reject(
       message.delivery_tag,
       BasicRejectOptions { requeue: true }, /*requeue*/
@@ -383,7 +387,7 @@ fn publish_not_implemented(ch: &Channel, message: Delivery) {
   }
 }
 
-fn publish_processing_error(ch: &Channel, message: Delivery, job_result: JobResult) {
+fn publish_processing_error(channel: &Channel, message: Delivery, job_result: JobResult) {
   let amqp_error_queue = get_amqp_error_queue();
 
   error!(target: &job_result.job_id.to_string(), "Job returned in error: {:?}", job_result.parameters);
@@ -392,7 +396,7 @@ fn publish_processing_error(ch: &Channel, message: Delivery, job_result: JobResu
     status: JobStatus::Error,
     parameters: job_result.parameters,
   });
-  if ch
+  if channel
     .basic_publish(
       "", // exchange
       &amqp_error_queue,
@@ -403,13 +407,13 @@ fn publish_processing_error(ch: &Channel, message: Delivery, job_result: JobResu
     .wait()
     .is_ok()
   {
-    if let Err(msg) = ch
+    if let Err(msg) = channel
       .basic_ack(message.delivery_tag, false /*not requeue*/)
       .wait()
     {
       error!(target: &job_result.job_id.to_string(), "Unable to ack message {:?}", msg);
     }
-  } else if let Err(msg) = ch
+  } else if let Err(msg) = channel
     .basic_reject(
       message.delivery_tag,
       BasicRejectOptions { requeue: true }, /*requeue*/
@@ -420,7 +424,7 @@ fn publish_processing_error(ch: &Channel, message: Delivery, job_result: JobResu
   }
 }
 
-fn publish_runtime_error(ch: &Channel, message: Delivery, details: &str) {
+fn publish_runtime_error(channel: &Channel, message: Delivery, details: &str) {
   let amqp_error_queue = get_amqp_error_queue();
 
   error!("An error occurred: {:?}", details);
@@ -428,7 +432,7 @@ fn publish_runtime_error(ch: &Channel, message: Delivery, details: &str) {
     "status": "error",
     "message": details
   });
-  if ch
+  if channel
     .basic_publish(
       "", // exchange
       &amqp_error_queue,
@@ -439,13 +443,13 @@ fn publish_runtime_error(ch: &Channel, message: Delivery, details: &str) {
     .wait()
     .is_ok()
   {
-    if let Err(msg) = ch
+    if let Err(msg) = channel
       .basic_ack(message.delivery_tag, false /*not requeue*/)
       .wait()
     {
       error!("Unable to ack message {:?}", msg);
     }
-  } else if let Err(msg) = ch
+  } else if let Err(msg) = channel
     .basic_reject(
       message.delivery_tag,
       BasicRejectOptions { requeue: true }, /*requeue*/
