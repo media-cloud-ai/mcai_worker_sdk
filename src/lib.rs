@@ -27,9 +27,9 @@ mod message;
 pub mod parameter;
 pub mod worker;
 
-pub use parameter::{Parameter, Requirement};
 pub use parameter::container::ParametersContainer;
 pub use parameter::credential::Credential;
+pub use parameter::{Parameter, Requirement};
 
 use amq_protocol_types::AMQPValue;
 use amq_protocol_uri::*;
@@ -218,7 +218,10 @@ where
             )
             .wait()
           {
-            error!("Unable to create exchange {}: {:?}", EXCHANGE_NAME_DELAYED, msg);
+            error!(
+              "Unable to create exchange {}: {:?}",
+              EXCHANGE_NAME_DELAYED, msg
+            );
           }
 
           if let Err(msg) = channel
@@ -230,7 +233,10 @@ where
             )
             .wait()
           {
-            error!("Unable to create exchange {}: {:?}", EXCHANGE_NAME_SUBMIT, msg);
+            error!(
+              "Unable to create exchange {}: {:?}",
+              EXCHANGE_NAME_SUBMIT, msg
+            );
           }
 
           if let Err(msg) = channel
@@ -242,7 +248,10 @@ where
             )
             .wait()
           {
-            error!("Unable to create exchange {}: {:?}", EXCHANGE_NAME_RESPONSE, msg);
+            error!(
+              "Unable to create exchange {}: {:?}",
+              EXCHANGE_NAME_RESPONSE, msg
+            );
           }
 
           let mut delaying_queue_fields = FieldTable::default();
@@ -260,7 +269,10 @@ where
             )
             .wait()
           {
-            error!("Unable to create queue {}: {:?}", EXCHANGE_NAME_DELAYED, msg);
+            error!(
+              "Unable to create queue {}: {:?}",
+              EXCHANGE_NAME_DELAYED, msg
+            );
           }
 
           let routing_key = "*";
@@ -288,13 +300,29 @@ where
             AMQPValue::LongString(amqp_queue.clone().into()),
           );
 
-          channel.clone()
-            .queue_declare("worker_discovery", QueueDeclareOptions::default(), FieldTable::default())
+          channel
+            .clone()
+            .queue_declare(
+              "worker_discovery",
+              QueueDeclareOptions::default(),
+              FieldTable::default(),
+            )
             .and_then(|_| {
-              let worker_definition = worker::WorkerConfiguration::new(&get_amqp_queue(), message_event);
+              let worker_definition =
+                worker::WorkerConfiguration::new(&get_amqp_queue(), message_event);
 
-              let msg = json!(worker_definition).to_string().as_str().as_bytes().to_vec();
-              channel.basic_publish("", "worker_discovery", msg, BasicPublishOptions::default(), BasicProperties::default())
+              let msg = json!(worker_definition)
+                .to_string()
+                .as_str()
+                .as_bytes()
+                .to_vec();
+              channel.basic_publish(
+                "",
+                "worker_discovery",
+                msg,
+                BasicPublishOptions::default(),
+                BasicProperties::default(),
+              )
             })
             .wait()
             .expect("runtime failure");
@@ -312,9 +340,12 @@ where
                   QueueBindOptions::default(),
                   FieldTable::default(),
                 )
-              .wait()
+                .wait()
               {
-                error!("Unable to bind queue to exchange {}: {:?}", EXCHANGE_NAME_SUBMIT, msg);
+                error!(
+                  "Unable to bind queue to exchange {}: {:?}",
+                  EXCHANGE_NAME_SUBMIT, msg
+                );
               }
 
               channel.basic_consume(

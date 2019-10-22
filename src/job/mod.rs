@@ -1,6 +1,4 @@
-use crate::{
-  parameter::container::ParametersContainer,
-  MessageError, Parameter, Requirement};
+use crate::{parameter::container::ParametersContainer, MessageError, Parameter, Requirement};
 use reqwest::Error;
 use std::path::Path;
 
@@ -73,7 +71,6 @@ impl ParametersContainer for Job {
     &self.parameters
   }
 }
-
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum JobStatus {

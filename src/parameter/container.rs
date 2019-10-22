@@ -1,8 +1,4 @@
-
-use crate::parameter::{
-  credential::Credential,
-  Parameter
-};
+use crate::parameter::{credential::Credential, Parameter};
 use std::collections::HashMap;
 
 pub trait ParametersContainer {
