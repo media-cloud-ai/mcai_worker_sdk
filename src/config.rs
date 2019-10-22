@@ -45,14 +45,6 @@ pub fn get_amqp_queue() -> String {
   get_env_value!("AMQP_QUEUE", "job_undefined")
 }
 
-pub fn get_amqp_completed_queue() -> String {
-  get_amqp_queue() + "_completed"
-}
-
-pub fn get_amqp_error_queue() -> String {
-  get_amqp_queue() + "_error"
-}
-
 pub fn get_backend_hostname() -> String {
   get_env_value!("BACKEND_HOSTNAME", "http://127.0.0.1:4000/api")
 }

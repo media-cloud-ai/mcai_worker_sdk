@@ -4,6 +4,7 @@
 
 extern crate amq_protocol_types;
 extern crate amq_protocol_uri;
+// extern crate built;
 extern crate chrono;
 extern crate env_logger;
 extern crate failure;
@@ -12,6 +13,7 @@ extern crate futures;
 extern crate log;
 extern crate lapin_futures as lapin;
 extern crate reqwest;
+extern crate semver;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -22,8 +24,12 @@ extern crate tokio;
 mod config;
 pub mod job;
 mod message;
-mod worker;
-pub use worker::{WorkerConfiguration, Version};
+pub mod parameter;
+pub mod worker;
+
+pub use parameter::{Parameter, Requirement};
+pub use parameter::container::ParametersContainer;
+pub use parameter::credential::Credential;
 
 use amq_protocol_types::AMQPValue;
 use amq_protocol_uri::*;
@@ -33,11 +39,25 @@ use env_logger::Builder;
 use failure::Error;
 use futures::{future::Future, Stream};
 use job::JobResult;
-use lapin::{options::*, types::FieldTable, ConnectionProperties};
+use lapin::{options::*, types::FieldTable, BasicProperties, ConnectionProperties};
 use std::{env, fs, io::Write, thread, time};
 use tokio::runtime::Runtime;
 
+static EXCHANGE_TYPE_FANOUT: &str = "fanout";
+static EXCHANGE_TYPE_TOPIC: &str = "topic";
+static EXCHANGE_NAME_SUBMIT: &str = "job_submit";
+static EXCHANGE_NAME_RESPONSE: &str = "job_response";
+static EXCHANGE_NAME_DELAYED: &str = "job_delayed";
+
 pub trait MessageEvent {
+  fn get_name(&self) -> String;
+  fn get_short_description(&self) -> String;
+  fn get_description(&self) -> String;
+  fn get_version(&self) -> semver::Version;
+  fn get_git_version(&self) -> semver::Version;
+
+  fn get_parameters(&self) -> Vec<worker::Parameter>;
+
   fn process(&self, _message: &str) -> Result<JobResult, MessageError>
   where
     Self: std::marker::Sized,
@@ -120,7 +140,7 @@ where
     })
     .init();
 
-  let queue = env::var("AMQP_QUEUE").expect("missing AMQP queue");
+  let queue = get_amqp_queue();
   let version = env::var("VERSION").unwrap_or_else(|_| "unknown".to_string());
 
   info!("Worker: {}, version: {}", queue, version);
@@ -133,8 +153,6 @@ where
     let amqp_password = get_amqp_password();
     let amqp_vhost = get_amqp_vhost();
     let amqp_queue = get_amqp_queue();
-    let amqp_completed_queue = get_amqp_completed_queue();
-    let amqp_error_queue = get_amqp_error_queue();
 
     info!("Start connection with configuration:");
     info!("AMQP TLS: {}", amqp_tls);
@@ -182,19 +200,49 @@ where
 
           let ch = channel.clone();
 
-          let delayed_name = amqp_queue.clone() + "_delayed";
-          let exchange_type = "fanout";
+          let mut exchange_options = ExchangeDeclareOptions::default();
+          exchange_options.durable = true;
+
+          let mut table = FieldTable::default();
+          table.insert(
+            "alternate-exchange".into(),
+            AMQPValue::LongString("job_queue_not_found".into()),
+          );
 
           if let Err(msg) = channel
             .exchange_declare(
-              &delayed_name,
-              exchange_type,
-              ExchangeDeclareOptions::default(),
+              EXCHANGE_NAME_DELAYED,
+              EXCHANGE_TYPE_FANOUT,
+              exchange_options.clone(),
               FieldTable::default(),
             )
             .wait()
           {
-            error!("Unable to create exchange {}: {:?}", delayed_name, msg);
+            error!("Unable to create exchange {}: {:?}", EXCHANGE_NAME_DELAYED, msg);
+          }
+
+          if let Err(msg) = channel
+            .exchange_declare(
+              EXCHANGE_NAME_SUBMIT,
+              EXCHANGE_TYPE_TOPIC,
+              exchange_options.clone(),
+              table,
+            )
+            .wait()
+          {
+            error!("Unable to create exchange {}: {:?}", EXCHANGE_NAME_SUBMIT, msg);
+          }
+
+          if let Err(msg) = channel
+            .exchange_declare(
+              EXCHANGE_NAME_RESPONSE,
+              EXCHANGE_TYPE_TOPIC,
+              exchange_options,
+              FieldTable::default(),
+            )
+            .wait()
+          {
+            error!("Unable to create exchange {}: {:?}", EXCHANGE_NAME_RESPONSE, msg);
           }
 
           let mut delaying_queue_fields = FieldTable::default();
@@ -206,66 +254,68 @@ where
 
           if let Err(msg) = channel
             .queue_declare(
-              &delayed_name,
+              &EXCHANGE_NAME_DELAYED,
               QueueDeclareOptions::default(),
               delaying_queue_fields,
             )
             .wait()
           {
-            error!("Unable to create queue {}: {:?}", delayed_name, msg);
+            error!("Unable to create queue {}: {:?}", EXCHANGE_NAME_DELAYED, msg);
           }
 
           let routing_key = "*";
 
           if let Err(msg) = channel
             .queue_bind(
-              &delayed_name,
-              &delayed_name,
+              EXCHANGE_NAME_DELAYED,
+              EXCHANGE_NAME_DELAYED,
               routing_key,
               QueueBindOptions::default(),
               FieldTable::default(),
             )
             .wait()
           {
-            error!("Unable to create queue {}: {:?}", delayed_name, msg);
-          }
-
-          if let Err(msg) = channel
-            .queue_declare(
-              &amqp_completed_queue,
-              QueueDeclareOptions::default(),
-              FieldTable::default(),
-            )
-            .wait()
-          {
-            error!("Unable to create queue {}: {:?}", amqp_completed_queue, msg);
-          }
-
-          if let Err(msg) = channel
-            .queue_declare(
-              &amqp_error_queue,
-              QueueDeclareOptions::default(),
-              FieldTable::default(),
-            )
-            .wait()
-          {
-            error!("Unable to create queue {}: {:?}", amqp_error_queue, msg);
+            error!("Unable to bind queue {}: {:?}", EXCHANGE_NAME_DELAYED, msg);
           }
 
           let mut queue_fields = FieldTable::default();
           queue_fields.insert(
             "x-dead-letter-exchange".into(),
-            AMQPValue::LongString(delayed_name.into()),
+            AMQPValue::LongString(EXCHANGE_NAME_DELAYED.into()),
           );
           queue_fields.insert(
             "x-dead-letter-routing-key".into(),
             AMQPValue::LongString(amqp_queue.clone().into()),
           );
 
+          channel.clone()
+            .queue_declare("worker_discovery", QueueDeclareOptions::default(), FieldTable::default())
+            .and_then(|_| {
+              let worker_definition = worker::WorkerConfiguration::new(&get_amqp_queue(), message_event);
+
+              let msg = json!(worker_definition).to_string().as_str().as_bytes().to_vec();
+              channel.basic_publish("", "worker_discovery", msg, BasicPublishOptions::default(), BasicProperties::default())
+            })
+            .wait()
+            .expect("runtime failure");
+
           channel
             .queue_declare(&amqp_queue, QueueDeclareOptions::default(), queue_fields)
             .and_then(move |queue| {
               info!("channel {} declared queue {}", id, amqp_queue);
+
+              if let Err(msg) = channel
+                .queue_bind(
+                  &amqp_queue,
+                  EXCHANGE_NAME_SUBMIT,
+                  &amqp_queue,
+                  QueueBindOptions::default(),
+                  FieldTable::default(),
+                )
+              .wait()
+              {
+                error!("Unable to bind queue to exchange {}: {:?}", EXCHANGE_NAME_SUBMIT, msg);
+              }
 
               channel.basic_consume(
                 &queue,

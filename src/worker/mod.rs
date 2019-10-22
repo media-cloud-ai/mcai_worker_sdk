@@ -1,102 +1,56 @@
+use crate::MessageEvent;
+use semver::Version;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ParameterType {
+  #[serde(rename = "array_of_strings")]
+  ArrayOfStrings,
+  #[serde(rename = "boolean")]
+  Boolean,
+  #[serde(rename = "credential")]
+  Credential,
+  #[serde(rename = "integer")]
+  Integer,
+  #[serde(rename = "requirement")]
+  Requirement,
+  #[serde(rename = "string")]
+  String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Parameter {
+  pub identifier: String,
+  pub label: String,
+  pub kind: Vec<ParameterType>,
+  pub required: bool,
+  // default: DefaultParameterType,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WorkerConfiguration {
-  identifier: String,
+  queue_name: String,
+  label: String,
+  short_description: String,
+  description: String,
   version: Version,
+  git_version: Version,
+  parameters: Vec<Parameter>
 }
 
 impl WorkerConfiguration {
-  pub fn new(identifier: &str, version: Version) -> Self {
+  pub fn new<ME: MessageEvent>(queue_name: &str, message_event: &'static ME) -> Self {
     WorkerConfiguration {
-      identifier: identifier.to_string(),
-      version
-    }
-  }
-}
-
-#[derive(Debug)]
-pub struct Version {
-  major: u32,
-  minor: u32,
-  patch: u32,
-  pre_release: Vec<String>,
-  build: Vec<String>,
-}
-
-impl Version {
-  pub fn new(major: u32, minor: u32, patch: u32) -> Self {
-    Version {
-      major,
-      minor,
-      patch,
-      pre_release: vec![],
-      build: vec![],
+      queue_name: queue_name.to_string(),
+      label: message_event.get_name(),
+      version: message_event.get_version(),
+      short_description: message_event.get_short_description(),
+      description: message_event.get_description(),
+      git_version: message_event.get_git_version(),
+      parameters: message_event.get_parameters()
     }
   }
 
-  pub fn new_with_pre_release(major: u32, minor: u32, patch: u32, pre_release: Vec<String>) -> Self {
-    Version {
-      major,
-      minor,
-      patch,
-      pre_release,
-      build: vec![],
-    }
+  pub fn add_parameter(&mut self, parameter: Parameter) {
+    self.parameters.push(parameter);
   }
-
-  pub fn new_with_build(major: u32, minor: u32, patch: u32, build: Vec<String>) -> Self {
-    Version {
-      major,
-      minor,
-      patch,
-      pre_release: vec![],
-      build,
-    }
-  }
-
-  pub fn new_with_pre_release_and_build(major: u32, minor: u32, patch: u32, pre_release: Vec<String>, build: Vec<String>) -> Self {
-    Version {
-      major,
-      minor,
-      patch,
-      pre_release,
-      build,
-    }
-  }
-}
-
-impl ToString for Version {
-  fn to_string(&self) -> String {
-    let pre_release =
-      if self.pre_release.is_empty() {
-        "".to_string()
-      } else {
-        format!("-{}", self.pre_release.join(","))
-      };
-
-    let extension =
-      if self.build.is_empty() {
-        pre_release
-      } else {
-        format!("{}+{}", pre_release, self.build.join(","))
-      };
-
-    format!("{}.{}.{}{}", self.major, self.minor, self.patch, extension)
-  }
-}
-
-#[test]
-fn version_to_string() {
-  let v = Version::new(1, 2, 3);
-  assert_eq!(v.to_string(), "1.2.3");
-
-  let v = Version::new_with_pre_release(1, 2, 3, vec!["rc1".to_string()]);
-  assert_eq!(v.to_string(), "1.2.3-rc1");
-
-  let v = Version::new_with_build(1, 2, 3, vec!["ac6dv2".to_string()]);
-  assert_eq!(v.to_string(), "1.2.3+ac6dv2");
-
-  let v = Version::new_with_pre_release_and_build(1, 2, 3, vec!["rc1".to_string()], vec!["ac6dv2".to_string()]);
-  assert_eq!(v.to_string(), "1.2.3-rc1+ac6dv2");
-
 }

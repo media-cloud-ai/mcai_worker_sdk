@@ -4,7 +4,7 @@ extern crate assert_matches;
 use assert_matches::assert_matches;
 
 use amqp_worker::job::*;
-use amqp_worker::MessageError;
+use amqp_worker::{MessageError, Parameter};
 
 use std::collections::HashMap;
 
