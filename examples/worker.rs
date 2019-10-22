@@ -28,11 +28,11 @@ Do no use in production, just for developments."#
   }
 
   fn get_version(&self) -> Version {
-    semver::Version::parse("1.2.3").unwrap()
+    semver::Version::new(1, 2, 3)
   }
 
   fn get_git_version(&self) -> Version {
-    semver::Version::parse("3.2.1").unwrap()
+    semver::Version::new(3, 2, 1)
   }
 
   fn get_parameters(&self) -> Vec<Parameter> {

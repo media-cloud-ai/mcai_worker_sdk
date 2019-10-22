@@ -381,7 +381,27 @@ fn empty_message_event_impl() {
   #[derive(Debug)]
   struct CustomEvent {}
 
-  impl MessageEvent for CustomEvent {}
+  impl MessageEvent for CustomEvent {
+    fn get_name(&self) -> String {
+      "custom".to_string()
+    }
+    fn get_short_description(&self) -> String {
+      "short description".to_string()
+    }
+    fn get_description(&self) -> String {
+      "long description".to_string()
+    }
+    fn get_version(&self) -> semver::Version {
+      semver::Version::new(1, 2, 3)
+    }
+    fn get_git_version(&self) -> semver::Version {
+      semver::Version::new(3, 2, 1)
+    }
+
+    fn get_parameters(&self) -> Vec<worker::Parameter> {
+      vec![]
+    }
+  }
 
   let custom_event = CustomEvent {};
 
