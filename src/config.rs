@@ -45,14 +45,6 @@ pub fn get_amqp_queue() -> String {
   get_env_value!("AMQP_QUEUE", "job_undefined")
 }
 
-pub fn get_amqp_completed_queue() -> String {
-  get_amqp_queue() + "_completed"
-}
-
-pub fn get_amqp_error_queue() -> String {
-  get_amqp_queue() + "_error"
-}
-
 pub fn get_backend_hostname() -> String {
   get_env_value!("BACKEND_HOSTNAME", "http://127.0.0.1:4000/api")
 }
@@ -74,8 +66,6 @@ fn configuration() {
   assert!(get_amqp_password() == "guest".to_string());
   assert!(get_amqp_vhost() == "/".to_string());
   assert!(get_amqp_queue() == "job_undefined".to_string());
-  assert!(get_amqp_completed_queue() == "job_undefined_completed".to_string());
-  assert!(get_amqp_error_queue() == "job_undefined_error".to_string());
   assert!(get_backend_hostname() == "http://127.0.0.1:4000/api".to_string());
   assert!(get_backend_username() == "".to_string());
   assert!(get_backend_password() == "".to_string());

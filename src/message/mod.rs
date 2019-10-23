@@ -1,7 +1,6 @@
 mod helpers;
 
 use crate::{
-  config::{get_amqp_completed_queue, get_amqp_error_queue},
   job::{JobResult, JobStatus},
   MessageError, MessageEvent,
 };
@@ -9,6 +8,10 @@ use crate::{
 use futures::future::Future;
 use lapin::{message::Delivery, options::*, BasicProperties, Channel};
 use serde_json::Value;
+
+static RESPONSE_EXCHANGE: &str = "job_response";
+static QUEUE_JOB_COMPLETED: &str = "job_completed";
+static QUEUE_JOB_ERROR: &str = "job_error";
 
 pub fn process_message<ME: MessageEvent>(
   message_event: &'static ME,
@@ -48,11 +51,10 @@ pub fn process_message<ME: MessageEvent>(
 }
 
 fn publish_completed_job(channel: &Channel, message: Delivery, job_result: JobResult, msg: Value) {
-  let amqp_completed_queue = get_amqp_completed_queue();
   let result = channel
     .basic_publish(
-      "", // exchange
-      &amqp_completed_queue,
+      RESPONSE_EXCHANGE,
+      QUEUE_JOB_COMPLETED,
       msg.to_string().as_str().as_bytes().to_vec(),
       BasicPublishOptions::default(),
       BasicProperties::default(),
@@ -102,8 +104,6 @@ fn publish_not_implemented(channel: &Channel, message: Delivery) {
 }
 
 fn publish_processing_error(channel: &Channel, message: Delivery, job_result: JobResult) {
-  let amqp_error_queue = get_amqp_error_queue();
-
   error!(target: &job_result.job_id.to_string(), "Job returned in error: {:?}", job_result.parameters);
   let content = json!(JobResult {
     job_id: job_result.job_id,
@@ -112,8 +112,8 @@ fn publish_processing_error(channel: &Channel, message: Delivery, job_result: Jo
   });
   if channel
     .basic_publish(
-      "", // exchange
-      &amqp_error_queue,
+      RESPONSE_EXCHANGE,
+      QUEUE_JOB_ERROR,
       content.to_string().as_str().as_bytes().to_vec(),
       BasicPublishOptions::default(),
       BasicProperties::default(),
@@ -139,8 +139,6 @@ fn publish_processing_error(channel: &Channel, message: Delivery, job_result: Jo
 }
 
 fn publish_runtime_error(channel: &Channel, message: Delivery, details: &str) {
-  let amqp_error_queue = get_amqp_error_queue();
-
   error!("An error occurred: {:?}", details);
   let content = json!({
     "status": "error",
@@ -148,8 +146,8 @@ fn publish_runtime_error(channel: &Channel, message: Delivery, details: &str) {
   });
   if channel
     .basic_publish(
-      "", // exchange
-      &amqp_error_queue,
+      RESPONSE_EXCHANGE,
+      QUEUE_JOB_ERROR,
       content.to_string().as_str().as_bytes().to_vec(),
       BasicPublishOptions::default(),
       BasicProperties::default(),
