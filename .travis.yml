@@ -13,14 +13,16 @@ matrix:
         - cargo fmt --version
       script:
         - cargo fmt -- --check
+      env: FORMAT=TRUE
 
     # Clippy
-    - rust: stable
+    - rust: nightly
       install:
         - rustup component add clippy-preview
       script:
         # Fail if clippy output contains "error:" or "warning:"
         - cargo clippy 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+      env: CLIPPY=TRUE
 
     # Test coverage (with Tarpaulin)
     - rust: stable
@@ -30,12 +32,14 @@ matrix:
         - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
         - cargo tarpaulin -v --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
-      env: ALLOW_FAILURE=TRUE
+      env: TARPAULIN=TRUE
 
 script:
   - cargo test
+
 cache:
   cargo: true
+
 before_cache:
   # Travis can't cache files that are not readable by "others"
   - chmod -R a+r $HOME/.cargo
