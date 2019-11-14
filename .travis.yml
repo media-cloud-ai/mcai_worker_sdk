@@ -1,16 +1,9 @@
 language: rust
 
 rust:
-  - 1.39.0
-  - stable
-  - beta
   - nightly
 
 matrix:
-  allow_failures:
-    - rust: nightly
-    - env: ALLOW_FAILURE=TRUE
-
   include:
     # Rustfmt
     - rust: stable
