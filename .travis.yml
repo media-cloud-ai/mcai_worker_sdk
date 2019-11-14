@@ -5,6 +5,9 @@ rust:
 
 matrix:
   include:
+    # Simple build
+    - rust: nightly
+
     # Rustfmt
     - rust: stable
       install:
@@ -25,7 +28,7 @@ matrix:
       env: CLIPPY=TRUE
 
     # Test coverage (with Tarpaulin)
-    - rust: stable
+    - rust: nightly
       # To avoid "Error: EPERM: operation not permitted" error (see https://github.com/valery-barysok/session-file-store/issues/58)
       sudo: true
       install:
