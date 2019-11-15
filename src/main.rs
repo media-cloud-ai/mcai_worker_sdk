@@ -6,6 +6,7 @@ use amqp_worker::start_worker;
 use amqp_worker::worker::{Parameter, ParameterType};
 use amqp_worker::MessageError;
 use amqp_worker::MessageEvent;
+use amqp_worker::Parameter::*;
 use pyo3::{prelude::*, types::*};
 use semver::Version;
 use std::{env, fs};
@@ -144,7 +145,22 @@ impl MessageEvent for PythonWorkerEvent {
     let python_module = PyModule::from_code(py, &contents, "worker.py", "worker")
       .expect("unable to create the python module");
 
-    if let Err(error) = python_module.call1("process", (PyString::new(py, message),)) {
+    let list_of_parameters = PyDict::new(py);
+    if let Err(error) = self.build_parameters(&job, &py, list_of_parameters) {
+      let locals = [("error", error)].into_py_dict(py);
+
+      let error_msg = py
+        .eval("repr(error)", None, Some(locals))
+        .expect("Unknown python error, unable to get the error message")
+        .to_string();
+
+      let result = JobResult::new(job.job_id, JobStatus::Error, vec![]).with_message(error_msg);
+      return Err(MessageError::ProcessingError(result));
+    }
+
+    let parameters = PyTuple::new(py, vec![list_of_parameters]);
+
+    if let Err(error) = python_module.call1("process", parameters) {
       let stacktrace = if let Some(tb) = &error.ptraceback {
         let locals = [("traceback", traceback)].into_py_dict(py);
 
@@ -171,6 +187,69 @@ impl MessageEvent for PythonWorkerEvent {
     } else {
       Ok(JobResult::new(job.job_id, JobStatus::Completed, vec![]))
     }
+  }
+}
+
+impl PythonWorkerEvent {
+  fn build_parameters(&self, job: &Job, py: &Python, list_of_parameters: &PyDict) -> Result<(), PyErr> {
+    for parameter in &job.parameters {
+      match parameter {
+        ArrayOfStringsParam{id, default, value} => {
+          if let Some(v) = value {
+            list_of_parameters.set_item(id.to_string(), PyList::new(*py, v))?;
+          } else if let Some(v) = default {
+            list_of_parameters.set_item(id.to_string(), PyList::new(*py, v))?;
+          }
+        }
+        BooleanParam{id, default, value} => {
+          if let Some(v) = value {
+            list_of_parameters.set_item(id.to_string(), v)?;
+          } else if let Some(v) = default {
+            list_of_parameters.set_item(id.to_string(), v)?;
+          }
+        },
+        CredentialParam{id, default, value} => {
+          let credential_key =
+            if let Some(v) = value {
+              Some(v)
+            } else if let Some(v) = default {
+              Some(v)
+            } else {
+              None
+            };
+
+          if let Some(credential_key) = credential_key {
+            let credential = amqp_worker::Credential{key: credential_key.to_string()};
+            if let Ok(retrieved_value) = credential.request_value(&job) {
+              list_of_parameters.set_item(id.to_string(), retrieved_value)?;
+            } else {
+              error!("unable to retrieve the credential value");
+            }
+          } else {
+            error!("no value or default for the credential value");
+          }
+        },
+        IntegerParam{id, default, value} => {
+          if let Some(v) = value {
+            list_of_parameters.set_item(id.to_string(), v)?;
+          } else if let Some(v) = default {
+            list_of_parameters.set_item(id.to_string(), v)?;
+          }
+        },
+        RequirementParam{..} => {
+          // do nothing
+        },
+        StringParam{id, default, value} => {
+          if let Some(v) = value {
+            list_of_parameters.set_item(id.to_string(), v)?;
+          } else if let Some(v) = default {
+            list_of_parameters.set_item(id.to_string(), v)?;
+          }
+        },
+      }
+    }
+
+    Ok(())
   }
 }
 

@@ -1,3 +1,4 @@
+import json
 
 def get_name():
 	return "My python Worker"
@@ -23,7 +24,7 @@ def get_parameters():
 		}
 	]
 
-def process(message):
+def process(parameters):
 	# be able to raise, return job in errors
 	# raise Exception("my error")
 
