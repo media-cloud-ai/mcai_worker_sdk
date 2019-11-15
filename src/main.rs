@@ -146,7 +146,7 @@ impl MessageEvent for PythonWorkerEvent {
       .expect("unable to create the python module");
 
     let list_of_parameters = PyDict::new(py);
-    if let Err(error) = self.build_parameters(&job, &py, list_of_parameters) {
+    if let Err(error) = self.build_parameters(&job, py, list_of_parameters) {
       let locals = [("error", error)].into_py_dict(py);
 
       let error_msg = py
@@ -191,35 +191,41 @@ impl MessageEvent for PythonWorkerEvent {
 }
 
 impl PythonWorkerEvent {
-  fn build_parameters(&self, job: &Job, py: &Python, list_of_parameters: &PyDict) -> Result<(), PyErr> {
+  fn build_parameters(
+    &self,
+    job: &Job,
+    py: Python,
+    list_of_parameters: &PyDict,
+  ) -> Result<(), PyErr> {
     for parameter in &job.parameters {
       match parameter {
-        ArrayOfStringsParam{id, default, value} => {
+        ArrayOfStringsParam { id, default, value } => {
           if let Some(v) = value {
-            list_of_parameters.set_item(id.to_string(), PyList::new(*py, v))?;
+            list_of_parameters.set_item(id.to_string(), PyList::new(py, v))?;
           } else if let Some(v) = default {
-            list_of_parameters.set_item(id.to_string(), PyList::new(*py, v))?;
+            list_of_parameters.set_item(id.to_string(), PyList::new(py, v))?;
           }
         }
-        BooleanParam{id, default, value} => {
+        BooleanParam { id, default, value } => {
           if let Some(v) = value {
             list_of_parameters.set_item(id.to_string(), v)?;
           } else if let Some(v) = default {
             list_of_parameters.set_item(id.to_string(), v)?;
           }
-        },
-        CredentialParam{id, default, value} => {
-          let credential_key =
-            if let Some(v) = value {
-              Some(v)
-            } else if let Some(v) = default {
-              Some(v)
-            } else {
-              None
-            };
+        }
+        CredentialParam { id, default, value } => {
+          let credential_key = if let Some(v) = value {
+            Some(v)
+          } else if let Some(v) = default {
+            Some(v)
+          } else {
+            None
+          };
 
           if let Some(credential_key) = credential_key {
-            let credential = amqp_worker::Credential{key: credential_key.to_string()};
+            let credential = amqp_worker::Credential {
+              key: credential_key.to_string(),
+            };
             if let Ok(retrieved_value) = credential.request_value(&job) {
               list_of_parameters.set_item(id.to_string(), retrieved_value)?;
             } else {
@@ -228,24 +234,24 @@ impl PythonWorkerEvent {
           } else {
             error!("no value or default for the credential value");
           }
-        },
-        IntegerParam{id, default, value} => {
+        }
+        IntegerParam { id, default, value } => {
           if let Some(v) = value {
             list_of_parameters.set_item(id.to_string(), v)?;
           } else if let Some(v) = default {
             list_of_parameters.set_item(id.to_string(), v)?;
           }
-        },
-        RequirementParam{..} => {
+        }
+        RequirementParam { .. } => {
           // do nothing
-        },
-        StringParam{id, default, value} => {
+        }
+        StringParam { id, default, value } => {
           if let Some(v) = value {
             list_of_parameters.set_item(id.to_string(), v)?;
           } else if let Some(v) = default {
             list_of_parameters.set_item(id.to_string(), v)?;
           }
-        },
+        }
       }
     }
 
