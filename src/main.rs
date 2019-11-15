@@ -140,13 +140,33 @@ impl MessageEvent for PythonWorkerEvent {
 
     let gil = Python::acquire_gil();
     let py = gil.python();
+    let traceback = py.import("traceback").unwrap();
     let python_module = PyModule::from_code(py, &contents, "worker.py", "worker")
       .expect("unable to create the python module");
 
-    if let Err(_error) = python_module.call1("process", (PyString::new(py, message),)) {
-      let result = JobResult::new(job.job_id, JobStatus::Error, vec![])
-        .with_message("Raised an exception in python.".to_string());
+    if let Err(error) = python_module.call1("process", (PyString::new(py, message),)) {
+      let stacktrace = if let Some(tb) = &error.ptraceback {
+        let locals = [("traceback", traceback)].into_py_dict(py);
 
+        locals.set_item("tb", tb).unwrap();
+
+        py.eval("traceback.format_tb(tb)", None, Some(locals))
+          .expect("Unknown python error, unable to get the stacktrace")
+          .to_string()
+      } else {
+        "Unknown python error, no stackstrace".to_string()
+      };
+
+      let locals = [("error", error)].into_py_dict(py);
+
+      let error_msg = py
+        .eval("repr(error)", None, Some(locals))
+        .expect("Unknown python error, unable to get the error message")
+        .to_string();
+
+      let error_message = format!("{}\n\nStacktrace:\n{}", error_msg, stacktrace);
+
+      let result = JobResult::new(job.job_id, JobStatus::Error, vec![]).with_message(error_message);
       Err(MessageError::ProcessingError(result))
     } else {
       Ok(JobResult::new(job.job_id, JobStatus::Completed, vec![]))

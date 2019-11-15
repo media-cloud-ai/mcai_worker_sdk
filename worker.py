@@ -25,8 +25,8 @@ def get_parameters():
 
 def process(message):
 	# be able to raise, return job in errors
-	# raise "my error"
+	# raise Exception("my error")
 
-	#do some stuff here
+	# do some stuff here
 
 	return
