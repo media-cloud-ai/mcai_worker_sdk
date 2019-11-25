@@ -16,7 +16,7 @@ edition = "2018"
 
 [dependencies]
 amq-protocol-types = "^2.1"
-amq-protocol-uri = "^2.1"
+amq-protocol-uri = "^3.1"
 chrono = "0.4"
 env_logger = "^0.6"
 failure = "^0.1"
