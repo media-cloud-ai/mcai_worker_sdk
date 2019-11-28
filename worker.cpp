@@ -1,29 +1,40 @@
 #include <stdio.h>
 #include <string.h>
-#include "parameter.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct Parameter {
+    char* identifier;
+    char* label;
+    unsigned int kind_size;
+    char** kind;
+    int required;
+} Parameter;
 
 char* get_name() {
-	return "my_c_worker";
+	return (char*)"my_c_worker";
 }
 
 char* get_short_description() {
-	return "My C Worker";
+	return (char*)"My C Worker";
 }
 
 char* get_description() {
-	return "This is my long description \n\
+	return (char*)"This is my long description \n\
 over multilines";
 }
 
 char* get_version() {
-	return "0.1.0";
+	return (char*)"0.1.0";
 }
 
-char* kind[1] = { "string" };
+char* kind[1] = { (char*)"string" };
 Parameter worker_parameters[1] = {
     {
-        .identifier = "my_parameter",
-        .label = "My parameter",
+        .identifier = (char*)"my_parameter",
+        .label = (char*)"My parameter",
         .kind_size = 1,
         .kind = kind,
         .required = 1
@@ -47,3 +58,7 @@ int process(unsigned int argc, char **argv) {
     }
     return 0;
 }
+
+#ifdef __cplusplus
+}
+#endif
