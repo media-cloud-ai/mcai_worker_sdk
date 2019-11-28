@@ -151,3 +151,41 @@ fn main() {
   start_worker(&C_WORKER_EVENT);
 }
 
+#[test]
+pub fn test_c_binding_worker_info() {
+  unsafe {
+    let name = get_string_from_c_string(get_name()).expect("cannot convert C string to String");
+    let expected_name = "my_c_worker".to_string();
+    assert_eq!(expected_name, name);
+
+    let short_description = get_string_from_c_string(get_short_description()).expect("cannot convert C string to String");
+    let expected_short_description = "My C Worker".to_string();
+    assert_eq!(expected_short_description, short_description);
+
+    let description = get_string_from_c_string(get_description()).expect("cannot convert C string to String");
+    let expected_description = "This is my long description \nover multilines".to_string();
+    assert_eq!(expected_description, description);
+
+    let version = get_string_from_c_string(get_version()).expect("cannot convert C string to String");
+    let expected_version = "0.1.0".to_string();
+    assert_eq!(expected_version, version);
+
+    let parameters = C_WORKER_EVENT.get_parameters();
+    assert_eq!(1, parameters.len());
+    let expected_parameter = Parameter {
+      identifier: "my_parameter".to_string(),
+      label: "My parameter".to_string(),
+      kind: vec![ParameterType::String],
+      required: true,
+    };
+    assert_eq!(expected_parameter.identifier, parameters[0].identifier);
+    assert_eq!(expected_parameter.label, parameters[0].label);
+    assert_eq!(expected_parameter.kind.len(), parameters[0].kind.len());
+
+    let parameter_kind = serde_json::to_string(&parameters[0].kind[0]).expect("cannot serialize parameter kind");
+    let expected_kind = serde_json::to_string(&expected_parameter.kind[0]).expect("cannot serialize parameter kind");
+    assert_eq!(expected_kind, parameter_kind);
+    assert_eq!(expected_parameter.required, parameters[0].required);
+  }
+}
+
