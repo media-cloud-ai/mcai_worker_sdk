@@ -9,3 +9,8 @@ links = "worker"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+libc = "0.2.65"
+amqp_worker = "0.6.0"
+log = "0.4.5"
+semver = "^0.9"
+serde_json = "^1.0"
