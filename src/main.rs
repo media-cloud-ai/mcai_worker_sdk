@@ -141,7 +141,93 @@ impl MessageEvent for CWorkerEvent {
       }
     }
 
-    Ok(JobResult::new(job.job_id, JobStatus::Completed, vec![]))
+    let mut list_of_parameters: Vec<String> = Vec::new();
+    let parameters = job.get_parameters();
+    for parameter in parameters {
+      match parameter {
+        ArrayOfStringsParam { id: _, default, value } => {
+          if let Some(v) = value {
+            for val in v {
+              list_of_parameters.push(val.to_string());
+            }
+          } else if let Some(v) = default {
+            for val in v {
+              list_of_parameters.push(val.to_string());
+            }
+          }
+        }
+        BooleanParam { id, default, value } => {
+          if let Some(v) = value {
+            if *v {
+              list_of_parameters.push(id.to_string());
+            }
+          } else if let Some(v) = default {
+            if *v {
+              list_of_parameters.push(id.to_string());
+            }
+          }
+        }
+        CredentialParam { id, default, value } => {
+          let credential_key = if let Some(v) = value {
+            Some(v)
+          } else if let Some(v) = default {
+            Some(v)
+          } else {
+            None
+          };
+
+          if let Some(credential_key) = credential_key {
+            let credential = amqp_worker::Credential {
+              key: credential_key.to_string(),
+            };
+            if let Ok(retrieved_value) = credential.request_value(&job) {
+              list_of_parameters.push(id.to_string());
+              list_of_parameters.push(retrieved_value);
+            } else {
+              error!("unable to retrieve the credential value");
+            }
+          } else {
+            error!("no value or default for the credential value");
+          }
+        }
+        IntegerParam { id: _, default, value } => {
+          if let Some(v) = value {
+            list_of_parameters.push(format!("{:?}", v));
+          } else if let Some(v) = default {
+            list_of_parameters.push(format!("{:?}", v));
+          }
+        }
+        RequirementParam { .. } => {
+          // do nothing
+        }
+        StringParam { id: _, default, value } => {
+          if let Some(v) = value {
+            list_of_parameters.push(v.to_string());
+          } else if let Some(v) = default {
+            list_of_parameters.push(v.to_string());
+          }
+        }
+      }
+    }
+
+    let argc = list_of_parameters.len() as u32;
+    debug!("Arguments (length: {:?}): {:?}", argc, list_of_parameters);
+    let mut argv: Vec<*const c_char> = list_of_parameters.iter().map(|arg| arg.as_ptr() as *const c_char).collect();
+
+    unsafe {
+      let return_code = process(argc, argv.as_mut_ptr());
+      debug!("Returned code: {:?}", return_code);
+
+      match return_code {
+        0 => Ok(JobResult::new(job.job_id, JobStatus::Completed, vec![])),
+        _ => {
+          let result =
+            JobResult::new(job.job_id, JobStatus::Error, vec![])
+              .with_message(format!("Worker process returned error code: {:?}", return_code));
+          Err(MessageError::ProcessingError(result))
+        }
+      }
+    }
   }
 }
 
@@ -189,3 +275,73 @@ pub fn test_c_binding_worker_info() {
   }
 }
 
+#[test]
+pub fn test_c_binding_process() {
+  unsafe {
+    let args = vec!["arg1".to_string(), "arg2".to_string(), "arg3".to_string()];
+    let argc = args.len();
+    let mut argv: Vec<*const c_char> = args.iter().map(|arg| arg.as_ptr() as *const c_char).collect();
+    assert_eq!(argc, argv.len());
+    let returned_code = process(argc as u32, argv.as_mut_ptr());
+    assert_eq!(0, returned_code);
+  }
+}
+
+#[test]
+pub fn test_c_binding_failing_process() {
+  unsafe {
+    let args = vec!["arg1".to_string(), "arg2".to_string()];
+    let argc = args.len();
+    let mut argv: Vec<*const c_char> = args.iter().map(|arg| arg.as_ptr() as *const c_char).collect();
+    let returned_code = process(argc as u32, argv.as_mut_ptr());
+    assert_eq!(1, returned_code);
+  }
+}
+
+#[test]
+pub fn test_process() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id": "human",
+        "type": "string",
+        "value": "--human"
+      },
+      {
+        "id": "verbose",
+        "type": "string",
+        "value": "--verbose"
+      },
+      {
+        "id": "path",
+        "type": "string",
+        "value": "/path/to/file"
+      }
+    ]
+  }"#;
+
+  let result = C_WORKER_EVENT.process(message);
+  assert!(result.is_ok());
+  let job_result = result.unwrap();
+  assert_eq!(123, job_result.job_id);
+  assert_eq!(JobStatus::Completed, job_result.status);
+}
+
+#[test]
+pub fn test_failing_process() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id": "path",
+        "type": "string",
+        "value": "/path/to/file"
+      }
+    ]
+  }"#;
+
+  let result = C_WORKER_EVENT.process(message);
+  assert!(result.is_err());
+  let _message_error = result.unwrap_err();
+}

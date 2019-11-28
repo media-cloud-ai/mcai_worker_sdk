@@ -39,5 +39,11 @@ void get_parameters(Parameter* parameters) {
 }
 
 int process(unsigned int argc, char **argv) {
+    for(int i = 0; i < argc; i++) {
+        printf("Argument %d: %s\n", i, argv[i]);
+    }
+    if(argc != 3) {
+        return 1;
+    }
     return 0;
 }
