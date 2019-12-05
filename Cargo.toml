@@ -3,8 +3,6 @@ name = "c_amqp_worker"
 version = "0.1.0"
 authors = ["Valentin NOEL <valentin.noel@media-io.com>"]
 edition = "2018"
-build = "build.rs"
-links = "worker"
 
 [dependencies]
 libc = "0.2.65"
@@ -13,6 +11,3 @@ log = "0.4.5"
 semver = "^0.9"
 serde_json = "^1.0"
 libloading = "0.5"
-
-[build-dependencies]
-cc = "1.0"
