@@ -13,8 +13,8 @@ typedef struct Parameter {
     int required;
 } Parameter;
 
-typedef void* Job;
-typedef char* (*GetParameterValueCallback)(Job, const char*);
+typedef void* JobParameters;
+typedef char* (*GetParameterValueCallback)(JobParameters, const char*);
 typedef void* (*Logger)(const char*);
 
 char* get_name() {
@@ -53,7 +53,7 @@ void get_parameters(Parameter* parameters) {
     memcpy(parameters, worker_parameters, sizeof(worker_parameters));
 }
 
-int process(Job job, GetParameterValueCallback parametersValueGetter, Logger logger) {
+int process(JobParameters job, GetParameterValueCallback parametersValueGetter, Logger logger) {
     logger("Start C Worker process...");
     char* value = parametersValueGetter(job, "path");
     logger(value);
