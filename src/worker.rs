@@ -172,10 +172,13 @@ pub fn get_worker_parameters() -> Vec<Parameter> {
   let library = std::env::var("WORKER_LIB").unwrap_or("libworker.so".to_string());
   match libloading::Library::new(library) {
     Ok(worker_lib) => unsafe {
+      // Retrieve number of parameters from the worker getter function
       let get_parameters_size_func: libloading::Symbol<GetParametersSizeFunc> =
         get_library_function(&worker_lib, GET_PARAMETERS_SIZE_FUNCTION)
           .unwrap_or_else(|error| panic!(error));
       let parameters_size = get_parameters_size_func() as usize;
+
+      // Allocate a C array to retrieve the worker parameters
       let worker_parameters = libc::malloc(std::mem::size_of::<WorkerParameter>() * parameters_size)
         as *mut WorkerParameter;
 
@@ -184,11 +187,13 @@ pub fn get_worker_parameters() -> Vec<Parameter> {
           .unwrap_or_else(|error| panic!(error));
       get_parameters_func(worker_parameters);
 
+      // Convert the retrieved worker parameters to AMQP Parameter instances
       let worker_parameters_parts = std::slice::from_raw_parts(worker_parameters, parameters_size);
       for worker_parameter in worker_parameters_parts {
         parameters.push(get_parameter_from_worker_parameter(worker_parameter));
       }
 
+      // Free parameters C array
       libc::free(worker_parameters as *mut libc::c_void);
     },
     Err(error) => panic!(format!(
