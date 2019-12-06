@@ -73,19 +73,24 @@ extern "C" fn check_error() -> c_int {
 }
 
 extern "C" fn get_parameter_value(
-  c_worker_job: *mut c_void,
+  mut c_worker_job: *mut c_void,
   parameter_id: *const c_char,
 ) -> *const c_char {
   let job_params_ptrs: Box<HashMap<String, *const c_char>> =
     unsafe { Box::from_raw(c_worker_job as *mut HashMap<String, *const c_char>) };
+  info!("job_params_ptrs: {:?}", job_params_ptrs);
   let key = unsafe { get_c_string!(parameter_id) };
+  info!("key: {:?}", key);
 
-  if let Some(value) = job_params_ptrs.get(&key) {
-    *value
-  } else {
-    handle_error!(format!("No worker_job parameter for id: {}.", key));
-    std::ptr::null()
-  }
+  let param_value =
+    if let Some(value) = job_params_ptrs.get(&key) {
+      *value
+    } else {
+      handle_error!(format!("No worker_job parameter for id: {}.", key));
+      std::ptr::null()
+    };
+  c_worker_job = Box::into_raw(job_params_ptrs) as *mut c_void;
+  param_value
 }
 
 extern "C" fn log(value: *const c_char) {
