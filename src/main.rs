@@ -141,3 +141,20 @@ pub fn test_process() {
   assert_eq!(JobStatus::Completed, job_result.status);
 }
 
+#[test]
+pub fn test_failing_process() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id": "not_the_expected_path_parameter",
+        "type": "string",
+        "value": "value"
+      }
+    ]
+  }"#;
+
+  let result = C_WORKER_EVENT.process(message);
+  assert!(result.is_err());
+  let _message_error = result.unwrap_err();
+}
