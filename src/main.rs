@@ -8,14 +8,11 @@ mod worker;
 use amqp_worker::job::*;
 use amqp_worker::start_worker;
 use amqp_worker::worker::Parameter;
+use amqp_worker::MessageError;
 use amqp_worker::MessageEvent;
-use amqp_worker::Parameter::*;
-use amqp_worker::{MessageError, ParametersContainer};
 use semver::Version;
 
 use crate::worker::*;
-use std::os::raw::c_char;
-
 
 #[derive(Debug)]
 struct CWorkerEvent {}
@@ -35,12 +32,10 @@ impl MessageEvent for CWorkerEvent {
 
   fn get_version(&self) -> Version {
     let version = get_worker_function_string_value(GET_VERSION_FUNCTION);
-    Version::parse(&version).unwrap_or_else(|_| {
-      panic!(
-        "unable to parse version {} (please use SemVer format)",
-        version
-      )
-    })
+    Version::parse(&version).expect(&format!(
+      "unable to parse version {} (please use SemVer format)",
+      version
+    ))
   }
 
   fn get_git_version(&self) -> Version {
@@ -49,37 +44,7 @@ impl MessageEvent for CWorkerEvent {
   }
 
   fn get_parameters(&self) -> Vec<Parameter> {
-    let mut parameters = vec![];
-
-    let library = std::env::var("WORKER_LIB").unwrap_or("libworker.so".to_string());
-    match libloading::Library::new(library) {
-      Err(error) => panic!(format!(
-        "Could not load worker dynamic library: {:?}",
-        error
-      )),
-      Ok(worker_lib) => unsafe {
-        let get_parameters_size_func: libloading::Symbol<GetParametersSizeFunc> =
-          get_library_function(&worker_lib, GET_PARAMETERS_SIZE_FUNCTION);
-        let parameters_size = get_parameters_size_func() as usize;
-        let worker_parameters =
-          libc::malloc(std::mem::size_of::<WorkerParameter>() * parameters_size)
-            as *mut WorkerParameter;
-
-        let get_parameters_func: libloading::Symbol<GetParametersFunc> =
-          get_library_function(&worker_lib, GET_PARAMETERS_FUNCTION);
-        get_parameters_func(worker_parameters);
-
-        let worker_parameters_parts =
-          std::slice::from_raw_parts(worker_parameters, parameters_size);
-        for worker_parameter in worker_parameters_parts {
-          parameters.push(get_parameter_from_worker_parameter(worker_parameter));
-        }
-
-        libc::free(worker_parameters as *mut libc::c_void);
-      },
-    }
-
-    parameters
+    get_worker_parameters()
   }
 
   fn process(&self, message: &str) -> Result<JobResult, MessageError> {
@@ -93,88 +58,14 @@ impl MessageEvent for CWorkerEvent {
       }
     }
 
-    let mut list_of_parameters: Vec<String> = Vec::new();
-
-    for parameter in job.get_parameters() {
-      match parameter {
-        ArrayOfStringsParam { default, value, .. } => {
-          if let Some(v) = value {
-            for val in v {
-              list_of_parameters.push(val.to_string());
-            }
-          } else if let Some(v) = default {
-            for val in v {
-              list_of_parameters.push(val.to_string());
-            }
-          }
-        }
-        BooleanParam { id, default, value } => {
-          if let Some(v) = value {
-            if *v {
-              list_of_parameters.push(id.to_string());
-            }
-          } else if let Some(v) = default {
-            if *v {
-              list_of_parameters.push(id.to_string());
-            }
-          }
-        }
-        CredentialParam { id, default, value } => {
-          let credential_key = if let Some(v) = value {
-            Some(v)
-          } else if let Some(v) = default {
-            Some(v)
-          } else {
-            None
-          };
-
-          if let Some(credential_key) = credential_key {
-            let credential = amqp_worker::Credential {
-              key: credential_key.to_string(),
-            };
-            if let Ok(retrieved_value) = credential.request_value(&job) {
-              list_of_parameters.push(id.to_string());
-              list_of_parameters.push(retrieved_value);
-            } else {
-              error!("unable to retrieve the credential value");
-            }
-          } else {
-            error!("no value or default for the credential value");
-          }
-        }
-        IntegerParam { default, value, .. } => {
-          if let Some(v) = value {
-            list_of_parameters.push(format!("{:?}", v));
-          } else if let Some(v) = default {
-            list_of_parameters.push(format!("{:?}", v));
-          }
-        }
-        RequirementParam { .. } => {
-          // do nothing
-        }
-        StringParam { default, value, .. } => {
-          if let Some(v) = value {
-            list_of_parameters.push(v.to_string());
-          } else if let Some(v) = default {
-            list_of_parameters.push(v.to_string());
-          }
-        }
-      }
-    }
-
-    let argc = list_of_parameters.len() as u32;
-    debug!("Arguments (length: {:?}): {:?}", argc, list_of_parameters);
-    let argv: Vec<*const c_char> = list_of_parameters
-      .iter()
-      .map(|arg| arg.as_ptr() as *const c_char)
-      .collect();
-
-    let return_code = call_worker_process(argc, argv);
+    let job_id = job.job_id;
+    debug!("Process job: {:?}", job_id);
+    let return_code = call_worker_process(job);
     debug!("Returned code: {:?}", return_code);
     match return_code {
-      0 => Ok(JobResult::new(job.job_id, JobStatus::Completed, vec![])),
+      0 => Ok(JobResult::new(job_id, JobStatus::Completed, vec![])),
       _ => {
-        let result = JobResult::new(job.job_id, JobStatus::Error, vec![]).with_message(format!(
+        let result = JobResult::new(job_id, JobStatus::Error, vec![]).with_message(format!(
           "Worker process returned error code: {:?}",
           return_code
         ));
@@ -236,16 +127,6 @@ pub fn test_process() {
     "job_id": 123,
     "parameters": [
       {
-        "id": "human",
-        "type": "string",
-        "value": "--human"
-      },
-      {
-        "id": "verbose",
-        "type": "string",
-        "value": "--verbose"
-      },
-      {
         "id": "path",
         "type": "string",
         "value": "/path/to/file"
@@ -260,20 +141,3 @@ pub fn test_process() {
   assert_eq!(JobStatus::Completed, job_result.status);
 }
 
-#[test]
-pub fn test_failing_process() {
-  let message = r#"{
-    "job_id": 123,
-    "parameters": [
-      {
-        "id": "path",
-        "type": "string",
-        "value": "/path/to/file"
-      }
-    ]
-  }"#;
-
-  let result = C_WORKER_EVENT.process(message);
-  assert!(result.is_err());
-  let _message_error = result.unwrap_err();
-}
