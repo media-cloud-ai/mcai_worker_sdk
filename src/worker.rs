@@ -81,13 +81,12 @@ extern "C" fn get_parameter_value(
     unsafe { Box::from_raw(c_worker_job as *mut HashMap<String, *const c_char>) };
   let key = unsafe { get_c_string!(parameter_id) };
   debug!("Get parameter value from id: {:?}", key);
-  let param_value =
-    if let Some(value) = job_params_ptrs.get(&key) {
-      *value
-    } else {
-      handle_error!(format!("No worker_job parameter for id: {}.", key));
-      std::ptr::null()
-    };
+  let param_value = if let Some(value) = job_params_ptrs.get(&key) {
+    *value
+  } else {
+    handle_error!(format!("No worker_job parameter for id: {}.", key));
+    std::ptr::null()
+  };
   // reset job parameters pointer
   c_worker_job = Box::into_raw(job_params_ptrs) as *mut c_void;
   param_value
