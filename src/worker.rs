@@ -78,10 +78,8 @@ extern "C" fn get_parameter_value(
 ) -> *const c_char {
   let job_params_ptrs: Box<HashMap<String, *const c_char>> =
     unsafe { Box::from_raw(c_worker_job as *mut HashMap<String, *const c_char>) };
-  info!("job_params_ptrs: {:?}", job_params_ptrs);
   let key = unsafe { get_c_string!(parameter_id) };
-  info!("key: {:?}", key);
-
+  debug!("Get parameter value from id: {:?}", key);
   let param_value =
     if let Some(value) = job_params_ptrs.get(&key) {
       *value
@@ -95,7 +93,7 @@ extern "C" fn get_parameter_value(
 
 extern "C" fn log(value: *const c_char) {
   unsafe {
-    info!("[Worker] {}", get_c_string!(value));
+    debug!("[Worker] {}", get_c_string!(value));
   }
 }
 
