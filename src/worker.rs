@@ -142,6 +142,10 @@ unsafe fn get_parameter_from_worker_parameter(worker_parameter: &WorkerParameter
   }
 }
 
+fn get_library_file_path() -> String {
+  std::env::var("WORKER_LIBRARY_FILE").unwrap_or("libworker.so".to_string())
+}
+
 unsafe fn get_library_function<'a, T>(
   library: &'a Library,
   func_name: &str,
@@ -155,8 +159,7 @@ unsafe fn get_library_function<'a, T>(
 }
 
 pub fn get_worker_function_string_value(function_name: &str) -> String {
-  let library = std::env::var("WORKER_LIB").unwrap_or("libworker.so".to_string());
-  match libloading::Library::new(library) {
+  match libloading::Library::new(get_library_file_path()) {
     Ok(worker_lib) => unsafe {
       let get_string_func: libloading::Symbol<GetStringFunc> =
         get_library_function(&worker_lib, function_name).unwrap_or_else(|error| panic!(error));
@@ -171,9 +174,7 @@ pub fn get_worker_function_string_value(function_name: &str) -> String {
 
 pub fn get_worker_parameters() -> Vec<Parameter> {
   let mut parameters = vec![];
-
-  let library = std::env::var("WORKER_LIB").unwrap_or("libworker.so".to_string());
-  match libloading::Library::new(library) {
+  match libloading::Library::new(get_library_file_path()) {
     Ok(worker_lib) => unsafe {
       // Retrieve number of parameters from the worker getter function
       let get_parameters_size_func: libloading::Symbol<GetParametersSizeFunc> =
@@ -209,8 +210,7 @@ pub fn get_worker_parameters() -> Vec<Parameter> {
 }
 
 pub fn call_worker_process(job: Job) -> i32 {
-  let library = std::env::var("WORKER_LIB").unwrap_or("libworker.so".to_string());
-  match libloading::Library::new(library) {
+  match libloading::Library::new(get_library_file_path()) {
     Ok(worker_lib) => unsafe {
       match get_library_function(&worker_lib, PROCESS_FUNCTION)
         as Result<libloading::Symbol<ProcessFunc>, String>
