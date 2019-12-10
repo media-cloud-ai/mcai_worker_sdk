@@ -10,7 +10,7 @@ rust:
   - nightly
 
 env:
-  - WORKER_LIBRARY_FILE=/home/travis/build/media-cloud-ai/c_amqp_worker/libworker.so
+  - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
 matrix:
   allow_failures:
@@ -43,8 +43,8 @@ matrix:
         - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
 
 script:
-  - gcc -c -Wall -Werror -fpic worker.cpp && gcc -shared -o libworker.so worker.o && pwd && ls -l && echo $TRAVIS_BUILD_DIR
-  - ls -l && cargo test
+  - gcc -c -Wall -Werror -fpic worker.cpp && gcc -shared -o libworker.so worker.o
+  - cargo test
 cache:
   cargo: true
 before_cache:
