@@ -40,6 +40,7 @@ jobs:
       install:
         - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
+        - gcc -c -Wall -Werror -fpic worker.cpp && gcc -shared -o libworker.so worker.o
         - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
 
 script:
