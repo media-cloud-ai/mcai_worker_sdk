@@ -72,6 +72,7 @@ extern "C" fn check_error() -> c_int {
   }
 }
 
+#[allow(unused_assignments)]
 extern "C" fn get_parameter_value(
   mut c_worker_job: *mut c_void,
   parameter_id: *const c_char,
@@ -87,6 +88,7 @@ extern "C" fn get_parameter_value(
       handle_error!(format!("No worker_job parameter for id: {}.", key));
       std::ptr::null()
     };
+  // reset job parameters pointer
   c_worker_job = Box::into_raw(job_params_ptrs) as *mut c_void;
   param_value
 }
