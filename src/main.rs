@@ -81,11 +81,10 @@ fn main() {
   start_worker(&C_WORKER_EVENT);
 }
 
-#[cfg(test)]
-use amqp_worker::worker::ParameterType;
-
 #[test]
 pub fn test_c_binding_worker_info() {
+  use amqp_worker::worker::ParameterType;
+
   let name = C_WORKER_EVENT.get_name();
   let short_description = C_WORKER_EVENT.get_short_description();
   let description = C_WORKER_EVENT.get_description();
