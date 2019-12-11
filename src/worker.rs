@@ -55,13 +55,13 @@ type ProcessFunc = unsafe fn(
 
 type CheckLastError = extern "C" fn() -> c_int;
 
-pub static GET_NAME_FUNCTION: &'static str = "get_name";
-pub static GET_SHORT_DESCRIPTION_FUNCTION: &'static str = "get_short_description";
-pub static GET_DESCRIPTION_FUNCTION: &'static str = "get_description";
-pub static GET_VERSION_FUNCTION: &'static str = "get_version";
-pub static GET_PARAMETERS_SIZE_FUNCTION: &'static str = "get_parameters_size";
-pub static GET_PARAMETERS_FUNCTION: &'static str = "get_parameters";
-pub static PROCESS_FUNCTION: &'static str = "process";
+pub static GET_NAME_FUNCTION: &str = "get_name";
+pub static GET_SHORT_DESCRIPTION_FUNCTION: &str = "get_short_description";
+pub static GET_DESCRIPTION_FUNCTION: &str = "get_description";
+pub static GET_VERSION_FUNCTION: &str = "get_version";
+pub static GET_PARAMETERS_SIZE_FUNCTION: &str = "get_parameters_size";
+pub static GET_PARAMETERS_FUNCTION: &str = "get_parameters";
+pub static PROCESS_FUNCTION: &str = "process";
 
 extern "C" fn check_error() -> c_int {
   let last_error = LAST_ERROR.with(|last_error| last_error.replace(None));
@@ -144,7 +144,7 @@ unsafe fn get_parameter_from_worker_parameter(worker_parameter: &WorkerParameter
 }
 
 fn get_library_file_path() -> String {
-  std::env::var("WORKER_LIBRARY_FILE").unwrap_or("libworker.so".to_string())
+  std::env::var("WORKER_LIBRARY_FILE").unwrap_or_else(|_| "libworker.so".to_string())
 }
 
 unsafe fn get_library_function<'a, T>(

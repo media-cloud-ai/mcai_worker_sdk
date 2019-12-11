@@ -32,10 +32,12 @@ impl MessageEvent for CWorkerEvent {
 
   fn get_version(&self) -> Version {
     let version = get_worker_function_string_value(GET_VERSION_FUNCTION);
-    Version::parse(&version).expect(&format!(
-      "unable to parse version {} (please use SemVer format)",
-      version
-    ))
+    Version::parse(&version).unwrap_or_else(|_| {
+      panic!(
+        "unable to parse version {} (please use SemVer format)",
+        version
+      )
+    })
   }
 
   fn get_git_version(&self) -> Version {
