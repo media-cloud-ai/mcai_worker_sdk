@@ -32,6 +32,10 @@ typedef void* (*Logger)(const char*);
  * Check error callback
  */
 typedef int* (*CheckError)();
+/**
+ * Message to return as a response
+ */
+typedef char* OutputMessage;
 
 
 /**
@@ -97,7 +101,7 @@ void get_parameters(Parameter* parameters) {
  * @param checkError               Check error callback
  * @param logger                   Rust logger callback
  */
-int process(JobParameters job, GetParameterValueCallback parametersValueGetter, CheckError checkError, Logger logger) {
+int process(JobParameters job, GetParameterValueCallback parametersValueGetter, CheckError checkError, Logger logger, OutputMessage message) {
     // Print message through the Rust internal logger
     logger("Start C Worker process...");
 
@@ -106,11 +110,16 @@ int process(JobParameters job, GetParameterValueCallback parametersValueGetter, 
 
     // Check whether an error occurred parsing job parameters
     if(checkError() != 0) {
+        const char* message_str = "Something went wrong...";
+        memcpy(message, message_str, strlen(message_str));
         return 1;
     }
 
     // Print value through the Rust internal logger
     logger(value);
+
+    const char* message_str = "Everything worked well!";
+    memcpy(message, message_str, strlen(message_str));
     return 0;
 }
 
