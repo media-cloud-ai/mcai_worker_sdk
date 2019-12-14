@@ -62,15 +62,15 @@ impl MessageEvent for CWorkerEvent {
 
     let job_id = job.job_id;
     debug!("Process job: {:?}", job_id);
-    let return_code = call_worker_process(job);
-    debug!("Returned code: {:?}", return_code);
-    match return_code {
-      0 => Ok(JobResult::new(job_id, JobStatus::Completed, vec![])),
-      _ => {
-        let result = JobResult::new(job_id, JobStatus::Error, vec![]).with_message(format!(
-          "Worker process returned error code: {:?}",
-          return_code
-        ));
+    let process_return = call_worker_process(job);
+    debug!("Returned code: {:?}", process_return);
+    match process_return {
+      ProcessReturn { code: 0, message } => {
+        Ok(JobResult::new(job_id, JobStatus::Completed, vec![]).with_message(message))
+      }
+      ProcessReturn { code, message } => {
+        let result = JobResult::new(job_id, JobStatus::Error, vec![])
+          .with_message(format!("{} (code: {:?})", message, code));
         Err(MessageError::ProcessingError(result))
       }
     }
