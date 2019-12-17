@@ -242,7 +242,7 @@ pub fn call_worker_process(job: Job) -> ProcessReturn {
           let job_params_ptrs_ptr = Box::into_raw(boxed_job_params_ptrs);
 
           // Get output message pointer
-          let message_ptr = libc::malloc(1024*1024) as *mut c_char; // 1MB max. sized message
+          let message_ptr = libc::malloc(1024 * 1024) as *mut c_char; // 1MB max. sized message
 
           // Call C worker process function
           let return_code = process_func(
