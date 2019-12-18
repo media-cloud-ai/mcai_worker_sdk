@@ -1,6 +1,6 @@
 [package]
 name = "c_amqp_worker"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Valentin NOEL <valentin.noel@media-io.com>"]
 edition = "2018"
 
