@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_uint, c_void};
@@ -10,21 +10,13 @@ use libloading::Library;
 use crate::constants;
 use crate::process_return::ProcessReturn;
 
-thread_local!(static LAST_ERROR: RefCell<Option<String>> = RefCell::new(None));
-
-macro_rules! handle_error {
-  ($name:expr) => {
-    LAST_ERROR.with(|last_error| {
-      last_error.replace(Some($name));
-    });
-  };
-}
-
 macro_rules! get_c_string {
   ($name:expr) => {
-    CString::from(CStr::from_ptr($name))
-      .into_string()
-      .expect("cannot convert C string to String")
+    if $name.is_null() {
+      "".to_string()
+    } else {
+      std::str::from_utf8_unchecked(CStr::from_ptr($name).to_bytes()).to_string()
+    }
   };
 }
 
@@ -47,25 +39,14 @@ type GetParametersSizeFunc = unsafe fn() -> c_uint;
 type GetParametersFunc = unsafe fn(parameters: *mut WorkerParameter);
 
 type GetParameterValueCallback = extern "C" fn(*mut c_void, *const c_char) -> *const c_char;
-type LogCallback = extern "C" fn(*const c_char);
+type LoggerCallback = extern "C" fn(*const c_char, *const c_char);
 type ProcessFunc = unsafe fn(
   job: *mut c_void,
   callback: GetParameterValueCallback,
-  check_error: CheckLastError,
-  logger: LogCallback,
-  output_message: *mut c_char,
+  logger: LoggerCallback,
+  output_message: &*const c_char,
+  output_paths: &*mut *const c_char
 ) -> c_int;
-
-type CheckLastError = extern "C" fn() -> c_int;
-
-extern "C" fn check_error() -> c_int {
-  let last_error = LAST_ERROR.with(|last_error| last_error.replace(None));
-  if last_error.is_some() {
-    ProcessReturn::get_error_code()
-  } else {
-    0
-  }
-}
 
 #[allow(unused_assignments)]
 extern "C" fn get_parameter_value(
@@ -74,22 +55,33 @@ extern "C" fn get_parameter_value(
 ) -> *const c_char {
   let job_params_ptrs: Box<HashMap<String, *const c_char>> =
     unsafe { Box::from_raw(c_worker_job as *mut HashMap<String, *const c_char>) };
+
   let key = unsafe { get_c_string!(parameter_id) };
   debug!("Get parameter value from id: {:?}", key);
+
   let param_value = if let Some(value) = job_params_ptrs.get(&key) {
     *value
   } else {
-    handle_error!(format!("No worker_job parameter for id: {}.", key));
     std::ptr::null()
   };
+
   // reset job parameters pointer
   c_worker_job = Box::into_raw(job_params_ptrs) as *mut c_void;
   param_value
 }
 
-extern "C" fn log(value: *const c_char) {
+extern "C" fn logger(level: *const c_char, raw_value: *const c_char) {
   unsafe {
-    debug!("[Worker] {}", get_c_string!(value));
+    let level = get_c_string!(level);
+    let value = get_c_string!(raw_value);
+
+    match level.as_str() {
+      "trace" => {trace!("[Worker] {}", value);},
+      "debug" => {debug!("[Worker] {}", value);},
+      "info" => {info!("[Worker] {}", value);},
+      "error" => {error!("[Worker] {}", value);},
+      _ => {}
+    }
   }
 }
 
@@ -225,23 +217,50 @@ pub fn call_worker_process(job: Job) -> ProcessReturn {
           let boxed_job_params_ptrs = Box::new(job_params_ptrs);
           let job_params_ptrs_ptr = Box::into_raw(boxed_job_params_ptrs);
 
-          // Get output message pointer
-          let message_ptr = libc::malloc(1024 * 1024) as *mut c_char; // 1MB max. sized message
+          let message_ptr = std::ptr::null();
+
+          let mut output_paths_ptr = vec![std::ptr::null()];
+          let ptr = output_paths_ptr.as_mut_ptr();
 
           // Call C worker process function
           let return_code = process_func(
             job_params_ptrs_ptr as *mut c_void,
             get_parameter_value,
-            check_error,
-            log,
-            message_ptr,
+            logger,
+            &message_ptr,
+            &ptr
           );
 
+          let mut output_paths = vec![];
+
+          if !ptr.is_null() {
+            let mut offset = 0;
+            loop {
+              let cur_ptr = *ptr.offset(offset);
+              if cur_ptr.is_null() {
+                break;
+              }
+
+              output_paths.push(get_c_string!(cur_ptr));
+
+              libc::free(cur_ptr as *mut libc::c_void);
+              offset += 1;
+            }
+
+            if offset > 0 {
+              libc::free(ptr as *mut libc::c_void);
+            }
+          }
+
           // Retrieve message as string and free pointer
-          let message = get_c_string!(message_ptr);
-          libc::free(message_ptr as *mut libc::c_void);
+          let mut message = "".to_string();
+          if !message_ptr.is_null() {
+            message = get_c_string!(message_ptr);
+            libc::free(message_ptr as *mut libc::c_void);
+          }
 
           ProcessReturn::new(return_code, &message)
+            .with_output_paths(output_paths)
         }
         Err(error) => ProcessReturn::new_error(&format!(
           "Could not access {:?} function from worker library: {:?}",
@@ -273,6 +292,7 @@ pub fn test_c_binding_process() {
   let returned_code = call_worker_process(job);
   assert_eq!(returned_code.get_code(), 0);
   assert_eq!(returned_code.get_message(), "Everything worked well!");
+  assert_eq!(returned_code.get_output_paths(), &vec!["/path/out.mxf".to_string()]);
 }
 
 #[test]
@@ -292,4 +312,5 @@ pub fn test_c_binding_failing_process() {
   let returned_code = call_worker_process(job);
   assert_eq!(returned_code.get_code(), 1);
   assert_eq!(returned_code.get_message(), "Something went wrong...");
+  assert!(returned_code.get_output_paths().is_empty());
 }

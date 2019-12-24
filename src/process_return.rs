@@ -6,6 +6,7 @@ use amqp_worker::MessageError;
 pub struct ProcessReturn {
   code: i32,
   message: String,
+  output_paths: Vec<String>,
 }
 
 impl ProcessReturn {
@@ -13,11 +14,17 @@ impl ProcessReturn {
     ProcessReturn {
       code,
       message: message.to_string(),
+      output_paths: vec![],
     }
   }
 
   pub fn new_error(message: &str) -> Self {
     ProcessReturn::new(ProcessReturn::get_error_code(), message)
+  }
+
+  pub fn with_output_paths(mut self, output_paths: Vec<String>) -> Self {
+    self.output_paths = output_paths;
+    self
   }
 
   pub fn get_error_code() -> i32 {
@@ -32,10 +39,17 @@ impl ProcessReturn {
     &self.message
   }
 
+  pub fn get_output_paths(&self) -> &Vec<String> {
+    &self.output_paths
+  }
+
   pub fn as_result(&self, job_id: u64) -> Result<JobResult, MessageError> {
     if self.code == 0 {
+      let mut output_paths = self.output_paths.clone();
+
       let job_result =
         JobResult::new(job_id, JobStatus::Completed)
+        .with_destination_paths(&mut output_paths)
         .with_message(&self.message);
 
       Ok(job_result)
