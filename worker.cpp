@@ -1,34 +1,9 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+
+#include "worker.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/**
- * Worker parameter type
- */
-typedef struct Parameter {
-    char* identifier;
-    char* label;
-    unsigned int kind_size;
-    char** kind;
-    int required;
-} Parameter;
-
-/**
- * Job parameters handler
- */
-typedef void* JobHandle;
-/**
- * Get job parameter value callback
- */
-typedef char* (*GetParameterValueCallback)(JobHandle, const char*);
-/**
- * Rust Logger
- */
-typedef void* (*Logger)(const char*, const char*);
 
 /**
  * Get worker name
@@ -107,25 +82,18 @@ int process(
 
     // Check whether an error occurred parsing job parameters
     if(value == NULL) {
-        const char* message_str = "Something went wrong...\0";
-        size_t length = strlen(message_str) + 1;
-        *message = (const char *)malloc(length);
-        memcpy((void*)*message, message_str, length);
+        set_str_on_ptr(message, "Something went wrong...\0");
         return 1;
     }
 
     // Print value through the Rust Logger
     logger("debug", value);
 
-    const char* message_str = "Everything worked well!\0";
-    size_t length = strlen(message_str) + 1;
-    *message = (const char *)malloc(length);
-    memcpy((void*)*message, message_str, length);
+    set_str_on_ptr(message, "Everything worked well!\0");
 
     output_paths[0] = (const char **)malloc(sizeof(int) * 2);
-    output_paths[0][0] = (const char *)malloc(20);
+    set_str_on_ptr(&output_paths[0][0], "/path/out.mxf\0");
     output_paths[0][1] = 0;
-    memcpy((void*)output_paths[0][0], "/path/out.mxf\0", 13);
 
     return 0;
 }
