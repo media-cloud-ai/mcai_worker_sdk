@@ -7,6 +7,8 @@ use amqp_worker::job::Job;
 use amqp_worker::worker::{Parameter, ParameterType};
 use amqp_worker::ParametersContainer;
 use libloading::Library;
+use crate::constants;
+use crate::process_return::ProcessReturn;
 
 thread_local!(static LAST_ERROR: RefCell<Option<String>> = RefCell::new(None));
 
@@ -56,18 +58,10 @@ type ProcessFunc = unsafe fn(
 
 type CheckLastError = extern "C" fn() -> c_int;
 
-pub static GET_NAME_FUNCTION: &str = "get_name";
-pub static GET_SHORT_DESCRIPTION_FUNCTION: &str = "get_short_description";
-pub static GET_DESCRIPTION_FUNCTION: &str = "get_description";
-pub static GET_VERSION_FUNCTION: &str = "get_version";
-pub static GET_PARAMETERS_SIZE_FUNCTION: &str = "get_parameters_size";
-pub static GET_PARAMETERS_FUNCTION: &str = "get_parameters";
-pub static PROCESS_FUNCTION: &str = "process";
-
 extern "C" fn check_error() -> c_int {
   let last_error = LAST_ERROR.with(|last_error| last_error.replace(None));
   if let Some(error_message) = last_error {
-    return_with_error(error_message).code
+    ProcessReturn::new_error(&error_message).code
   } else {
     0
   }
@@ -102,16 +96,6 @@ extern "C" fn log(value: *const c_char) {
 /************************
  *   Utility functions
  ************************/
-
-#[derive(Debug)]
-pub struct ProcessReturn {
-  pub code: i32,
-  pub message: String,
-}
-
-fn return_with_error(message: String) -> ProcessReturn {
-  ProcessReturn { code: 1, message }
-}
 
 fn get_parameter_type_from_c_str(c_str: &CStr) -> ParameterType {
   match c_str.to_str() {
@@ -185,7 +169,7 @@ pub fn get_worker_parameters() -> Vec<Parameter> {
     Ok(worker_lib) => unsafe {
       // Retrieve number of parameters from the worker getter function
       let get_parameters_size_func: libloading::Symbol<GetParametersSizeFunc> =
-        get_library_function(&worker_lib, GET_PARAMETERS_SIZE_FUNCTION)
+        get_library_function(&worker_lib, constants::GET_PARAMETERS_SIZE_FUNCTION)
           .unwrap_or_else(|error| panic!(error));
       let parameters_size = get_parameters_size_func() as usize;
 
@@ -194,7 +178,7 @@ pub fn get_worker_parameters() -> Vec<Parameter> {
         as *mut WorkerParameter;
 
       let get_parameters_func: libloading::Symbol<GetParametersFunc> =
-        get_library_function(&worker_lib, GET_PARAMETERS_FUNCTION)
+        get_library_function(&worker_lib, constants::GET_PARAMETERS_FUNCTION)
           .unwrap_or_else(|error| panic!(error));
       get_parameters_func(worker_parameters);
 
@@ -221,7 +205,7 @@ pub fn call_worker_process(job: Job) -> ProcessReturn {
   debug!("Call worker process from library: {}", library);
   match libloading::Library::new(library) {
     Ok(worker_lib) => unsafe {
-      match get_library_function(&worker_lib, PROCESS_FUNCTION)
+      match get_library_function(&worker_lib, constants::PROCESS_FUNCTION)
         as Result<libloading::Symbol<ProcessFunc>, String>
       {
         Ok(process_func) => {
@@ -257,18 +241,15 @@ pub fn call_worker_process(job: Job) -> ProcessReturn {
           let message = get_c_string!(message_ptr);
           libc::free(message_ptr as *mut libc::c_void);
 
-          ProcessReturn {
-            code: return_code,
-            message,
-          }
+          ProcessReturn::new(return_code, &message)
         }
-        Err(error) => return_with_error(format!(
+        Err(error) => ProcessReturn::new_error(&format!(
           "Could not access {:?} function from worker library: {:?}",
-          PROCESS_FUNCTION, error
+          constants::PROCESS_FUNCTION, error
         )),
       }
     },
-    Err(error) => return_with_error(format!(
+    Err(error) => ProcessReturn::new_error(&format!(
       "Could not load worker dynamic library: {:?}",
       error
     )),
