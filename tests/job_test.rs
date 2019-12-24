@@ -433,9 +433,7 @@ fn test_job_result_from_job_ref() {
     ]
   }"#;
 
-  let result = Job::new(message);
-  assert!(result.is_ok());
-  let job = result.unwrap();
+  let job = Job::new(message).unwrap();
   let job_result = JobResult::from(&job);
   assert_eq!(job_result.get_job_id(), 123);
   assert_eq!(job_result.get_status(), &JobStatus::Unknown);
@@ -451,19 +449,15 @@ fn test_job_result_with_setters() {
   assert_eq!(job_result.get_parameters().len(), 0);
   job_result = job_result.with_status(JobStatus::Completed);
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
-  let hello = "Hello!";
-  job_result = job_result.with_message(hello);
+  let content = "Hello!";
+
+  job_result = job_result.with_message(content);
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
 
-  let optional_string = job_result.get_string_parameter("message");
-  assert!(optional_string.is_some());
-  let string_value = optional_string.unwrap();
-  assert_eq!(hello.to_string(), string_value.to_string());
-
-  // let mut job_result = JobResult::new(job_id, JobStatus::Unknown, vec![]);
-
-  // let e = std::io::Error::new(std::io::ErrorKind::Other, "oh no!");
-  // let job_result = job_result.with_error(reqwest::Error::from(e));
+  assert_eq!(
+    Some(content.to_string()),
+    job_result.get_string_parameter("message")
+  );
 }
 
 #[test]
@@ -498,17 +492,21 @@ fn test_credential_request_value() {
     ]
   }"#;
 
-  let message_parsing = Job::new(message);
-  assert!(message_parsing.is_ok());
-  let job = message_parsing.unwrap();
-  let optional_credential = job.get_credential_parameter("test_credential");
-  assert!(optional_credential.is_some());
-  let credential = optional_credential.unwrap();
-  assert_eq!("TEST_CREDENTIAL_KEY".to_string(), credential.key);
-  let request_result = credential.request_value(&job);
-  assert!(request_result.is_ok());
-  let credential_value = request_result.unwrap();
-  assert_eq!("TEST_CREDENTIAL_VALUE".to_string(), credential_value);
+  let job = Job::new(message).unwrap();
+
+  assert_eq!(
+    job.get_credential_parameter("test_credential"),
+    Some(amqp_worker::Credential {
+      key: "TEST_CREDENTIAL_KEY".to_string()
+    })
+  );
+
+  let credential = job.get_credential_parameter("test_credential").unwrap();
+
+  assert_eq!(
+    Ok("TEST_CREDENTIAL_VALUE".to_string()),
+    credential.request_value(&job)
+  );
 }
 
 #[test]
@@ -528,25 +526,33 @@ fn test_credential_request_value_no_session() {
     ]
   }"#;
 
-  let message_parsing = Job::new(message);
-  assert!(message_parsing.is_ok());
-  let job = message_parsing.unwrap();
-  let optional_credential = job.get_credential_parameter("test_credential");
-  assert!(optional_credential.is_some());
-  let credential = optional_credential.unwrap();
-  assert_eq!("TEST_CREDENTIAL_KEY".to_string(), credential.key);
-  let request_result = credential.request_value(&job);
-  assert!(request_result.is_err());
-  let error = request_result.unwrap_err();
+  let job = Job::new(message).unwrap();
+
   assert_eq!(
-    MessageError::ProcessingError(JobResult::new(123, JobStatus::Error).with_parameters(
-      &mut vec![Parameter::StringParam {
+    job.get_credential_parameter("test_credential"),
+    Some(amqp_worker::Credential {
+      key: "TEST_CREDENTIAL_KEY".to_string()
+    })
+  );
+
+  assert_eq!(
+    job.get_credential_parameter("test_credential"),
+    Some(amqp_worker::Credential {
+      key: "TEST_CREDENTIAL_KEY".to_string()
+    })
+  );
+
+  let credential = job.get_credential_parameter("test_credential").unwrap();
+
+  assert_eq!(
+    Err(MessageError::ProcessingError(
+      JobResult::new(123, JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some("EOF while parsing a value at line 1 column 0".to_string())
-      }]
+      }])
     )),
-    error
+    credential.request_value(&job)
   );
 }
 
@@ -570,26 +576,33 @@ fn test_credential_request_value_invalid_session() {
     ]
   }"#;
 
-  let message_parsing = Job::new(message);
-  assert!(message_parsing.is_ok());
-  let job = message_parsing.unwrap();
-  let optional_credential = job.get_credential_parameter("test_credential");
-  assert!(optional_credential.is_some());
-  let credential = optional_credential.unwrap();
-  assert_eq!("TEST_CREDENTIAL_KEY".to_string(), credential.key);
-  let request_result = credential.request_value(&job);
-  assert!(request_result.is_err());
-  let error = request_result.unwrap_err();
+  let job = Job::new(message).unwrap();
 
   assert_eq!(
-    MessageError::ProcessingError(JobResult::new(123, JobStatus::Error).with_parameters(
-      &mut vec![Parameter::StringParam {
+    job.get_credential_parameter("test_credential"),
+    Some(amqp_worker::Credential {
+      key: "TEST_CREDENTIAL_KEY".to_string()
+    })
+  );
+
+  assert_eq!(
+    job.get_credential_parameter("test_credential"),
+    Some(amqp_worker::Credential {
+      key: "TEST_CREDENTIAL_KEY".to_string()
+    })
+  );
+
+  let credential = job.get_credential_parameter("test_credential").unwrap();
+
+  assert_eq!(
+    Err(MessageError::ProcessingError(
+      JobResult::new(123, JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some("missing field `access_token` at line 1 column 26".to_string())
-      }]
+      }])
     )),
-    error
+    credential.request_value(&job)
   );
 }
 
@@ -617,26 +630,33 @@ fn test_credential_request_value_no_credential() {
     ]
   }"#;
 
-  let message_parsing = Job::new(message);
-  assert!(message_parsing.is_ok());
-  let job = message_parsing.unwrap();
-  let optional_credential = job.get_credential_parameter("test_credential");
-  assert!(optional_credential.is_some());
-  let credential = optional_credential.unwrap();
-  assert_eq!("TEST_CREDENTIAL_KEY".to_string(), credential.key);
-  let request_result = credential.request_value(&job);
-  assert!(request_result.is_err());
-  let error = request_result.unwrap_err();
+  let job = Job::new(message).unwrap();
 
   assert_eq!(
-    MessageError::ProcessingError(JobResult::new(123, JobStatus::Error).with_parameters(
-      &mut vec![Parameter::StringParam {
+    job.get_credential_parameter("test_credential"),
+    Some(amqp_worker::Credential {
+      key: "TEST_CREDENTIAL_KEY".to_string()
+    })
+  );
+
+  assert_eq!(
+    job.get_credential_parameter("test_credential"),
+    Some(amqp_worker::Credential {
+      key: "TEST_CREDENTIAL_KEY".to_string()
+    })
+  );
+
+  let credential = job.get_credential_parameter("test_credential").unwrap();
+
+  assert_eq!(
+    Err(MessageError::ProcessingError(
+      JobResult::new(123, JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some("EOF while parsing a value at line 1 column 0".to_string())
-      }]
+      }])
     )),
-    error
+    credential.request_value(&job)
   );
 }
 
@@ -665,25 +685,32 @@ fn test_credential_request_value_invalid_credential() {
     ]
   }"#;
 
-  let message_parsing = Job::new(message);
-  assert!(message_parsing.is_ok());
-  let job = message_parsing.unwrap();
-  let optional_credential = job.get_credential_parameter("test_credential");
-  assert!(optional_credential.is_some());
-  let credential = optional_credential.unwrap();
-  assert_eq!("TEST_CREDENTIAL_KEY".to_string(), credential.key);
-  let request_result = credential.request_value(&job);
-  assert!(request_result.is_err());
-  let error = request_result.unwrap_err();
+  let job = Job::new(message).unwrap();
 
   assert_eq!(
-    MessageError::ProcessingError(JobResult::new(123, JobStatus::Error).with_parameters(
-      &mut vec![Parameter::StringParam {
+    job.get_credential_parameter("test_credential"),
+    Some(amqp_worker::Credential {
+      key: "TEST_CREDENTIAL_KEY".to_string()
+    })
+  );
+
+  assert_eq!(
+    job.get_credential_parameter("test_credential"),
+    Some(amqp_worker::Credential {
+      key: "TEST_CREDENTIAL_KEY".to_string()
+    })
+  );
+
+  let credential = job.get_credential_parameter("test_credential").unwrap();
+
+  assert_eq!(
+    Err(MessageError::ProcessingError(
+      JobResult::new(123, JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some("missing field `id` at line 1 column 11".to_string())
-      }]
+      }])
     )),
-    error
+    credential.request_value(&job)
   );
 }

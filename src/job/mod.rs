@@ -166,4 +166,8 @@ impl JobResult {
   pub fn get_parameters(&self) -> &Vec<Parameter> {
     &self.parameters
   }
+
+  pub fn get_destination_paths(&self) -> &Vec<String> {
+    &self.destination_paths
+  }
 }

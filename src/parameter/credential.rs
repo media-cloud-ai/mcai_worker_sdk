@@ -6,7 +6,7 @@ use crate::{
 use reqwest::Error;
 use std::thread;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Credential {
   pub key: String,
 }
