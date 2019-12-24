@@ -70,7 +70,7 @@ pub fn process_message(message: &str) -> Result<JobResult, MessageError> {
     "completed" => Ok(JobResult::new(job.job_id, JobStatus::Completed)),
     action_label => {
       let result = JobResult::new(job.job_id, JobStatus::Error)
-        .with_message(format!("Unknown action named {}", action_label));
+        .with_message(&format!("Unknown action named {}", action_label));
       Err(MessageError::ProcessingError(result))
     }
   }

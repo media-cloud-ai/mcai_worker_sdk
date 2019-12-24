@@ -452,7 +452,7 @@ fn test_job_result_with_setters() {
   job_result = job_result.with_status(JobStatus::Completed);
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
   let hello = "Hello!";
-  job_result = job_result.with_message(hello.to_string());
+  job_result = job_result.with_message(hello);
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
 
   let optional_string = job_result.get_string_parameter("message");
