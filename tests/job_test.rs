@@ -539,10 +539,8 @@ fn test_credential_request_value_no_session() {
   assert!(request_result.is_err());
   let error = request_result.unwrap_err();
   assert_eq!(
-    MessageError::ProcessingError(JobResult::new(
-      123,
-      JobStatus::Error
-    ).with_parameters(&mut vec![Parameter::StringParam {
+    MessageError::ProcessingError(JobResult::new(123, JobStatus::Error).with_parameters(
+      &mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some("EOF while parsing a value at line 1 column 0".to_string())
@@ -584,10 +582,8 @@ fn test_credential_request_value_invalid_session() {
   let error = request_result.unwrap_err();
 
   assert_eq!(
-    MessageError::ProcessingError(JobResult::new(
-      123,
-      JobStatus::Error
-    ).with_parameters(&mut vec![Parameter::StringParam {
+    MessageError::ProcessingError(JobResult::new(123, JobStatus::Error).with_parameters(
+      &mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some("missing field `access_token` at line 1 column 26".to_string())
@@ -633,10 +629,8 @@ fn test_credential_request_value_no_credential() {
   let error = request_result.unwrap_err();
 
   assert_eq!(
-    MessageError::ProcessingError(JobResult::new(
-      123,
-      JobStatus::Error
-    ).with_parameters(&mut vec![Parameter::StringParam {
+    MessageError::ProcessingError(JobResult::new(123, JobStatus::Error).with_parameters(
+      &mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some("EOF while parsing a value at line 1 column 0".to_string())
@@ -683,10 +677,8 @@ fn test_credential_request_value_invalid_credential() {
   let error = request_result.unwrap_err();
 
   assert_eq!(
-    MessageError::ProcessingError(JobResult::new(
-      123,
-      JobStatus::Error
-    ).with_parameters(&mut vec![Parameter::StringParam {
+    MessageError::ProcessingError(JobResult::new(123, JobStatus::Error).with_parameters(
+      &mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some("missing field `id` at line 1 column 11".to_string())

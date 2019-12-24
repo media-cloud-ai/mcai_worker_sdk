@@ -114,7 +114,7 @@ impl JobResult {
       job_id,
       status,
       parameters: vec![],
-      destination_paths: vec![]
+      destination_paths: vec![],
     }
   }
 
@@ -132,11 +132,11 @@ impl JobResult {
     self
   }
 
-  pub fn with_message(mut self, message: String) -> Self {
+  pub fn with_message(mut self, message: &str) -> Self {
     self.parameters.push(Parameter::StringParam {
       id: "message".to_string(),
       default: None,
-      value: Some(message),
+      value: Some(message.to_string()),
     });
     self
   }

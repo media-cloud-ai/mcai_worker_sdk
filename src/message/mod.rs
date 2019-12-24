@@ -106,10 +106,8 @@ fn publish_not_implemented(channel: &Channel, message: Delivery) {
 fn publish_processing_error(channel: &Channel, message: Delivery, job_result: JobResult) {
   error!(target: &job_result.get_str_job_id(), "Job returned in error: {:?}", job_result.get_parameters());
 
-  let content = json!(JobResult::new(
-    job_result.get_job_id(),
-    JobStatus::Error
-  ).with_parameters(&mut job_result.get_parameters().clone()));
+  let content = json!(JobResult::new(job_result.get_job_id(), JobStatus::Error)
+    .with_parameters(&mut job_result.get_parameters().clone()));
 
   if channel
     .basic_publish(
