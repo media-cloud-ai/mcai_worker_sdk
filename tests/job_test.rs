@@ -72,7 +72,7 @@ fn test_new_job() {
   let result = Job::new(message);
   assert!(result.is_ok());
   let job = result.unwrap();
-  assert_eq!(123, job.job_id);
+  assert_eq!(job.job_id, 123);
 
   let optional_string = job.get_string_parameter("string_parameter");
   assert!(optional_string.is_some());
@@ -82,12 +82,12 @@ fn test_new_job() {
   let optional_boolean = job.get_boolean_parameter("boolean_parameter");
   assert!(optional_boolean.is_some());
   let boolean_value = optional_boolean.unwrap();
-  assert_eq!(true, boolean_value);
+  assert_eq!(boolean_value, true);
 
   let optional_integer = job.get_integer_parameter("integer_parameter");
   assert!(optional_integer.is_some());
   let integer_value = optional_integer.unwrap();
-  assert_eq!(654321, integer_value);
+  assert_eq!(integer_value, 654321);
 
   let optional_credential = job.get_credential_parameter("credential_parameter");
   assert!(optional_credential.is_some());
@@ -97,7 +97,7 @@ fn test_new_job() {
   let option_array = job.get_array_of_strings_parameter("array_of_string_parameter");
   assert!(option_array.is_some());
   let array_of_values = option_array.unwrap();
-  assert_eq!(1, array_of_values.len());
+  assert_eq!(array_of_values.len(), 1);
   assert_eq!("real_value".to_string(), array_of_values[0]);
 
   let map = job.get_parameters_as_map();
@@ -200,6 +200,7 @@ fn test_job_result_from_json() {
   let json = r#"{
     "job_id": 456,
     "status": "completed",
+    "destination_paths": [],
     "parameters": [
       { "id":"string_parameter",
         "type":"string",
@@ -227,24 +228,21 @@ fn test_job_result_from_json() {
   let result = serde_json::from_str(json);
   assert!(result.is_ok());
   let job_result: JobResult = result.unwrap();
-  assert_eq!(job_result.job_id, 456);
-  assert_eq!(job_result.status, JobStatus::Completed);
-  assert_eq!(job_result.parameters.len(), 5);
+  assert_eq!(job_result.get_job_id(), 456);
+  assert_eq!(job_result.get_status(), &JobStatus::Completed);
+  assert_eq!(job_result.get_parameters().len(), 5);
 
   let optional_string = job_result.get_string_parameter("string_parameter");
   assert!(optional_string.is_some());
-  let string_value = optional_string.unwrap();
-  assert_eq!("real_value".to_string(), string_value);
+  assert_eq!("real_value".to_string(), optional_string.unwrap());
 
   let optional_boolean = job_result.get_boolean_parameter("boolean_parameter");
   assert!(optional_boolean.is_some());
-  let boolean_value = optional_boolean.unwrap();
-  assert_eq!(true, boolean_value);
+  assert_eq!(true, optional_boolean.unwrap());
 
   let optional_integer = job_result.get_integer_parameter("integer_parameter");
   assert!(optional_integer.is_some());
-  let integer_value = optional_integer.unwrap();
-  assert_eq!(654321, integer_value);
+  assert_eq!(654321, optional_integer.unwrap());
 
   let optional_credential = job_result.get_credential_parameter("credential_parameter");
   assert!(optional_credential.is_some());
@@ -297,6 +295,7 @@ fn test_job_result_from_json_without_value() {
   let json = r#"{
     "job_id": 456,
     "status": "completed",
+    "destination_paths": [],
     "parameters": [
       { "id":"string_parameter",
         "type":"string",
@@ -317,11 +316,12 @@ fn test_job_result_from_json_without_value() {
   }"#;
 
   let result = serde_json::from_str(json);
+  println!("{:?}", result);
   assert!(result.is_ok());
   let job_result: JobResult = result.unwrap();
-  assert_eq!(job_result.job_id, 456);
-  assert_eq!(job_result.status, JobStatus::Completed);
-  assert_eq!(job_result.parameters.len(), 5);
+  assert_eq!(job_result.get_job_id(), 456);
+  assert_eq!(job_result.get_status(), &JobStatus::Completed);
+  assert_eq!(job_result.get_parameters().len(), 5);
 
   let optional_string = job_result.get_string_parameter("string_parameter");
   assert!(optional_string.is_some());
@@ -416,9 +416,9 @@ fn test_job_result_from_job() {
   assert!(result.is_ok());
   let job = result.unwrap();
   let job_result = JobResult::from(job);
-  assert_eq!(job_result.job_id, 123);
-  assert_eq!(job_result.status, JobStatus::Unknown);
-  assert_eq!(job_result.parameters.len(), 0);
+  assert_eq!(job_result.get_job_id(), 123);
+  assert_eq!(job_result.get_status(), &JobStatus::Unknown);
+  assert_eq!(job_result.get_parameters().len(), 0);
 }
 
 #[test]
@@ -437,23 +437,23 @@ fn test_job_result_from_job_ref() {
   assert!(result.is_ok());
   let job = result.unwrap();
   let job_result = JobResult::from(&job);
-  assert_eq!(job_result.job_id, 123);
-  assert_eq!(job_result.status, JobStatus::Unknown);
-  assert_eq!(job_result.parameters.len(), 0);
+  assert_eq!(job_result.get_job_id(), 123);
+  assert_eq!(job_result.get_status(), &JobStatus::Unknown);
+  assert_eq!(job_result.get_parameters().len(), 0);
 }
 
 #[test]
 fn test_job_result_with_setters() {
   let job_id = 123;
-  let mut job_result = JobResult::new(job_id, JobStatus::Unknown, vec![]);
-  assert_eq!(job_result.job_id, job_id);
-  assert_eq!(job_result.status, JobStatus::Unknown);
-  assert_eq!(job_result.parameters.len(), 0);
+  let mut job_result = JobResult::new(job_id, JobStatus::Unknown);
+  assert_eq!(job_result.get_job_id(), job_id);
+  assert_eq!(job_result.get_status(), &JobStatus::Unknown);
+  assert_eq!(job_result.get_parameters().len(), 0);
   job_result = job_result.with_status(JobStatus::Completed);
-  assert_eq!(job_result.status, JobStatus::Completed);
+  assert_eq!(job_result.get_status(), &JobStatus::Completed);
   let hello = "Hello!";
   job_result = job_result.with_message(hello.to_string());
-  assert_eq!(job_result.status, JobStatus::Completed);
+  assert_eq!(job_result.get_status(), &JobStatus::Completed);
 
   let optional_string = job_result.get_string_parameter("message");
   assert!(optional_string.is_some());
@@ -539,15 +539,15 @@ fn test_credential_request_value_no_session() {
   assert!(request_result.is_err());
   let error = request_result.unwrap_err();
   assert_eq!(
-    MessageError::ProcessingError(JobResult {
-      job_id: 123,
-      status: JobStatus::Error,
-      parameters: vec![Parameter::StringParam {
+    MessageError::ProcessingError(JobResult::new(
+      123,
+      JobStatus::Error
+    ).with_parameters(&mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some("EOF while parsing a value at line 1 column 0".to_string())
       }]
-    }),
+    )),
     error
   );
 }
@@ -582,16 +582,17 @@ fn test_credential_request_value_invalid_session() {
   let request_result = credential.request_value(&job);
   assert!(request_result.is_err());
   let error = request_result.unwrap_err();
+
   assert_eq!(
-    MessageError::ProcessingError(JobResult {
-      job_id: 123,
-      status: JobStatus::Error,
-      parameters: vec![Parameter::StringParam {
+    MessageError::ProcessingError(JobResult::new(
+      123,
+      JobStatus::Error
+    ).with_parameters(&mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some("missing field `access_token` at line 1 column 26".to_string())
       }]
-    }),
+    )),
     error
   );
 }
@@ -630,16 +631,17 @@ fn test_credential_request_value_no_credential() {
   let request_result = credential.request_value(&job);
   assert!(request_result.is_err());
   let error = request_result.unwrap_err();
+
   assert_eq!(
-    MessageError::ProcessingError(JobResult {
-      job_id: 123,
-      status: JobStatus::Error,
-      parameters: vec![Parameter::StringParam {
+    MessageError::ProcessingError(JobResult::new(
+      123,
+      JobStatus::Error
+    ).with_parameters(&mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some("EOF while parsing a value at line 1 column 0".to_string())
       }]
-    }),
+    )),
     error
   );
 }
@@ -679,16 +681,17 @@ fn test_credential_request_value_invalid_credential() {
   let request_result = credential.request_value(&job);
   assert!(request_result.is_err());
   let error = request_result.unwrap_err();
+
   assert_eq!(
-    MessageError::ProcessingError(JobResult {
-      job_id: 123,
-      status: JobStatus::Error,
-      parameters: vec![Parameter::StringParam {
+    MessageError::ProcessingError(JobResult::new(
+      123,
+      JobStatus::Error
+    ).with_parameters(&mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some("missing field `id` at line 1 column 11".to_string())
       }]
-    }),
+    )),
     error
   );
 }

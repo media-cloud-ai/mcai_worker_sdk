@@ -182,7 +182,7 @@ where
       query: Default::default(),
     };
 
-    let state = Runtime::new().unwrap().block_on_all(
+    let state = Runtime::new().unwrap().block_on(
       lapin::Client::connect_uri(amqp_uri, ConnectionProperties::default())
         .map_err(Error::from)
         .and_then(|client| client.create_channel().map_err(Error::from))
