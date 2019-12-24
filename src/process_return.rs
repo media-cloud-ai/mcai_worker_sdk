@@ -4,8 +4,8 @@ use amqp_worker::MessageError;
 
 #[derive(Debug)]
 pub struct ProcessReturn {
-  pub code: i32,
-  pub message: String,
+  code: i32,
+  message: String,
 }
 
 impl ProcessReturn {
@@ -17,7 +17,19 @@ impl ProcessReturn {
   }
 
   pub fn new_error(message: &str) -> Self {
-    ProcessReturn::new(1, message)
+    ProcessReturn::new(ProcessReturn::get_error_code(), message)
+  }
+
+  pub fn get_error_code() -> i32 {
+    1
+  }
+
+  pub fn get_code(&self) -> i32 {
+    self.code
+  }
+
+  pub fn get_message(&self) -> &String {
+    &self.message
   }
 
   pub fn as_result(&self, job_id: u64) -> Result<JobResult, MessageError> {

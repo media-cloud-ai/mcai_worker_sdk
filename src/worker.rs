@@ -60,8 +60,8 @@ type CheckLastError = extern "C" fn() -> c_int;
 
 extern "C" fn check_error() -> c_int {
   let last_error = LAST_ERROR.with(|last_error| last_error.replace(None));
-  if let Some(error_message) = last_error {
-    ProcessReturn::new_error(&error_message).code
+  if last_error.is_some() {
+    ProcessReturn::get_error_code()
   } else {
     0
   }
@@ -271,8 +271,8 @@ pub fn test_c_binding_process() {
 
   let job = Job::new(message).unwrap();
   let returned_code = call_worker_process(job);
-  assert_eq!(0, returned_code.code);
-  assert_eq!("Everything worked well!", returned_code.message);
+  assert_eq!(returned_code.get_code(), 0);
+  assert_eq!(returned_code.get_message(), "Everything worked well!");
 }
 
 #[test]
@@ -290,6 +290,6 @@ pub fn test_c_binding_failing_process() {
 
   let job = Job::new(message).unwrap();
   let returned_code = call_worker_process(job);
-  assert_eq!(1, returned_code.code);
-  assert_eq!("Something went wrong...", returned_code.message);
+  assert_eq!(returned_code.get_code(), 1);
+  assert_eq!(returned_code.get_message(), "Something went wrong...");
 }
