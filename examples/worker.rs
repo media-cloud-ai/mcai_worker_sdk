@@ -31,10 +31,6 @@ Do no use in production, just for developments."#
     semver::Version::new(1, 2, 3)
   }
 
-  fn get_git_version(&self) -> Version {
-    semver::Version::new(3, 2, 1)
-  }
-
   fn get_parameters(&self) -> Vec<Parameter> {
     vec![Parameter {
       identifier: "action".to_string(),

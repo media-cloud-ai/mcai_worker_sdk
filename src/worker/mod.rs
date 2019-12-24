@@ -33,7 +33,6 @@ pub struct WorkerConfiguration {
   short_description: String,
   description: String,
   version: Version,
-  git_version: Version,
   parameters: Vec<Parameter>,
 }
 
@@ -45,7 +44,6 @@ impl WorkerConfiguration {
       version: message_event.get_version(),
       short_description: message_event.get_short_description(),
       description: message_event.get_description(),
-      git_version: message_event.get_git_version(),
       parameters: message_event.get_parameters(),
     }
   }

@@ -54,7 +54,6 @@ pub trait MessageEvent {
   fn get_short_description(&self) -> String;
   fn get_description(&self) -> String;
   fn get_version(&self) -> semver::Version;
-  fn get_git_version(&self) -> semver::Version;
 
   fn get_parameters(&self) -> Vec<worker::Parameter>;
 
@@ -393,9 +392,6 @@ fn empty_message_event_impl() {
     }
     fn get_version(&self) -> semver::Version {
       semver::Version::new(1, 2, 3)
-    }
-    fn get_git_version(&self) -> semver::Version {
-      semver::Version::new(3, 2, 1)
     }
 
     fn get_parameters(&self) -> Vec<worker::Parameter> {
