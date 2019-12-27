@@ -4,8 +4,8 @@ extern crate libloading;
 extern crate log;
 
 mod constants;
-mod worker;
 mod process_return;
+mod worker;
 
 use amqp_worker::job::*;
 use amqp_worker::start_worker;
@@ -121,7 +121,10 @@ pub fn test_process() {
   let job_result = result.unwrap();
   assert_eq!(job_result.get_job_id(), 123);
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
-  assert_eq!(job_result.get_destination_paths(), &vec!["/path/out.mxf".to_string()]);
+  assert_eq!(
+    job_result.get_destination_paths(),
+    &vec!["/path/out.mxf".to_string()]
+  );
 }
 
 #[test]
@@ -140,5 +143,4 @@ pub fn test_failing_process() {
   let result = C_WORKER_EVENT.process(message);
   assert!(result.is_err());
   let _message_error = result.unwrap_err();
-
 }

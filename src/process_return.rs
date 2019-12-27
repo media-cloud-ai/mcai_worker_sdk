@@ -1,4 +1,3 @@
-
 use amqp_worker::job::*;
 use amqp_worker::MessageError;
 
@@ -47,8 +46,7 @@ impl ProcessReturn {
     if self.code == 0 {
       let mut output_paths = self.output_paths.clone();
 
-      let job_result =
-        JobResult::new(job_id, JobStatus::Completed)
+      let job_result = JobResult::new(job_id, JobStatus::Completed)
         .with_destination_paths(&mut output_paths)
         .with_message(&self.message);
 

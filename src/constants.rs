@@ -1,4 +1,3 @@
-
 pub static GET_NAME_FUNCTION: &str = "get_name";
 pub static GET_SHORT_DESCRIPTION_FUNCTION: &str = "get_short_description";
 pub static GET_DESCRIPTION_FUNCTION: &str = "get_description";

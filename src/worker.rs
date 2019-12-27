@@ -1,14 +1,13 @@
-
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 
+use crate::constants;
+use crate::process_return::ProcessReturn;
 use amqp_worker::job::Job;
 use amqp_worker::worker::{Parameter, ParameterType};
 use amqp_worker::ParametersContainer;
 use libloading::Library;
-use crate::constants;
-use crate::process_return::ProcessReturn;
 
 macro_rules! get_c_string {
   ($name:expr) => {
@@ -45,7 +44,7 @@ type ProcessFunc = unsafe fn(
   callback: GetParameterValueCallback,
   logger: LoggerCallback,
   output_message: &*const c_char,
-  output_paths: &*mut *const c_char
+  output_paths: &*mut *const c_char,
 ) -> c_int;
 
 #[allow(unused_assignments)]
@@ -76,10 +75,18 @@ extern "C" fn logger(level: *const c_char, raw_value: *const c_char) {
     let value = get_c_string!(raw_value);
 
     match level.as_str() {
-      "trace" => {trace!("[Worker] {}", value);},
-      "debug" => {debug!("[Worker] {}", value);},
-      "info" => {info!("[Worker] {}", value);},
-      "error" => {error!("[Worker] {}", value);},
+      "trace" => {
+        trace!("[Worker] {}", value);
+      }
+      "debug" => {
+        debug!("[Worker] {}", value);
+      }
+      "info" => {
+        info!("[Worker] {}", value);
+      }
+      "error" => {
+        error!("[Worker] {}", value);
+      }
       _ => {}
     }
   }
@@ -228,7 +235,7 @@ pub fn call_worker_process(job: Job) -> ProcessReturn {
             get_parameter_value,
             logger,
             &message_ptr,
-            &ptr
+            &ptr,
           );
 
           let mut output_paths = vec![];
@@ -259,12 +266,12 @@ pub fn call_worker_process(job: Job) -> ProcessReturn {
             libc::free(message_ptr as *mut libc::c_void);
           }
 
-          ProcessReturn::new(return_code, &message)
-            .with_output_paths(output_paths)
+          ProcessReturn::new(return_code, &message).with_output_paths(output_paths)
         }
         Err(error) => ProcessReturn::new_error(&format!(
           "Could not access {:?} function from worker library: {:?}",
-          constants::PROCESS_FUNCTION, error
+          constants::PROCESS_FUNCTION,
+          error
         )),
       }
     },
@@ -292,7 +299,10 @@ pub fn test_c_binding_process() {
   let returned_code = call_worker_process(job);
   assert_eq!(returned_code.get_code(), 0);
   assert_eq!(returned_code.get_message(), "Everything worked well!");
-  assert_eq!(returned_code.get_output_paths(), &vec!["/path/out.mxf".to_string()]);
+  assert_eq!(
+    returned_code.get_output_paths(),
+    &vec!["/path/out.mxf".to_string()]
+  );
 }
 
 #[test]
