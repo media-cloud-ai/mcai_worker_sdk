@@ -15,13 +15,13 @@ readme = "README.md"
 edition = "2018"
 
 [dependencies]
-amq-protocol-types = "^2.1"
-amq-protocol-uri = "^2.1"
+amq-protocol-types = "^3.1"
+amq-protocol-uri = "^3.1"
 chrono = "0.4"
-env_logger = "^0.6"
+env_logger = "^0.7"
 failure = "^0.1"
 futures = "^0.1"
-lapin-futures = "^0.25"
+lapin-futures = "^0.28"
 log = "0.4.5"
 reqwest = "0.9.8"
 semver = { version = "^0.9", features = ["serde"] }

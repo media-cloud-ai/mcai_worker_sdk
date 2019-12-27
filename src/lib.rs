@@ -39,12 +39,16 @@ use env_logger::Builder;
 use failure::Error;
 use futures::{future::Future, Stream};
 use job::JobResult;
-use lapin::{options::*, types::FieldTable, BasicProperties, ConnectionProperties};
+use lapin::{
+  ExchangeKind,
+  options::*,
+  types::FieldTable,
+  BasicProperties,
+  ConnectionProperties
+};
 use std::{env, fs, io::Write, thread, time};
 use tokio::runtime::Runtime;
 
-static EXCHANGE_TYPE_FANOUT: &str = "fanout";
-static EXCHANGE_TYPE_TOPIC: &str = "topic";
 static EXCHANGE_NAME_SUBMIT: &str = "job_submit";
 static EXCHANGE_NAME_RESPONSE: &str = "job_response";
 static EXCHANGE_NAME_DELAYED: &str = "job_delayed";
@@ -211,7 +215,7 @@ where
           if let Err(msg) = channel
             .exchange_declare(
               EXCHANGE_NAME_DELAYED,
-              EXCHANGE_TYPE_FANOUT,
+              ExchangeKind::Fanout,
               exchange_options.clone(),
               FieldTable::default(),
             )
@@ -226,7 +230,7 @@ where
           if let Err(msg) = channel
             .exchange_declare(
               EXCHANGE_NAME_SUBMIT,
-              EXCHANGE_TYPE_TOPIC,
+              ExchangeKind::Topic,
               exchange_options.clone(),
               table,
             )
@@ -241,7 +245,7 @@ where
           if let Err(msg) = channel
             .exchange_declare(
               EXCHANGE_NAME_RESPONSE,
-              EXCHANGE_TYPE_TOPIC,
+              ExchangeKind::Topic,
               exchange_options,
               FieldTable::default(),
             )
