@@ -30,14 +30,17 @@ impl ProcessReturn {
     1
   }
 
+  #[allow(dead_code)]
   pub fn get_code(&self) -> i32 {
     self.code
   }
 
+  #[allow(dead_code)]
   pub fn get_message(&self) -> &String {
     &self.message
   }
 
+  #[allow(dead_code)]
   pub fn get_output_paths(&self) -> &Vec<String> {
     &self.output_paths
   }
