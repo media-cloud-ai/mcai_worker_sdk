@@ -39,13 +39,7 @@ use env_logger::Builder;
 use failure::Error;
 use futures::{future::Future, Stream};
 use job::JobResult;
-use lapin::{
-  ExchangeKind,
-  options::*,
-  types::FieldTable,
-  BasicProperties,
-  ConnectionProperties
-};
+use lapin::{options::*, types::FieldTable, BasicProperties, ConnectionProperties, ExchangeKind};
 use std::{env, fs, io::Write, thread, time};
 use tokio::runtime::Runtime;
 
