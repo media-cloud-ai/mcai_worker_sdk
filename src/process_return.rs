@@ -62,3 +62,43 @@ impl ProcessReturn {
     }
   }
 }
+
+#[test]
+pub fn process_return_new() {
+  let process_return = ProcessReturn::new(123, "this is a message");
+  assert_eq!(123, process_return.get_code());
+  assert_eq!(
+    &"this is a message".to_string(),
+    process_return.get_message()
+  );
+  assert_eq!(0, process_return.get_output_paths().len());
+}
+
+#[test]
+pub fn process_return_new_with_output_paths() {
+  let output_path = "/path/to/output";
+  let mut output_paths = vec![];
+  output_paths.push(output_path.to_string());
+  let process_return = ProcessReturn::new(123, "this is a message").with_output_paths(output_paths);
+  assert_eq!(123, process_return.get_code());
+  assert_eq!(
+    &"this is a message".to_string(),
+    process_return.get_message()
+  );
+  assert_eq!(1, process_return.get_output_paths().len());
+  assert_eq!(
+    output_path,
+    process_return.get_output_paths().get(0).unwrap()
+  );
+}
+
+#[test]
+pub fn process_return_new_error() {
+  let process_return = ProcessReturn::new_error("this is an error message");
+  assert_eq!(ProcessReturn::get_error_code(), process_return.get_code());
+  assert_eq!(
+    &"this is an error message".to_string(),
+    process_return.get_message()
+  );
+  assert_eq!(0, process_return.get_output_paths().len());
+}

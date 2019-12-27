@@ -324,3 +324,34 @@ pub fn test_c_binding_failing_process() {
   assert_eq!(returned_code.get_message(), "Something went wrong...");
   assert!(returned_code.get_output_paths().is_empty());
 }
+
+#[test]
+pub fn test_c_worker_library_env_var() {
+  let fake_path = "/path/to/nowhere/where/there/is/nothing";
+  std::env::set_var("WORKER_LIBRARY_FILE", fake_path);
+  let library_path = get_library_file_path();
+  assert_eq!(library_path, fake_path);
+  std::env::remove_var("WORKER_LIBRARY_FILE");
+}
+
+#[test]
+pub fn test_c_worker_library_failure_on_get_worker_function_string_value() {
+  std::env::set_var(
+    "WORKER_LIBRARY_FILE",
+    "/path/to/nowhere/where/there/is/nothing",
+  );
+  let result = std::panic::catch_unwind(|| get_worker_function_string_value("fake_function"));
+  assert!(result.is_err());
+  std::env::remove_var("WORKER_LIBRARY_FILE");
+}
+
+#[test]
+pub fn test_c_worker_library_failure_on_get_worker_parameters() {
+  std::env::set_var(
+    "WORKER_LIBRARY_FILE",
+    "/path/to/nowhere/where/there/is/nothing",
+  );
+  let result = std::panic::catch_unwind(|| get_worker_parameters());
+  assert!(result.is_err());
+  std::env::remove_var("WORKER_LIBRARY_FILE");
+}
