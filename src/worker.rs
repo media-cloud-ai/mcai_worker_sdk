@@ -1,28 +1,21 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 
+use crate::constants;
+use crate::process_return::ProcessReturn;
 use amqp_worker::job::Job;
 use amqp_worker::worker::{Parameter, ParameterType};
 use amqp_worker::ParametersContainer;
 use libloading::Library;
 
-thread_local!(static LAST_ERROR: RefCell<Option<String>> = RefCell::new(None));
-
-macro_rules! handle_error {
-  ($name:expr) => {
-    LAST_ERROR.with(|last_error| {
-      last_error.replace(Some($name));
-    });
-  };
-}
-
 macro_rules! get_c_string {
   ($name:expr) => {
-    CString::from(CStr::from_ptr($name))
-      .into_string()
-      .expect("cannot convert C string to String")
+    if $name.is_null() {
+      "".to_string()
+    } else {
+      std::str::from_utf8_unchecked(CStr::from_ptr($name).to_bytes()).to_string()
+    }
   };
 }
 
@@ -45,33 +38,14 @@ type GetParametersSizeFunc = unsafe fn() -> c_uint;
 type GetParametersFunc = unsafe fn(parameters: *mut WorkerParameter);
 
 type GetParameterValueCallback = extern "C" fn(*mut c_void, *const c_char) -> *const c_char;
-type LogCallback = extern "C" fn(*const c_char);
+type LoggerCallback = extern "C" fn(*const c_char, *const c_char);
 type ProcessFunc = unsafe fn(
   job: *mut c_void,
   callback: GetParameterValueCallback,
-  check_error: CheckLastError,
-  logger: LogCallback,
-  output_message: *mut c_char,
+  logger: LoggerCallback,
+  output_message: &*const c_char,
+  output_paths: &*mut *const c_char,
 ) -> c_int;
-
-type CheckLastError = extern "C" fn() -> c_int;
-
-pub static GET_NAME_FUNCTION: &str = "get_name";
-pub static GET_SHORT_DESCRIPTION_FUNCTION: &str = "get_short_description";
-pub static GET_DESCRIPTION_FUNCTION: &str = "get_description";
-pub static GET_VERSION_FUNCTION: &str = "get_version";
-pub static GET_PARAMETERS_SIZE_FUNCTION: &str = "get_parameters_size";
-pub static GET_PARAMETERS_FUNCTION: &str = "get_parameters";
-pub static PROCESS_FUNCTION: &str = "process";
-
-extern "C" fn check_error() -> c_int {
-  let last_error = LAST_ERROR.with(|last_error| last_error.replace(None));
-  if let Some(error_message) = last_error {
-    return_with_error(error_message).code
-  } else {
-    0
-  }
-}
 
 #[allow(unused_assignments)]
 extern "C" fn get_parameter_value(
@@ -80,38 +54,47 @@ extern "C" fn get_parameter_value(
 ) -> *const c_char {
   let job_params_ptrs: Box<HashMap<String, *const c_char>> =
     unsafe { Box::from_raw(c_worker_job as *mut HashMap<String, *const c_char>) };
+
   let key = unsafe { get_c_string!(parameter_id) };
   debug!("Get parameter value from id: {:?}", key);
+
   let param_value = if let Some(value) = job_params_ptrs.get(&key) {
     *value
   } else {
-    handle_error!(format!("No worker_job parameter for id: {}.", key));
     std::ptr::null()
   };
+
   // reset job parameters pointer
   c_worker_job = Box::into_raw(job_params_ptrs) as *mut c_void;
   param_value
 }
 
-extern "C" fn log(value: *const c_char) {
+extern "C" fn logger(level: *const c_char, raw_value: *const c_char) {
   unsafe {
-    debug!("[Worker] {}", get_c_string!(value));
+    let level = get_c_string!(level);
+    let value = get_c_string!(raw_value);
+
+    match level.as_str() {
+      "trace" => {
+        trace!("[Worker] {}", value);
+      }
+      "debug" => {
+        debug!("[Worker] {}", value);
+      }
+      "info" => {
+        info!("[Worker] {}", value);
+      }
+      "error" => {
+        error!("[Worker] {}", value);
+      }
+      _ => {}
+    }
   }
 }
 
 /************************
  *   Utility functions
  ************************/
-
-#[derive(Debug)]
-pub struct ProcessReturn {
-  pub code: i32,
-  pub message: String,
-}
-
-fn return_with_error(message: String) -> ProcessReturn {
-  ProcessReturn { code: 1, message }
-}
 
 fn get_parameter_type_from_c_str(c_str: &CStr) -> ParameterType {
   match c_str.to_str() {
@@ -185,7 +168,7 @@ pub fn get_worker_parameters() -> Vec<Parameter> {
     Ok(worker_lib) => unsafe {
       // Retrieve number of parameters from the worker getter function
       let get_parameters_size_func: libloading::Symbol<GetParametersSizeFunc> =
-        get_library_function(&worker_lib, GET_PARAMETERS_SIZE_FUNCTION)
+        get_library_function(&worker_lib, constants::GET_PARAMETERS_SIZE_FUNCTION)
           .unwrap_or_else(|error| panic!(error));
       let parameters_size = get_parameters_size_func() as usize;
 
@@ -194,7 +177,7 @@ pub fn get_worker_parameters() -> Vec<Parameter> {
         as *mut WorkerParameter;
 
       let get_parameters_func: libloading::Symbol<GetParametersFunc> =
-        get_library_function(&worker_lib, GET_PARAMETERS_FUNCTION)
+        get_library_function(&worker_lib, constants::GET_PARAMETERS_FUNCTION)
           .unwrap_or_else(|error| panic!(error));
       get_parameters_func(worker_parameters);
 
@@ -221,7 +204,7 @@ pub fn call_worker_process(job: Job) -> ProcessReturn {
   debug!("Call worker process from library: {}", library);
   match libloading::Library::new(library) {
     Ok(worker_lib) => unsafe {
-      match get_library_function(&worker_lib, PROCESS_FUNCTION)
+      match get_library_function(&worker_lib, constants::PROCESS_FUNCTION)
         as Result<libloading::Symbol<ProcessFunc>, String>
       {
         Ok(process_func) => {
@@ -241,34 +224,58 @@ pub fn call_worker_process(job: Job) -> ProcessReturn {
           let boxed_job_params_ptrs = Box::new(job_params_ptrs);
           let job_params_ptrs_ptr = Box::into_raw(boxed_job_params_ptrs);
 
-          // Get output message pointer
-          let message_ptr = libc::malloc(1024 * 1024) as *mut c_char; // 1MB max. sized message
+          let message_ptr = std::ptr::null();
+
+          let mut output_paths_ptr = vec![std::ptr::null()];
+          let ptr = output_paths_ptr.as_mut_ptr();
 
           // Call C worker process function
           let return_code = process_func(
             job_params_ptrs_ptr as *mut c_void,
             get_parameter_value,
-            check_error,
-            log,
-            message_ptr,
+            logger,
+            &message_ptr,
+            &ptr,
           );
 
-          // Retrieve message as string and free pointer
-          let message = get_c_string!(message_ptr);
-          libc::free(message_ptr as *mut libc::c_void);
+          let mut output_paths = vec![];
 
-          ProcessReturn {
-            code: return_code,
-            message,
+          if !ptr.is_null() {
+            let mut offset = 0;
+            loop {
+              let cur_ptr = *ptr.offset(offset);
+              if cur_ptr.is_null() {
+                break;
+              }
+
+              output_paths.push(get_c_string!(cur_ptr));
+
+              libc::free(cur_ptr as *mut libc::c_void);
+              offset += 1;
+            }
+
+            if offset > 0 {
+              libc::free(ptr as *mut libc::c_void);
+            }
           }
+
+          // Retrieve message as string and free pointer
+          let mut message = "".to_string();
+          if !message_ptr.is_null() {
+            message = get_c_string!(message_ptr);
+            libc::free(message_ptr as *mut libc::c_void);
+          }
+
+          ProcessReturn::new(return_code, &message).with_output_paths(output_paths)
         }
-        Err(error) => return_with_error(format!(
+        Err(error) => ProcessReturn::new_error(&format!(
           "Could not access {:?} function from worker library: {:?}",
-          PROCESS_FUNCTION, error
+          constants::PROCESS_FUNCTION,
+          error
         )),
       }
     },
-    Err(error) => return_with_error(format!(
+    Err(error) => ProcessReturn::new_error(&format!(
       "Could not load worker dynamic library: {:?}",
       error
     )),
@@ -290,8 +297,12 @@ pub fn test_c_binding_process() {
 
   let job = Job::new(message).unwrap();
   let returned_code = call_worker_process(job);
-  assert_eq!(0, returned_code.code);
-  assert_eq!("Everything worked well!", returned_code.message);
+  assert_eq!(returned_code.get_code(), 0);
+  assert_eq!(returned_code.get_message(), "Everything worked well!");
+  assert_eq!(
+    returned_code.get_output_paths(),
+    &vec!["/path/out.mxf".to_string()]
+  );
 }
 
 #[test]
@@ -309,6 +320,7 @@ pub fn test_c_binding_failing_process() {
 
   let job = Job::new(message).unwrap();
   let returned_code = call_worker_process(job);
-  assert_eq!(1, returned_code.code);
-  assert_eq!("Something went wrong...", returned_code.message);
+  assert_eq!(returned_code.get_code(), 1);
+  assert_eq!(returned_code.get_message(), "Something went wrong...");
+  assert!(returned_code.get_output_paths().is_empty());
 }

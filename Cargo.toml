@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 libc = "0.2.66"
-amqp_worker = "0.6.0"
+amqp_worker = "0.7.0"
 log = "0.4.8"
 semver = "^0.9"
 serde_json = "^1.0"

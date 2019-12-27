@@ -1,42 +1,9 @@
-#include <stdio.h>
-#include <string.h>
+
+#include "worker.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/**
- * Worker parameter type
- */
-typedef struct Parameter {
-    char* identifier;
-    char* label;
-    unsigned int kind_size;
-    char** kind;
-    int required;
-} Parameter;
-
-/**
- * Job parameters handler
- */
-typedef void* JobParameters;
-/**
- * Get job parameter value callback
- */
-typedef char* (*GetParameterValueCallback)(JobParameters, const char*);
-/**
- * Rust logger callback
- */
-typedef void* (*Logger)(const char*);
-/**
- * Check error callback
- */
-typedef int* (*CheckError)();
-/**
- * Message to return as a response
- */
-typedef char* OutputMessage;
-
 
 /**
  * Get worker name
@@ -98,28 +65,36 @@ void get_parameters(Parameter* parameters) {
  * Worker main process function
  * @param job                      Job parameters handler
  * @param parametersValueGetter    Get job parameter value callback
- * @param checkError               Check error callback
- * @param logger                   Rust logger callback
+ * @param logger                   Rust Logger
  */
-int process(JobParameters job, GetParameterValueCallback parametersValueGetter, CheckError checkError, Logger logger, OutputMessage message) {
-    // Print message through the Rust internal logger
-    logger("Start C Worker process...");
+int process(
+    JobHandle job_handle,
+    GetParameterValueCallback parametersValueGetter,
+    Logger logger,
+    const char** message,
+    const char*** output_paths
+  ) {
+    // Print message through the Rust Logger
+    logger("debug", "Start C Worker process...");
 
     // Retrieve "path" job parameter value
-    char* value = parametersValueGetter(job, "path");
+    char* value = parametersValueGetter(job_handle, "path");
 
     // Check whether an error occurred parsing job parameters
-    if(checkError() != 0) {
-        const char* message_str = "Something went wrong...";
-        memcpy(message, message_str, strlen(message_str));
+    if(value == NULL) {
+        set_str_on_ptr(message, "Something went wrong...\0");
         return 1;
     }
 
-    // Print value through the Rust internal logger
-    logger(value);
+    // Print value through the Rust Logger
+    logger("debug", value);
 
-    const char* message_str = "Everything worked well!";
-    memcpy(message, message_str, strlen(message_str));
+    set_str_on_ptr(message, "Everything worked well!\0");
+
+    output_paths[0] = (const char **)malloc(sizeof(int) * 2);
+    set_str_on_ptr(&output_paths[0][0], "/path/out.mxf\0");
+    output_paths[0][1] = 0;
+
     return 0;
 }
 
