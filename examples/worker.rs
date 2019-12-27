@@ -31,10 +31,6 @@ Do no use in production, just for developments."#
     semver::Version::new(1, 2, 3)
   }
 
-  fn get_git_version(&self) -> Version {
-    semver::Version::new(3, 2, 1)
-  }
-
   fn get_parameters(&self) -> Vec<Parameter> {
     vec![Parameter {
       identifier: "action".to_string(),
@@ -71,10 +67,10 @@ pub fn process_message(message: &str) -> Result<JobResult, MessageError> {
     .unwrap_or("error".to_string())
     .as_str()
   {
-    "completed" => Ok(JobResult::new(job.job_id, JobStatus::Completed, vec![])),
+    "completed" => Ok(JobResult::new(job.job_id, JobStatus::Completed)),
     action_label => {
-      let result = JobResult::new(job.job_id, JobStatus::Error, vec![])
-        .with_message(format!("Unknown action named {}", action_label));
+      let result = JobResult::new(job.job_id, JobStatus::Error)
+        .with_message(&format!("Unknown action named {}", action_label));
       Err(MessageError::ProcessingError(result))
     }
   }

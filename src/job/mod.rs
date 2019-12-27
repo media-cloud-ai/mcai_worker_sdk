@@ -72,7 +72,7 @@ impl ParametersContainer for Job {
   }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum JobStatus {
   #[serde(rename = "unknown")]
   Unknown,
@@ -84,20 +84,21 @@ pub enum JobStatus {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct JobResult {
-  pub job_id: u64,
-  pub status: JobStatus,
-  pub parameters: Vec<Parameter>,
+  job_id: u64,
+  status: JobStatus,
+  parameters: Vec<Parameter>,
+  destination_paths: Vec<String>,
 }
 
 impl From<Job> for JobResult {
   fn from(job: Job) -> JobResult {
-    JobResult::new(job.job_id, JobStatus::Unknown, vec![])
+    JobResult::new(job.job_id, JobStatus::Unknown)
   }
 }
 
 impl From<&Job> for JobResult {
   fn from(job: &Job) -> JobResult {
-    JobResult::new(job.job_id, JobStatus::Unknown, vec![])
+    JobResult::new(job.job_id, JobStatus::Unknown)
   }
 }
 
@@ -108,11 +109,12 @@ impl ParametersContainer for JobResult {
 }
 
 impl JobResult {
-  pub fn new(job_id: u64, status: JobStatus, parameters: Vec<Parameter>) -> JobResult {
+  pub fn new(job_id: u64, status: JobStatus) -> JobResult {
     JobResult {
       job_id,
       status,
-      parameters,
+      parameters: vec![],
+      destination_paths: vec![],
     }
   }
 
@@ -130,12 +132,42 @@ impl JobResult {
     self
   }
 
-  pub fn with_message(mut self, message: String) -> Self {
+  pub fn with_message(mut self, message: &str) -> Self {
     self.parameters.push(Parameter::StringParam {
       id: "message".to_string(),
       default: None,
-      value: Some(message),
+      value: Some(message.to_string()),
     });
     self
+  }
+
+  pub fn with_parameters(mut self, parameters: &mut Vec<Parameter>) -> Self {
+    self.parameters.append(parameters);
+    self
+  }
+
+  pub fn with_destination_paths(mut self, destination_paths: &mut Vec<String>) -> Self {
+    self.destination_paths.append(destination_paths);
+    self
+  }
+
+  pub fn get_job_id(&self) -> u64 {
+    self.job_id
+  }
+
+  pub fn get_str_job_id(&self) -> String {
+    self.job_id.to_string()
+  }
+
+  pub fn get_status(&self) -> &JobStatus {
+    &self.status
+  }
+
+  pub fn get_parameters(&self) -> &Vec<Parameter> {
+    &self.parameters
+  }
+
+  pub fn get_destination_paths(&self) -> &Vec<String> {
+    &self.destination_paths
   }
 }

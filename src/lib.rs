@@ -54,7 +54,6 @@ pub trait MessageEvent {
   fn get_short_description(&self) -> String;
   fn get_description(&self) -> String;
   fn get_version(&self) -> semver::Version;
-  fn get_git_version(&self) -> semver::Version;
 
   fn get_parameters(&self) -> Vec<worker::Parameter>;
 
@@ -182,7 +181,7 @@ where
       query: Default::default(),
     };
 
-    let state = Runtime::new().unwrap().block_on_all(
+    let state = Runtime::new().unwrap().block_on(
       lapin::Client::connect_uri(amqp_uri, ConnectionProperties::default())
         .map_err(Error::from)
         .and_then(|client| client.create_channel().map_err(Error::from))
@@ -393,9 +392,6 @@ fn empty_message_event_impl() {
     }
     fn get_version(&self) -> semver::Version {
       semver::Version::new(1, 2, 3)
-    }
-    fn get_git_version(&self) -> semver::Version {
-      semver::Version::new(3, 2, 1)
     }
 
     fn get_parameters(&self) -> Vec<worker::Parameter> {

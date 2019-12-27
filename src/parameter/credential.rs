@@ -6,7 +6,7 @@ use crate::{
 use reqwest::Error;
 use std::thread;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Credential {
   pub key: String,
 }
@@ -60,7 +60,7 @@ impl Credential {
     request_thread.join().map_err(|e| {
       let job_result = JobResult::from(cloned_job)
         .with_status(JobStatus::Error)
-        .with_message(format!("{:?}", e));
+        .with_message(&format!("{:?}", e));
       MessageError::ProcessingError(job_result)
     })?
   }

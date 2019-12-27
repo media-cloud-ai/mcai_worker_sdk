@@ -28,7 +28,7 @@ pub fn process_message<ME: MessageEvent>(
 
   match MessageEvent::process(message_event, message_data) {
     Ok(job_result) => {
-      info!(target: &job_result.job_id.to_string(), "Completed");
+      info!(target: &job_result.get_str_job_id(), "Completed");
       let msg = json!(job_result);
 
       publish_completed_job(channel, message, job_result, msg);
@@ -67,7 +67,7 @@ fn publish_completed_job(channel: &Channel, message: Delivery, job_result: JobRe
       .basic_ack(message.delivery_tag, false /*not requeue*/)
       .wait()
     {
-      error!(target: &job_result.job_id.to_string(), "Unable to ack message {:?}", msg);
+      error!(target: &job_result.get_str_job_id(), "Unable to ack message {:?}", msg);
     }
   } else if let Err(msg) = channel
     .basic_reject(
@@ -76,7 +76,7 @@ fn publish_completed_job(channel: &Channel, message: Delivery, job_result: JobRe
     )
     .wait()
   {
-    error!(target: &job_result.job_id.to_string(), "Unable to reject message {:?}", msg);
+    error!(target: &job_result.get_str_job_id(), "Unable to reject message {:?}", msg);
   }
 }
 
@@ -104,12 +104,11 @@ fn publish_not_implemented(channel: &Channel, message: Delivery) {
 }
 
 fn publish_processing_error(channel: &Channel, message: Delivery, job_result: JobResult) {
-  error!(target: &job_result.job_id.to_string(), "Job returned in error: {:?}", job_result.parameters);
-  let content = json!(JobResult {
-    job_id: job_result.job_id,
-    status: JobStatus::Error,
-    parameters: job_result.parameters,
-  });
+  error!(target: &job_result.get_str_job_id(), "Job returned in error: {:?}", job_result.get_parameters());
+
+  let content = json!(JobResult::new(job_result.get_job_id(), JobStatus::Error)
+    .with_parameters(&mut job_result.get_parameters().clone()));
+
   if channel
     .basic_publish(
       RESPONSE_EXCHANGE,
@@ -125,7 +124,7 @@ fn publish_processing_error(channel: &Channel, message: Delivery, job_result: Jo
       .basic_ack(message.delivery_tag, false /*not requeue*/)
       .wait()
     {
-      error!(target: &job_result.job_id.to_string(), "Unable to ack message {:?}", msg);
+      error!(target: &job_result.get_str_job_id(), "Unable to ack message {:?}", msg);
     }
   } else if let Err(msg) = channel
     .basic_reject(
@@ -134,7 +133,7 @@ fn publish_processing_error(channel: &Channel, message: Delivery, job_result: Jo
     )
     .wait()
   {
-    error!(target: &job_result.job_id.to_string(), "Unable to reject message {:?}", msg);
+    error!(target: &job_result.get_str_job_id(), "Unable to reject message {:?}", msg);
   }
 }
 
