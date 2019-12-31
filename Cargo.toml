@@ -23,7 +23,7 @@ failure = "^0.1"
 futures = "^0.1"
 lapin-futures = "^0.28"
 log = "0.4.5"
-reqwest = "0.9.8"
+reqwest = "0.10.0"
 semver = { version = "^0.9", features = ["serde"] }
 serde = "^1.0"
 serde_derive = "^1.0"
