@@ -324,6 +324,8 @@ where
             .wait()
             .expect("runtime failure");
 
+          queue_fields.insert("x-max-priority".into(), AMQPValue::ShortInt(100));
+
           channel
             .queue_declare(&amqp_queue, QueueDeclareOptions::default(), queue_fields)
             .and_then(move |queue| {
