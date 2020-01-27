@@ -90,13 +90,16 @@ fn test_credential_request_value_no_session() {
 
   assert_eq!(
     Err(MessageError::ProcessingError(
-      JobResult::new(123).with_status(JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
-        id: "message".to_string(),
-        default: None,
-        value: Some(
-          "error decoding response body: EOF while parsing a value at line 1 column 0".to_string()
-        )
-      }])
+      JobResult::new(123)
+        .with_status(JobStatus::Error)
+        .with_parameters(&mut vec![Parameter::StringParam {
+          id: "message".to_string(),
+          default: None,
+          value: Some(
+            "error decoding response body: EOF while parsing a value at line 1 column 0"
+              .to_string()
+          )
+        }])
     )),
     credential.request_value(&job)
   );
@@ -142,14 +145,16 @@ fn test_credential_request_value_invalid_session() {
 
   assert_eq!(
     Err(MessageError::ProcessingError(
-      JobResult::new(123).with_status(JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
-        id: "message".to_string(),
-        default: None,
-        value: Some(
-          "error decoding response body: missing field `access_token` at line 1 column 26"
-            .to_string()
-        )
-      }])
+      JobResult::new(123)
+        .with_status(JobStatus::Error)
+        .with_parameters(&mut vec![Parameter::StringParam {
+          id: "message".to_string(),
+          default: None,
+          value: Some(
+            "error decoding response body: missing field `access_token` at line 1 column 26"
+              .to_string()
+          )
+        }])
     )),
     credential.request_value(&job)
   );
@@ -199,13 +204,16 @@ fn test_credential_request_value_no_credential() {
 
   assert_eq!(
     Err(MessageError::ProcessingError(
-      JobResult::new(123).with_status(JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
-        id: "message".to_string(),
-        default: None,
-        value: Some(
-          "error decoding response body: EOF while parsing a value at line 1 column 0".to_string()
-        )
-      }])
+      JobResult::new(123)
+        .with_status(JobStatus::Error)
+        .with_parameters(&mut vec![Parameter::StringParam {
+          id: "message".to_string(),
+          default: None,
+          value: Some(
+            "error decoding response body: EOF while parsing a value at line 1 column 0"
+              .to_string()
+          )
+        }])
     )),
     credential.request_value(&job)
   );
@@ -256,13 +264,15 @@ fn test_credential_request_value_invalid_credential() {
 
   assert_eq!(
     Err(MessageError::ProcessingError(
-      JobResult::new(123).with_status(JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
-        id: "message".to_string(),
-        default: None,
-        value: Some(
-          "error decoding response body: missing field `id` at line 1 column 11".to_string()
-        )
-      }])
+      JobResult::new(123)
+        .with_status(JobStatus::Error)
+        .with_parameters(&mut vec![Parameter::StringParam {
+          id: "message".to_string(),
+          default: None,
+          value: Some(
+            "error decoding response body: missing field `id` at line 1 column 11".to_string()
+          )
+        }])
     )),
     credential.request_value(&job)
   );

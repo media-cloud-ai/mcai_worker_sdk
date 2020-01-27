@@ -7,7 +7,6 @@ use crate::{
 
 use futures::future::Future;
 use lapin_futures::{message::Delivery, options::*, BasicProperties, Channel};
-use serde_json::Value;
 
 static RESPONSE_EXCHANGE: &str = "job_response";
 static QUEUE_JOB_COMPLETED: &str = "job_completed";
@@ -21,29 +20,9 @@ pub fn process_message<ME: MessageEvent>(
   let count = helpers::get_message_death_count(&message);
   let message_data = std::str::from_utf8(&message.data).unwrap();
 
-  let parsed_job = Job::new(message_data);
-
-  if let Err(MessageError::RuntimeError(error_message)) = parsed_job {
-    return publish_runtime_error(channel, message, &error_message);
-  }
-
-  let job = parsed_job.unwrap();
-  debug!(target: &job.job_id.to_string(),
-    "received message: {:?} (iteration: {})",
-    job,
-    count.unwrap_or(0));
-
-  if let Err(MessageError::RequirementsError(details)) = job.check_requirements() {
-    return publish_missing_requirements(channel, message, &details);
-  }
-
-  let job_result = JobResult::new(job.job_id);
-
-  match MessageEvent::process(message_event, &job, job_result) {
+  match parse_and_process_message(message_event, message_data, count) {
     Ok(job_result) => {
       info!(target: &job_result.get_str_job_id(), "Completed");
-      
-
       publish_completed_job(channel, message, job_result);
     }
     Err(error) => match error {
@@ -61,6 +40,23 @@ pub fn process_message<ME: MessageEvent>(
       }
     },
   }
+}
+
+pub fn parse_and_process_message<ME: MessageEvent>(
+  message_event: &'static ME,
+  message_data: &str,
+  count: Option<i64>,
+) -> Result<JobResult, MessageError> {
+  let job = Job::new(message_data)?;
+  debug!(target: &job.job_id.to_string(),
+    "received message: {:?} (iteration: {})",
+    job,
+    count.unwrap_or(0));
+
+  job.check_requirements()?;
+
+  let job_result = JobResult::new(job.job_id);
+  MessageEvent::process(message_event, &job, job_result)
 }
 
 fn publish_completed_job(channel: &Channel, message: Delivery, job_result: JobResult) {
@@ -121,7 +117,8 @@ fn publish_not_implemented(channel: &Channel, message: Delivery) {
 fn publish_processing_error(channel: &Channel, message: Delivery, job_result: JobResult) {
   error!(target: &job_result.get_str_job_id(), "Job returned in error: {:?}", job_result.get_parameters());
 
-  let content = json!(JobResult::new(job_result.get_job_id()).with_status(JobStatus::Error)
+  let content = json!(JobResult::new(job_result.get_job_id())
+    .with_status(JobStatus::Error)
     .with_parameters(&mut job_result.get_parameters().clone()));
 
   if channel

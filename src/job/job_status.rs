@@ -1,4 +1,3 @@
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum JobStatus {
   #[serde(rename = "unknown")]
@@ -9,7 +8,7 @@ pub enum JobStatus {
   Error,
 }
 
-impl Default  for JobStatus {
+impl Default for JobStatus {
   fn default() -> Self {
     JobStatus::Unknown
   }
