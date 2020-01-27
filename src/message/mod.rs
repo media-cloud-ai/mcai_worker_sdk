@@ -21,7 +21,13 @@ pub fn process_message<ME: MessageEvent>(
   let count = helpers::get_message_death_count(&message);
   let message_data = std::str::from_utf8(&message.data).unwrap();
 
-  let job = Job::new(message_data).expect("unable to create a new job");
+  let parsed_job = Job::new(message_data);
+
+  if let Err(MessageError::RuntimeError(error_message)) = parsed_job {
+    return publish_runtime_error(channel, message, &error_message);
+  }
+
+  let job = parsed_job.unwrap();
   debug!(target: &job.job_id.to_string(),
     "received message: {:?} (iteration: {})",
     job,
@@ -31,12 +37,14 @@ pub fn process_message<ME: MessageEvent>(
     return publish_missing_requirements(channel, message, &details);
   }
 
-  match MessageEvent::process(message_event, &job) {
+  let job_result = JobResult::new(job.job_id);
+
+  match MessageEvent::process(message_event, &job, job_result) {
     Ok(job_result) => {
       info!(target: &job_result.get_str_job_id(), "Completed");
-      let msg = json!(job_result);
+      
 
-      publish_completed_job(channel, message, job_result, msg);
+      publish_completed_job(channel, message, job_result);
     }
     Err(error) => match error {
       MessageError::RequirementsError(details) => {
@@ -55,12 +63,14 @@ pub fn process_message<ME: MessageEvent>(
   }
 }
 
-fn publish_completed_job(channel: &Channel, message: Delivery, job_result: JobResult, msg: Value) {
+fn publish_completed_job(channel: &Channel, message: Delivery, job_result: JobResult) {
+  let msg = json!(job_result).to_string();
+
   let result = channel
     .basic_publish(
       RESPONSE_EXCHANGE,
       QUEUE_JOB_COMPLETED,
-      msg.to_string().as_str().as_bytes().to_vec(),
+      msg.as_str().as_bytes().to_vec(),
       BasicPublishOptions::default(),
       BasicProperties::default(),
     )
@@ -111,7 +121,7 @@ fn publish_not_implemented(channel: &Channel, message: Delivery) {
 fn publish_processing_error(channel: &Channel, message: Delivery, job_result: JobResult) {
   error!(target: &job_result.get_str_job_id(), "Job returned in error: {:?}", job_result.get_parameters());
 
-  let content = json!(JobResult::new(job_result.get_job_id(), JobStatus::Error)
+  let content = json!(JobResult::new(job_result.get_job_id()).with_status(JobStatus::Error)
     .with_parameters(&mut job_result.get_parameters().clone()));
 
   if channel

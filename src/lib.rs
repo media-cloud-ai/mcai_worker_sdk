@@ -45,7 +45,7 @@ pub trait MessageEvent {
 
   fn get_parameters(&self) -> Vec<worker::Parameter>;
 
-  fn process(&self, _job: &Job) -> Result<JobResult, MessageError>
+  fn process(&self, _job: &Job, _job_result: JobResult) -> Result<JobResult, MessageError>
   where
     Self: std::marker::Sized,
   {
@@ -394,6 +394,8 @@ fn empty_message_event_impl() {
     parameters: vec![],
   };
 
-  let result = custom_event.process(&job);
+  let job_result = job::JobResult::new(1234);
+
+  let result = custom_event.process(&job, job_result);
   assert!(result == Err(MessageError::NotImplemented()));
 }

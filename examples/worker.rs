@@ -1,4 +1,4 @@
-use amqp_worker::job::*;
+use amqp_worker::job::{Job, JobResult, JobStatus};
 use amqp_worker::worker::{Parameter, ParameterType};
 use amqp_worker::{MessageError, MessageEvent, ParametersContainer};
 use semver::Version;
@@ -34,8 +34,8 @@ Do no use in production, just for developments."#
     }]
   }
 
-  fn process(&self, job: &Job) -> Result<JobResult, MessageError> {
-    process_message(job)
+  fn process(&self, job: &Job, job_result: JobResult) -> Result<JobResult, MessageError> {
+    process_message(job, job_result)
   }
 }
 
@@ -45,15 +45,15 @@ fn main() {
   amqp_worker::start_worker(&WORKER_EVENT);
 }
 
-pub fn process_message(job: &Job) -> Result<JobResult, MessageError> {
+pub fn process_message(job: &Job, job_result: JobResult) -> Result<JobResult, MessageError> {
   match job
     .get_string_parameter("action")
     .unwrap_or("error".to_string())
     .as_str()
   {
-    "completed" => Ok(JobResult::new(job.job_id, JobStatus::Completed)),
+    "completed" => Ok(job_result.with_status(JobStatus::Completed)),
     action_label => {
-      let result = JobResult::new(job.job_id, JobStatus::Error)
+      let result = job_result
         .with_message(&format!("Unknown action named {}", action_label));
       Err(MessageError::ProcessingError(result))
     }
