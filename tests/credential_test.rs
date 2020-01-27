@@ -90,7 +90,7 @@ fn test_credential_request_value_no_session() {
 
   assert_eq!(
     Err(MessageError::ProcessingError(
-      JobResult::new(123, JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
+      JobResult::new(123).with_status(JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some(
@@ -142,7 +142,7 @@ fn test_credential_request_value_invalid_session() {
 
   assert_eq!(
     Err(MessageError::ProcessingError(
-      JobResult::new(123, JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
+      JobResult::new(123).with_status(JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some(
@@ -199,7 +199,7 @@ fn test_credential_request_value_no_credential() {
 
   assert_eq!(
     Err(MessageError::ProcessingError(
-      JobResult::new(123, JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
+      JobResult::new(123).with_status(JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some(
@@ -256,7 +256,7 @@ fn test_credential_request_value_invalid_credential() {
 
   assert_eq!(
     Err(MessageError::ProcessingError(
-      JobResult::new(123, JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
+      JobResult::new(123).with_status(JobStatus::Error).with_parameters(&mut vec![Parameter::StringParam {
         id: "message".to_string(),
         default: None,
         value: Some(
