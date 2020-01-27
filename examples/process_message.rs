@@ -1,7 +1,11 @@
-use amqp_worker::job::{Job, JobResult, JobStatus};
+use amqp_worker::job::*;
+use amqp_worker::parameter::container::ParametersContainer;
+use amqp_worker::parse_and_process_message;
 use amqp_worker::worker::{Parameter, ParameterType};
-use amqp_worker::{MessageError, MessageEvent, ParametersContainer};
+use amqp_worker::{MessageError, MessageEvent};
 use semver::Version;
+use std::env;
+use std::path::Path;
 
 #[derive(Debug)]
 struct WorkerEvent {}
@@ -39,12 +43,6 @@ Do no use in production, just for developments."#
   }
 }
 
-static WORKER_EVENT: WorkerEvent = WorkerEvent {};
-
-fn main() {
-  amqp_worker::start_worker(&WORKER_EVENT);
-}
-
 pub fn process_message(job: &Job, job_result: JobResult) -> Result<JobResult, MessageError> {
   match job
     .get_string_parameter("action")
@@ -56,5 +54,31 @@ pub fn process_message(job: &Job, job_result: JobResult) -> Result<JobResult, Me
       let result = job_result.with_message(&format!("Unknown action named {}", action_label));
       Err(MessageError::ProcessingError(result))
     }
+  }
+}
+
+static WORKER_EVENT: WorkerEvent = WorkerEvent {};
+
+fn main() {
+  let args = env::args();
+  if args.len() == 2 {
+    if let Some(path_or_json) = args.last() {
+      let path = Path::new(&path_or_json);
+
+      let result = if path.exists() {
+        let message = std::fs::read_to_string(&path_or_json)
+          .expect(&format!("unable to read content of: {}", path_or_json));
+
+        parse_and_process_message(&WORKER_EVENT, &message, None)
+      } else {
+        parse_and_process_message(&WORKER_EVENT, &path_or_json, None)
+      };
+
+      println!("{:?}", result);
+    } else {
+      println!("Unable to get last parameters");
+    }
+  } else {
+    println!("Missing 2nd parameter, pass raw json data or path to json file");
   }
 }

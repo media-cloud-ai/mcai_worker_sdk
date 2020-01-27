@@ -15,6 +15,7 @@ mod message;
 pub mod parameter;
 pub mod worker;
 
+pub use message::parse_and_process_message;
 pub use parameter::container::ParametersContainer;
 pub use parameter::credential::Credential;
 pub use parameter::{Parameter, Requirement};

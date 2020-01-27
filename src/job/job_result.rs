@@ -1,9 +1,9 @@
+use super::job_status::JobStatus;
 use crate::job::Job;
 use crate::parameter::container::ParametersContainer;
 use crate::parameter::Parameter;
 use reqwest::Error;
 use std::time::Instant;
-use super::job_status::JobStatus;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JobResult {
@@ -116,9 +116,9 @@ impl ParametersContainer for JobResult {
 
 impl PartialEq for JobResult {
   fn eq(&self, other: &Self) -> bool {
-    self.job_id == other.job_id &&
-    self.status == other.status &&
-    self.parameters == other.parameters &&
-    self.destination_paths == other.destination_paths
+    self.job_id == other.job_id
+      && self.status == other.status
+      && self.parameters == other.parameters
+      && self.destination_paths == other.destination_paths
   }
 }
