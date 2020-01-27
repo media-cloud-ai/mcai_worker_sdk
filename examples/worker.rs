@@ -1,9 +1,3 @@
-extern crate amqp_worker;
-#[macro_use]
-extern crate log;
-extern crate serde;
-extern crate serde_json;
-
 use amqp_worker::job::*;
 use amqp_worker::worker::{Parameter, ParameterType};
 use amqp_worker::{MessageError, MessageEvent, ParametersContainer};
@@ -40,8 +34,8 @@ Do no use in production, just for developments."#
     }]
   }
 
-  fn process(&self, message: &str) -> Result<JobResult, MessageError> {
-    process_message(message)
+  fn process(&self, job: &Job) -> Result<JobResult, MessageError> {
+    process_message(job)
   }
 }
 
@@ -51,17 +45,7 @@ fn main() {
   amqp_worker::start_worker(&WORKER_EVENT);
 }
 
-pub fn process_message(message: &str) -> Result<JobResult, MessageError> {
-  let job = Job::new(message)?;
-  debug!("reveived message: {:?}", job);
-
-  match job.check_requirements() {
-    Ok(_) => {}
-    Err(message) => {
-      return Err(message);
-    }
-  }
-
+pub fn process_message(job: &Job) -> Result<JobResult, MessageError> {
   match job
     .get_string_parameter("action")
     .unwrap_or("error".to_string())
