@@ -23,8 +23,8 @@ failure = "^0.1"
 futures = "^0.1"
 lapin-futures = "^0.28"
 log = "0.4.5"
-reqwest = "0.9.8"
-semver = { version = "^0.9", features = ["serde"] }
+reqwest = { version = "0.10", features = ['blocking', 'json'] }
+semver = { version = "0.9", features = ["serde"] }
 serde = "^1.0"
 serde_derive = "^1.0"
 serde_json = "^1.0"

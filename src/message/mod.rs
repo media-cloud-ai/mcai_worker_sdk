@@ -1,12 +1,12 @@
 mod helpers;
 
 use crate::{
-  job::{JobResult, JobStatus},
+  job::{Job, JobResult, JobStatus},
   MessageError, MessageEvent,
 };
 
 use futures::future::Future;
-use lapin::{message::Delivery, options::*, BasicProperties, Channel};
+use lapin_futures::{message::Delivery, options::*, BasicProperties, Channel};
 use serde_json::Value;
 
 static RESPONSE_EXCHANGE: &str = "job_response";
@@ -20,13 +20,18 @@ pub fn process_message<ME: MessageEvent>(
 ) {
   let count = helpers::get_message_death_count(&message);
   let message_data = std::str::from_utf8(&message.data).unwrap();
-  info!(
-    "got message: {} (iteration: {})",
-    message_data,
-    count.unwrap_or(0)
-  );
 
-  match MessageEvent::process(message_event, message_data) {
+  let job = Job::new(message_data).expect("unable to create a new job");
+  debug!(target: &job.job_id.to_string(),
+    "received message: {:?} (iteration: {})",
+    job,
+    count.unwrap_or(0));
+
+  if let Err(MessageError::RequirementsError(details)) = job.check_requirements() {
+    return publish_missing_requirements(channel, message, &details);
+  }
+
+  match MessageEvent::process(message_event, &job) {
     Ok(job_result) => {
       info!(target: &job_result.get_str_job_id(), "Completed");
       let msg = json!(job_result);

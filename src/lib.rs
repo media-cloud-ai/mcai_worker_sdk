@@ -2,24 +2,12 @@
 #![doc(html_logo_url = "https://media-io.com/images/mediaio_logo.png")]
 #![doc(html_no_source)]
 
-extern crate amq_protocol_types;
-extern crate amq_protocol_uri;
-// extern crate built;
-extern crate chrono;
-extern crate env_logger;
-extern crate failure;
-extern crate futures;
 #[macro_use]
 extern crate log;
-extern crate lapin_futures as lapin;
-extern crate reqwest;
-extern crate semver;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-extern crate tokio;
 
 mod config;
 pub mod job;
@@ -38,8 +26,10 @@ use config::*;
 use env_logger::Builder;
 use failure::Error;
 use futures::{future::Future, Stream};
-use job::JobResult;
-use lapin::{options::*, types::FieldTable, BasicProperties, ConnectionProperties, ExchangeKind};
+use job::{Job, JobResult};
+use lapin_futures::{
+  options::*, types::FieldTable, BasicProperties, ConnectionProperties, ExchangeKind,
+};
 use std::{env, fs, io::Write, thread, time};
 use tokio::runtime::Runtime;
 
@@ -55,7 +45,7 @@ pub trait MessageEvent {
 
   fn get_parameters(&self) -> Vec<worker::Parameter>;
 
-  fn process(&self, _message: &str) -> Result<JobResult, MessageError>
+  fn process(&self, _job: &Job) -> Result<JobResult, MessageError>
   where
     Self: std::marker::Sized,
   {
@@ -180,7 +170,7 @@ where
     };
 
     let state = Runtime::new().unwrap().block_on(
-      lapin::Client::connect_uri(amqp_uri, ConnectionProperties::default())
+      lapin_futures::Client::connect_uri(amqp_uri, ConnectionProperties::default())
         .map_err(Error::from)
         .and_then(|client| client.create_channel().map_err(Error::from))
         .and_then(move |channel| {
@@ -401,6 +391,11 @@ fn empty_message_event_impl() {
 
   let custom_event = CustomEvent {};
 
-  let result = custom_event.process("test");
+  let job = job::Job {
+    job_id: 1234,
+    parameters: vec![],
+  };
+
+  let result = custom_event.process(&job);
   assert!(result == Err(MessageError::NotImplemented()));
 }
