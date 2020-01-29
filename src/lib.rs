@@ -15,7 +15,7 @@ mod message;
 pub mod parameter;
 pub mod worker;
 
-pub use message::parse_and_process_message;
+pub use message::{parse_and_process_message, publish_job_progression};
 pub use parameter::container::ParametersContainer;
 pub use parameter::credential::Credential;
 pub use parameter::{Parameter, Requirement};
@@ -29,7 +29,7 @@ use failure::Error;
 use futures::{future::Future, Stream};
 use job::{Job, JobResult};
 use lapin_futures::{
-  options::*, types::FieldTable, BasicProperties, ConnectionProperties, ExchangeKind,
+  options::*, types::FieldTable, BasicProperties, Channel, ConnectionProperties, ExchangeKind,
 };
 use std::{env, fs, io::Write, thread, time};
 use tokio::runtime::Runtime;
@@ -46,12 +46,15 @@ pub trait MessageEvent {
 
   fn get_parameters(&self) -> Vec<worker::Parameter>;
 
-  fn process(&self, _job: &Job, _job_result: JobResult) -> Result<JobResult, MessageError>
+  fn process(
+    &self,
+    _channel: Option<&Channel>,
+    _job: &Job,
+    _job_result: JobResult,
+  ) -> Result<JobResult, MessageError>
   where
     Self: std::marker::Sized,
   {
-    
-
     Err(MessageError::NotImplemented())
   }
 }
@@ -401,6 +404,6 @@ fn empty_message_event_impl() {
 
   let job_result = job::JobResult::new(1234);
 
-  let result = custom_event.process(&job, job_result);
+  let result = custom_event.process(None, &job, job_result);
   assert!(result == Err(MessageError::NotImplemented()));
 }

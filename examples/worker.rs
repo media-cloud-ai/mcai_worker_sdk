@@ -1,6 +1,8 @@
 use amqp_worker::job::{Job, JobResult, JobStatus};
+use amqp_worker::publish_job_progression;
 use amqp_worker::worker::{Parameter, ParameterType};
 use amqp_worker::{MessageError, MessageEvent, ParametersContainer};
+use lapin_futures::Channel;
 use semver::Version;
 
 #[derive(Debug)]
@@ -34,8 +36,13 @@ Do no use in production, just for developments."#
     }]
   }
 
-  fn process(&self, job: &Job, job_result: JobResult) -> Result<JobResult, MessageError> {
-    process_message(job, job_result)
+  fn process(
+    &self,
+    channel: Option<&Channel>,
+    job: &Job,
+    job_result: JobResult,
+  ) -> Result<JobResult, MessageError> {
+    process_message(channel, job, job_result)
   }
 }
 
@@ -45,7 +52,13 @@ fn main() {
   amqp_worker::start_worker(&WORKER_EVENT);
 }
 
-pub fn process_message(job: &Job, job_result: JobResult) -> Result<JobResult, MessageError> {
+pub fn process_message(
+  channel: Option<&Channel>,
+  job: &Job,
+  job_result: JobResult,
+) -> Result<JobResult, MessageError> {
+  publish_job_progression(channel, &job, 50)?;
+
   match job
     .get_string_parameter("action")
     .unwrap_or("error".to_string())

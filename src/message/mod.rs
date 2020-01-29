@@ -51,7 +51,7 @@ pub fn process_message<ME: MessageEvent>(
 
 pub fn parse_and_process_message<
   ME: MessageEvent,
-  F: Fn(&Channel, &Job, u8) -> Result<(), MessageError> + 'static,
+  F: Fn(Option<&Channel>, &Job, u8) -> Result<(), MessageError> + 'static,
 >(
   message_event: &'static ME,
   message_data: &str,
@@ -67,12 +67,10 @@ pub fn parse_and_process_message<
 
   job.check_requirements()?;
 
-  if let Some(channel) = channel {
-    publish_job_progression(channel, &job, 0)?;
-  }
+  publish_job_progression(channel, &job, 0)?;
 
   let job_result = JobResult::new(job.job_id);
-  MessageEvent::process(message_event, &job, job_result)
+  MessageEvent::process(message_event, channel, &job, job_result)
 }
 
 fn publish_job_completed(channel: &Channel, message: Delivery, job_result: JobResult) {
@@ -107,28 +105,32 @@ fn publish_job_completed(channel: &Channel, message: Delivery, job_result: JobRe
   }
 }
 
-fn publish_job_progression(
-  channel: &Channel,
+pub fn publish_job_progression(
+  channel: Option<&Channel>,
   job: &Job,
   progression: u8,
 ) -> Result<(), MessageError> {
-  let msg = json!(JobProgression::new(job, progression)).to_string();
-
-  channel
-    .basic_publish(
-      RESPONSE_EXCHANGE,
-      QUEUE_JOB_PROGRESSION,
-      msg.as_str().as_bytes().to_vec(),
-      BasicPublishOptions::default(),
-      BasicProperties::default(),
-    )
-    .wait()
-    .map_err(|e| {
-      let result = JobResult::new(job.job_id)
-        .with_status(JobStatus::Error)
-        .with_message(&e.to_string());
-      MessageError::ProcessingError(result)
-    })
+  if let Some(channel) = channel {
+    let msg = json!(JobProgression::new(job, progression)).to_string();
+    channel
+      .basic_publish(
+        RESPONSE_EXCHANGE,
+        QUEUE_JOB_PROGRESSION,
+        msg.as_str().as_bytes().to_vec(),
+        BasicPublishOptions::default(),
+        BasicProperties::default(),
+      )
+      .wait()
+      .map_err(|e| {
+        let result = JobResult::new(job.job_id)
+          .with_status(JobStatus::Error)
+          .with_message(&e.to_string());
+        MessageError::ProcessingError(result)
+      })
+  } else {
+    info!("progression: {}%", progression);
+    Ok(())
+  }
 }
 
 fn publish_missing_requirements(channel: &Channel, message: Delivery, details: &str) {
