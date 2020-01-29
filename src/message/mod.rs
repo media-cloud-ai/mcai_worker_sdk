@@ -1,7 +1,7 @@
 mod helpers;
 
 use crate::{
-  job::{Job, JobResult, JobStatus},
+  job::{Job, JobProgression, JobResult, JobStatus},
   MessageError, MessageEvent,
 };
 
@@ -11,6 +11,7 @@ use lapin_futures::{message::Delivery, options::*, BasicProperties, Channel};
 static RESPONSE_EXCHANGE: &str = "job_response";
 static QUEUE_JOB_COMPLETED: &str = "job_completed";
 static QUEUE_JOB_ERROR: &str = "job_error";
+static QUEUE_JOB_PROGRESSION: &str = "job_progression";
 
 pub fn process_message<ME: MessageEvent>(
   message_event: &'static ME,
@@ -20,10 +21,16 @@ pub fn process_message<ME: MessageEvent>(
   let count = helpers::get_message_death_count(&message);
   let message_data = std::str::from_utf8(&message.data).unwrap();
 
-  match parse_and_process_message(message_event, message_data, count) {
+  match parse_and_process_message(
+    message_event,
+    message_data,
+    count,
+    Some(channel),
+    publish_job_progression,
+  ) {
     Ok(job_result) => {
       info!(target: &job_result.get_str_job_id(), "Completed");
-      publish_completed_job(channel, message, job_result);
+      publish_job_completed(channel, message, job_result);
     }
     Err(error) => match error {
       MessageError::RequirementsError(details) => {
@@ -42,10 +49,15 @@ pub fn process_message<ME: MessageEvent>(
   }
 }
 
-pub fn parse_and_process_message<ME: MessageEvent>(
+pub fn parse_and_process_message<
+  ME: MessageEvent,
+  F: Fn(Option<&Channel>, &Job, u8) -> Result<(), MessageError> + 'static,
+>(
   message_event: &'static ME,
   message_data: &str,
   count: Option<i64>,
+  channel: Option<&Channel>,
+  publish_job_progression: F,
 ) -> Result<JobResult, MessageError> {
   let job = Job::new(message_data)?;
   debug!(target: &job.job_id.to_string(),
@@ -55,11 +67,13 @@ pub fn parse_and_process_message<ME: MessageEvent>(
 
   job.check_requirements()?;
 
+  publish_job_progression(channel, &job, 0)?;
+
   let job_result = JobResult::new(job.job_id);
-  MessageEvent::process(message_event, &job, job_result)
+  MessageEvent::process(message_event, channel, &job, job_result)
 }
 
-fn publish_completed_job(channel: &Channel, message: Delivery, job_result: JobResult) {
+fn publish_job_completed(channel: &Channel, message: Delivery, job_result: JobResult) {
   let msg = json!(job_result).to_string();
 
   let result = channel
@@ -88,6 +102,34 @@ fn publish_completed_job(channel: &Channel, message: Delivery, job_result: JobRe
     .wait()
   {
     error!(target: &job_result.get_str_job_id(), "Unable to reject message {:?}", msg);
+  }
+}
+
+pub fn publish_job_progression(
+  channel: Option<&Channel>,
+  job: &Job,
+  progression: u8,
+) -> Result<(), MessageError> {
+  if let Some(channel) = channel {
+    let msg = json!(JobProgression::new(job, progression)).to_string();
+    channel
+      .basic_publish(
+        RESPONSE_EXCHANGE,
+        QUEUE_JOB_PROGRESSION,
+        msg.as_str().as_bytes().to_vec(),
+        BasicPublishOptions::default(),
+        BasicProperties::default(),
+      )
+      .wait()
+      .map_err(|e| {
+        let result = JobResult::new(job.job_id)
+          .with_status(JobStatus::Error)
+          .with_message(&e.to_string());
+        MessageError::ProcessingError(result)
+      })
+  } else {
+    info!("progression: {}%", progression);
+    Ok(())
   }
 }
 

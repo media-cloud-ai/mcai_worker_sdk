@@ -1,8 +1,9 @@
 use amqp_worker::job::*;
 use amqp_worker::parameter::container::ParametersContainer;
-use amqp_worker::parse_and_process_message;
 use amqp_worker::worker::{Parameter, ParameterType};
+use amqp_worker::{parse_and_process_message, publish_job_progression};
 use amqp_worker::{MessageError, MessageEvent};
+use lapin_futures::Channel;
 use semver::Version;
 use std::env;
 use std::path::Path;
@@ -38,7 +39,12 @@ Do no use in production, just for developments."#
     }]
   }
 
-  fn process(&self, job: &Job, job_result: JobResult) -> Result<JobResult, MessageError> {
+  fn process(
+    &self,
+    _channel: Option<&Channel>,
+    job: &Job,
+    job_result: JobResult,
+  ) -> Result<JobResult, MessageError> {
     process_message(job, job_result)
   }
 }
@@ -69,9 +75,15 @@ fn main() {
         let message = std::fs::read_to_string(&path_or_json)
           .expect(&format!("unable to read content of: {}", path_or_json));
 
-        parse_and_process_message(&WORKER_EVENT, &message, None)
+        parse_and_process_message(&WORKER_EVENT, &message, None, None, publish_job_progression)
       } else {
-        parse_and_process_message(&WORKER_EVENT, &path_or_json, None)
+        parse_and_process_message(
+          &WORKER_EVENT,
+          &path_or_json,
+          None,
+          None,
+          publish_job_progression,
+        )
       };
 
       println!("{:?}", result);

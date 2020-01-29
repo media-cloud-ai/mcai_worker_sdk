@@ -1,9 +1,11 @@
 use crate::{parameter::container::ParametersContainer, MessageError, Parameter, Requirement};
 use std::path::Path;
 
+mod job_progression;
 mod job_result;
 mod job_status;
 
+pub use job_progression::JobProgression;
 pub use job_result::JobResult;
 pub use job_status::JobStatus;
 
