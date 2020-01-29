@@ -3,6 +3,7 @@ use amqp_worker::parameter::container::ParametersContainer;
 use amqp_worker::parse_and_process_message;
 use amqp_worker::worker::{Parameter, ParameterType};
 use amqp_worker::{MessageError, MessageEvent};
+use lapin_futures::Channel;
 use semver::Version;
 use std::env;
 use std::path::Path;
@@ -58,7 +59,14 @@ pub fn process_message(job: &Job, job_result: JobResult) -> Result<JobResult, Me
 }
 
 static WORKER_EVENT: WorkerEvent = WorkerEvent {};
-
+fn publish_job_progression(
+  _channel: &Channel,
+  _job: &Job,
+  progression: u8,
+) -> Result<(), lapin_futures::Error> {
+  println!("progression: {}%", progression);
+  Ok(())
+}
 fn main() {
   let args = env::args();
   if args.len() == 2 {
@@ -69,9 +77,15 @@ fn main() {
         let message = std::fs::read_to_string(&path_or_json)
           .expect(&format!("unable to read content of: {}", path_or_json));
 
-        parse_and_process_message(&WORKER_EVENT, &message, None)
+        parse_and_process_message(&WORKER_EVENT, &message, None, None, publish_job_progression)
       } else {
-        parse_and_process_message(&WORKER_EVENT, &path_or_json, None)
+        parse_and_process_message(
+          &WORKER_EVENT,
+          &path_or_json,
+          None,
+          None,
+          publish_job_progression,
+        )
       };
 
       println!("{:?}", result);
