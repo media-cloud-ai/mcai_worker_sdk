@@ -50,6 +50,8 @@ pub trait MessageEvent {
   where
     Self: std::marker::Sized,
   {
+    
+
     Err(MessageError::NotImplemented())
   }
 }

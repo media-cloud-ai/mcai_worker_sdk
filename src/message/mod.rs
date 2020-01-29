@@ -51,7 +51,7 @@ pub fn process_message<ME: MessageEvent>(
 
 pub fn parse_and_process_message<
   ME: MessageEvent,
-  F: Fn(&Channel, &Job, u8) -> Result<(), lapin_futures::Error> + 'static,
+  F: Fn(&Channel, &Job, u8) -> Result<(), MessageError> + 'static,
 >(
   message_event: &'static ME,
   message_data: &str,
@@ -68,12 +68,7 @@ pub fn parse_and_process_message<
   job.check_requirements()?;
 
   if let Some(channel) = channel {
-    publish_job_progression(channel, &job, 0).map_err(|e| {
-      let result = JobResult::new(job.job_id)
-        .with_status(JobStatus::Error)
-        .with_message(&e.to_string());
-      MessageError::ProcessingError(result)
-    })?;
+    publish_job_progression(channel, &job, 0)?;
   }
 
   let job_result = JobResult::new(job.job_id);
@@ -116,7 +111,7 @@ fn publish_job_progression(
   channel: &Channel,
   job: &Job,
   progression: u8,
-) -> Result<(), lapin_futures::Error> {
+) -> Result<(), MessageError> {
   let msg = json!(JobProgression::new(job, progression)).to_string();
 
   channel
@@ -128,6 +123,12 @@ fn publish_job_progression(
       BasicProperties::default(),
     )
     .wait()
+    .map_err(|e| {
+      let result = JobResult::new(job.job_id)
+        .with_status(JobStatus::Error)
+        .with_message(&e.to_string());
+      MessageError::ProcessingError(result)
+    })
 }
 
 fn publish_missing_requirements(channel: &Channel, message: Delivery, details: &str) {

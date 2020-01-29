@@ -64,7 +64,7 @@ fn publish_job_progression(
   _channel: &Channel,
   _job: &Job,
   progression: u8,
-) -> Result<(), lapin_futures::Error> {
+) -> Result<(), MessageError> {
   println!("progression: {}%", progression);
   Ok(())
 }
