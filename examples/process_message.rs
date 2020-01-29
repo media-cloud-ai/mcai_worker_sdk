@@ -59,6 +59,7 @@ pub fn process_message(job: &Job, job_result: JobResult) -> Result<JobResult, Me
 }
 
 static WORKER_EVENT: WorkerEvent = WorkerEvent {};
+
 fn publish_job_progression(
   _channel: &Channel,
   _job: &Job,
@@ -67,6 +68,7 @@ fn publish_job_progression(
   println!("progression: {}%", progression);
   Ok(())
 }
+
 fn main() {
   let args = env::args();
   if args.len() == 2 {
