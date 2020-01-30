@@ -1,8 +1,8 @@
 [package]
 name = "amqp_worker"
-version = "0.7.0"
+version = "0.8.0"
 authors = [
-  "Marc-Antoine Arnaud <arnaud.marcantoine@gmail.com>",
+  "Marc-Antoine Arnaud <maarnaud@media-io.com>",
   "Valentin Noel <valentin.noel@media-io.com>"
 ]
 description = "AMQP Worker to listen and provide trait to process message"
