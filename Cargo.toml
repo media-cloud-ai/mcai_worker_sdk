@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-amqp_worker = "0.6.0"
+amqp_worker = "0.8.0"
+lapin-futures = "0.28.4"
 log = "0.4.5"
 pyo3 = "0.8.2"
 semver = "^0.9"
