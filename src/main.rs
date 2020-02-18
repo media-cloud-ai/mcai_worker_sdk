@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate log;
 
+use crate::helpers::get_destination_paths;
 use amqp_worker::{
   job::*,
   publish_job_progression, start_worker,
@@ -8,11 +9,12 @@ use amqp_worker::{
   MessageError, MessageEvent,
   Parameter::*,
 };
-
 use lapin_futures::Channel;
 use pyo3::{prelude::*, types::*};
 use semver::Version;
 use std::{env, fs};
+
+mod helpers;
 
 #[derive(Debug)]
 struct PythonWorkerEvent {}
@@ -141,7 +143,7 @@ impl MessageEvent for PythonWorkerEvent {
     &self,
     channel: Option<&Channel>,
     job: &Job,
-    job_result: JobResult,
+    mut job_result: JobResult,
   ) -> Result<JobResult, MessageError> {
     let contents = self.read_python_file();
 
@@ -173,34 +175,41 @@ impl MessageEvent for PythonWorkerEvent {
       job: job.clone(),
     };
 
-    if let Err(error) = python_module.call1("process", (callback_handle, parameters)) {
-      let stacktrace = if let Some(tb) = &error.ptraceback {
-        let locals = [("traceback", traceback)].into_py_dict(py);
+    match python_module.call1("process", (callback_handle, parameters)) {
+      Ok(response) => {
+        if let Some(mut destination_paths) = get_destination_paths(response) {
+          job_result = job_result.with_destination_paths(&mut destination_paths);
+        }
 
-        locals.set_item("tb", tb).unwrap();
+        Ok(job_result.with_status(JobStatus::Completed))
+      }
+      Err(error) => {
+        let stacktrace = if let Some(tb) = &error.ptraceback {
+          let locals = [("traceback", traceback)].into_py_dict(py);
 
-        py.eval("traceback.format_tb(tb)", None, Some(locals))
-          .expect("Unknown python error, unable to get the stacktrace")
-          .to_string()
-      } else {
-        "Unknown python error, no stackstrace".to_string()
-      };
+          locals.set_item("tb", tb).unwrap();
 
-      let locals = [("error", error)].into_py_dict(py);
+          py.eval("traceback.format_tb(tb)", None, Some(locals))
+            .expect("Unknown python error, unable to get the stacktrace")
+            .to_string()
+        } else {
+          "Unknown python error, no stackstrace".to_string()
+        };
 
-      let error_msg = py
-        .eval("repr(error)", None, Some(locals))
-        .expect("Unknown python error, unable to get the error message")
-        .to_string();
+        let locals = [("error", error)].into_py_dict(py);
 
-      let error_message = format!("{}\n\nStacktrace:\n{}", error_msg, stacktrace);
+        let error_msg = py
+          .eval("repr(error)", None, Some(locals))
+          .expect("Unknown python error, unable to get the error message")
+          .to_string();
 
-      let result = job_result
-        .with_status(JobStatus::Error)
-        .with_message(&error_message);
-      Err(MessageError::ProcessingError(result))
-    } else {
-      Ok(job_result.with_status(JobStatus::Completed))
+        let error_message = format!("{}\n\nStacktrace:\n{}", error_msg, stacktrace);
+
+        let result = job_result
+          .with_status(JobStatus::Error)
+          .with_message(&error_message);
+        Err(MessageError::ProcessingError(result))
+      }
     }
   }
 }

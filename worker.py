@@ -33,4 +33,6 @@ def process(handle_callback, parameters):
 	# notify the progression (between 0 and 100)
 	handle_callback.publish_job_progression(50)
 
-	return
+	return {
+		"destination_paths": ["/path/to/generated/file.ext"]
+	}
