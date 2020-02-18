@@ -1,12 +1,15 @@
 #[macro_use]
 extern crate log;
 
-use amqp_worker::job::*;
-use amqp_worker::start_worker;
-use amqp_worker::worker::{Parameter, ParameterType};
-use amqp_worker::MessageError;
-use amqp_worker::MessageEvent;
-use amqp_worker::Parameter::*;
+use amqp_worker::{
+  job::*,
+  publish_job_progression, start_worker,
+  worker::{Parameter, ParameterType},
+  MessageError, MessageEvent,
+  Parameter::*,
+};
+
+use lapin_futures::Channel;
 use pyo3::{prelude::*, types::*};
 use semver::Version;
 use std::{env, fs};
@@ -40,6 +43,19 @@ impl PythonWorkerEvent {
   }
 }
 
+#[pyclass]
+struct CallbackHandle {
+  channel: Channel,
+  job: Job,
+}
+
+#[pymethods]
+impl CallbackHandle {
+  fn publish_job_progression(&self, value: u8) -> bool {
+    publish_job_progression(Some(&self.channel), &self.job, value).is_ok()
+  }
+}
+
 impl MessageEvent for PythonWorkerEvent {
   fn get_name(&self) -> String {
     self.get_string_from_module("get_name")
@@ -54,11 +70,6 @@ impl MessageEvent for PythonWorkerEvent {
   }
 
   fn get_version(&self) -> Version {
-    Version::parse(&self.get_string_from_module("get_version"))
-      .expect("unable to parse version (please use SemVer format)")
-  }
-
-  fn get_git_version(&self) -> Version {
     Version::parse(&self.get_string_from_module("get_version"))
       .expect("unable to parse version (please use SemVer format)")
   }
@@ -126,17 +137,12 @@ impl MessageEvent for PythonWorkerEvent {
     parameters
   }
 
-  fn process(&self, message: &str) -> Result<JobResult, MessageError> {
-    let job = Job::new(message)?;
-    debug!("reveived message: {:?}", job);
-
-    match job.check_requirements() {
-      Ok(_) => {}
-      Err(message) => {
-        return Err(message);
-      }
-    }
-
+  fn process(
+    &self,
+    channel: Option<&Channel>,
+    job: &Job,
+    job_result: JobResult,
+  ) -> Result<JobResult, MessageError> {
     let contents = self.read_python_file();
 
     let gil = Python::acquire_gil();
@@ -146,7 +152,7 @@ impl MessageEvent for PythonWorkerEvent {
       .expect("unable to create the python module");
 
     let list_of_parameters = PyDict::new(py);
-    if let Err(error) = self.build_parameters(&job, py, list_of_parameters) {
+    if let Err(error) = self.build_parameters(job, py, list_of_parameters) {
       let locals = [("error", error)].into_py_dict(py);
 
       let error_msg = py
@@ -154,13 +160,20 @@ impl MessageEvent for PythonWorkerEvent {
         .expect("Unknown python error, unable to get the error message")
         .to_string();
 
-      let result = JobResult::new(job.job_id, JobStatus::Error, vec![]).with_message(error_msg);
+      let result = job_result
+        .with_status(JobStatus::Error)
+        .with_message(&error_msg);
       return Err(MessageError::ProcessingError(result));
     }
 
     let parameters = PyTuple::new(py, vec![list_of_parameters]);
 
-    if let Err(error) = python_module.call1("process", parameters) {
+    let callback_handle = CallbackHandle {
+      channel: channel.unwrap().clone(),
+      job: job.clone(),
+    };
+
+    if let Err(error) = python_module.call1("process", (callback_handle, parameters)) {
       let stacktrace = if let Some(tb) = &error.ptraceback {
         let locals = [("traceback", traceback)].into_py_dict(py);
 
@@ -182,10 +195,12 @@ impl MessageEvent for PythonWorkerEvent {
 
       let error_message = format!("{}\n\nStacktrace:\n{}", error_msg, stacktrace);
 
-      let result = JobResult::new(job.job_id, JobStatus::Error, vec![]).with_message(error_message);
+      let result = job_result
+        .with_status(JobStatus::Error)
+        .with_message(&error_message);
       Err(MessageError::ProcessingError(result))
     } else {
-      Ok(JobResult::new(job.job_id, JobStatus::Completed, vec![]))
+      Ok(job_result.with_status(JobStatus::Completed))
     }
   }
 }
