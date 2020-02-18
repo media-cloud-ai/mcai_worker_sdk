@@ -24,10 +24,13 @@ def get_parameters():
 		}
 	]
 
-def process(parameters):
+def process(handle_callback, parameters):
 	# be able to raise, return job in errors
 	# raise Exception("my error")
 
 	# do some stuff here
+
+	# notify the progression (between 0 and 100)
+	handle_callback.publish_job_progression(50)
 
 	return

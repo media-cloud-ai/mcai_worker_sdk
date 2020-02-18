@@ -3,7 +3,7 @@ extern crate log;
 
 use amqp_worker::{
   job::*,
-  start_worker,
+  publish_job_progression, start_worker,
   worker::{Parameter, ParameterType},
   MessageError, MessageEvent,
   Parameter::*,
@@ -40,6 +40,19 @@ impl PythonWorkerEvent {
       .unwrap_or_else(|_| panic!("unable to found a return value for {} function", method));
 
     response
+  }
+}
+
+#[pyclass]
+struct CallbackHandle {
+  channel: Channel,
+  job: Job,
+}
+
+#[pymethods]
+impl CallbackHandle {
+  fn publish_job_progression(&self, value: u8) -> bool {
+    publish_job_progression(Some(&self.channel), &self.job, value).is_ok()
   }
 }
 
@@ -126,7 +139,7 @@ impl MessageEvent for PythonWorkerEvent {
 
   fn process(
     &self,
-    _channel: Option<&Channel>,
+    channel: Option<&Channel>,
     job: &Job,
     job_result: JobResult,
   ) -> Result<JobResult, MessageError> {
@@ -155,7 +168,12 @@ impl MessageEvent for PythonWorkerEvent {
 
     let parameters = PyTuple::new(py, vec![list_of_parameters]);
 
-    if let Err(error) = python_module.call1("process", parameters) {
+    let callback_handle = CallbackHandle {
+      channel: channel.unwrap().clone(),
+      job: job.clone(),
+    };
+
+    if let Err(error) = python_module.call1("process", (callback_handle, parameters)) {
       let stacktrace = if let Some(tb) = &error.ptraceback {
         let locals = [("traceback", traceback)].into_py_dict(py);
 
