@@ -15,7 +15,7 @@ readme = "README.md"
 edition = "2018"
 
 [dependencies]
-amq-protocol-types = "^3.1"
+amq-protocol-types = "^4.2"
 amq-protocol-uri = "^3.1"
 chrono = {version = "0.4", features = ["serde"]}
 env_logger = "^0.7"
