@@ -70,9 +70,9 @@ dependencies = [
 
 [[package]]
 name = "amqp_worker"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41046bd887bc7fb04607e4499e7b53b132308e3b1e25af3103bb23eafcb7564c"
+checksum = "fc7f6384d7d69a60be0db44d893a6f3c14384b1edd224812d76d5900f9bbbe5e"
 dependencies = [
  "amq-protocol-types",
  "amq-protocol-uri",
@@ -1236,7 +1236,7 @@ dependencies = [
 
 [[package]]
 name = "py_amqp_worker"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "amqp_worker",
  "lapin-futures",
