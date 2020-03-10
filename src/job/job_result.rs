@@ -5,7 +5,7 @@ use crate::parameter::Parameter;
 use reqwest::Error;
 use std::time::Instant;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JobResult {
   destination_paths: Vec<String>,
   execution_duration: f64,
