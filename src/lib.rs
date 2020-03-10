@@ -37,6 +37,9 @@ use tokio::runtime::Runtime;
 static EXCHANGE_NAME_SUBMIT: &str = "job_submit";
 static EXCHANGE_NAME_RESPONSE: &str = "job_response";
 static EXCHANGE_NAME_DELAYED: &str = "job_delayed";
+static EXCHANGE_NAME_RESPONSE_DELAYED: &str = "job_response_delayed";
+
+static QUEUE_NAME_WORKER_DISCOVERY: &str = "worker_discovery";
 
 pub trait MessageEvent {
   fn get_name(&self) -> String;
@@ -201,6 +204,11 @@ where
             "alternate-exchange".into(),
             AMQPValue::LongString("job_queue_not_found".into()),
           );
+          let mut table_response = FieldTable::default();
+          table_response.insert(
+            "alternate-exchange".into(),
+            AMQPValue::LongString("job_response_not_found".into()),
+          );
 
           if let Err(msg) = channel
             .exchange_declare(
@@ -237,7 +245,7 @@ where
               EXCHANGE_NAME_RESPONSE,
               ExchangeKind::Topic,
               exchange_options,
-              FieldTable::default(),
+              table_response,
             )
             .wait()
           {
@@ -283,22 +291,25 @@ where
             error!("Unable to bind queue {}: {:?}", EXCHANGE_NAME_DELAYED, msg);
           }
 
-          let mut queue_fields = FieldTable::default();
-          queue_fields.insert(
+          let mut worker_discovery_fields = FieldTable::default();
+          worker_discovery_fields.insert(
             "x-dead-letter-exchange".into(),
-            AMQPValue::LongString(EXCHANGE_NAME_DELAYED.into()),
+            AMQPValue::LongString(EXCHANGE_NAME_RESPONSE_DELAYED.into()),
           );
-          queue_fields.insert(
+          worker_discovery_fields.insert(
             "x-dead-letter-routing-key".into(),
-            AMQPValue::LongString(amqp_queue.clone().into()),
+            AMQPValue::LongString(QUEUE_NAME_WORKER_DISCOVERY.into()),
           );
 
           channel
             .clone()
             .queue_declare(
-              "worker_discovery",
-              QueueDeclareOptions::default(),
-              FieldTable::default(),
+              QUEUE_NAME_WORKER_DISCOVERY,
+              QueueDeclareOptions {
+                durable: true,
+                ..Default::default()
+              },
+              worker_discovery_fields,
             )
             .and_then(|_| {
               let worker_definition =
@@ -311,7 +322,7 @@ where
                 .to_vec();
               channel.basic_publish(
                 "",
-                "worker_discovery",
+                QUEUE_NAME_WORKER_DISCOVERY,
                 msg,
                 BasicPublishOptions::default(),
                 BasicProperties::default(),
@@ -320,10 +331,26 @@ where
             .wait()
             .expect("runtime failure");
 
+          let mut queue_fields = FieldTable::default();
+          queue_fields.insert(
+            "x-dead-letter-exchange".into(),
+            AMQPValue::LongString(EXCHANGE_NAME_DELAYED.into()),
+          );
+          queue_fields.insert(
+            "x-dead-letter-routing-key".into(),
+            AMQPValue::LongString(amqp_queue.clone().into()),
+          );
           queue_fields.insert("x-max-priority".into(), AMQPValue::ShortInt(100));
 
           channel
-            .queue_declare(&amqp_queue, QueueDeclareOptions::default(), queue_fields)
+            .queue_declare(
+              &amqp_queue,
+              QueueDeclareOptions {
+                durable: true,
+                ..Default::default()
+              },
+              queue_fields,
+            )
             .and_then(move |queue| {
               info!("channel {} declared queue {}", id, amqp_queue);
 
