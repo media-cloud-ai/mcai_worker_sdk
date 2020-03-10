@@ -27,6 +27,7 @@ def get_parameters():
 def process(handle_callback, parameters):
 	# be able to raise, return job in errors
 	# raise Exception("my error")
+	print(parameters)
 
 	# do some stuff here
 

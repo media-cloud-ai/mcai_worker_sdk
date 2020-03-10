@@ -168,14 +168,12 @@ impl MessageEvent for PythonWorkerEvent {
       return Err(MessageError::ProcessingError(result));
     }
 
-    let parameters = PyTuple::new(py, vec![list_of_parameters]);
-
     let callback_handle = CallbackHandle {
       channel: channel.unwrap().clone(),
       job: job.clone(),
     };
 
-    match python_module.call1("process", (callback_handle, parameters)) {
+    match python_module.call1("process", (callback_handle, list_of_parameters)) {
       Ok(response) => {
         if let Some(mut destination_paths) = get_destination_paths(response) {
           job_result = job_result.with_destination_paths(&mut destination_paths);
