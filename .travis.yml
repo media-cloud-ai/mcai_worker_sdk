@@ -43,9 +43,10 @@ jobs:
         - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
         - gcc -c -Wall -Werror -fpic worker.cpp && gcc -shared -o libworker.so worker.o
-        - ls
         - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
-      env: COVERAGE_CHECK=TRUE
+      env:
+        - COVERAGE_CHECK=TRUE
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
 script:
   - gcc -c -Wall -Werror -fpic worker.cpp && gcc -shared -o libworker.so worker.o
