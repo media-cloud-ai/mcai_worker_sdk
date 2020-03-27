@@ -47,7 +47,12 @@ impl MessageEvent for CWorkerEvent {
     get_worker_parameters()
   }
 
-  fn process(&self, _channel: Option<&Channel>, job: &Job, job_result: JobResult) -> Result<JobResult, MessageError> {
+  fn process(
+    &self,
+    _channel: Option<&Channel>,
+    job: &Job,
+    job_result: JobResult,
+  ) -> Result<JobResult, MessageError> {
     debug!("Process job: {:?}", job.job_id);
     let process_return = call_worker_process(job);
     debug!("Returned: {:?}", process_return);
@@ -112,7 +117,7 @@ pub fn test_process() {
   }"#;
 
   let job = Job::new(message).unwrap();
-  let job_result = JobResult::new(job.job_id); 
+  let job_result = JobResult::new(job.job_id);
 
   let result = C_WORKER_EVENT.process(None, &job, job_result);
   assert!(result.is_ok());
@@ -139,7 +144,7 @@ pub fn test_failing_process() {
   }"#;
 
   let job = Job::new(message).unwrap();
-  let job_result = JobResult::new(job.job_id); 
+  let job_result = JobResult::new(job.job_id);
 
   let result = C_WORKER_EVENT.process(None, &job, job_result);
   assert!(result.is_err());

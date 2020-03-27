@@ -49,16 +49,14 @@ impl ProcessReturn {
     if self.code == 0 {
       let mut output_paths = self.output_paths.clone();
 
-      let job_result =
-        job_result
+      let job_result = job_result
         .with_status(JobStatus::Completed)
         .with_destination_paths(&mut output_paths)
         .with_message(&self.message);
 
       Ok(job_result)
     } else {
-      let result =
-        job_result
+      let result = job_result
         .with_status(JobStatus::Error)
         .with_message(&format!("{} (code: {:?})", self.message, self.code));
 

@@ -7,6 +7,9 @@ rust:
   - 1.37.0
   - 1.38.0
   - 1.39.0
+  - 1.40.0
+  - 1.41.0
+  - 1.42.0
   - stable
   - beta
   - nightly
@@ -26,6 +29,7 @@ jobs:
         - cargo fmt --version
       script:
         - cargo fmt -- --check
+      env: FORMAT_CODE_CHECK=TRUE
 
     # Clippy
     - rust: stable
@@ -34,6 +38,7 @@ jobs:
       script:
         # Fail if clippy output contains "error:" or "warning:"
         - cargo clippy 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+      env: CLIPPY_CHECK=TRUE
 
     # Test coverage (with Tarpaulin)
     - rust: stable
@@ -42,6 +47,7 @@ jobs:
       script:
         - gcc -c -Wall -Werror -fpic worker.cpp && gcc -shared -o libworker.so worker.o
         - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+      env: COVERAGE_CHECK=TRUE
 
 script:
   - gcc -c -Wall -Werror -fpic worker.cpp && gcc -shared -o libworker.so worker.o
