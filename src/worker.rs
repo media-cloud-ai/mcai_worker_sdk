@@ -199,7 +199,7 @@ pub fn get_worker_parameters() -> Vec<Parameter> {
   parameters
 }
 
-pub fn call_worker_process(job: Job) -> ProcessReturn {
+pub fn call_worker_process(job: &Job) -> ProcessReturn {
   let library = get_library_file_path();
   debug!("Call worker process from library: {}", library);
   match libloading::Library::new(library) {
@@ -296,7 +296,7 @@ pub fn test_c_binding_process() {
   }"#;
 
   let job = Job::new(message).unwrap();
-  let returned_code = call_worker_process(job);
+  let returned_code = call_worker_process(&job);
   assert_eq!(returned_code.get_code(), 0);
   assert_eq!(returned_code.get_message(), "Everything worked well!");
   assert_eq!(
@@ -319,7 +319,7 @@ pub fn test_c_binding_failing_process() {
   }"#;
 
   let job = Job::new(message).unwrap();
-  let returned_code = call_worker_process(job);
+  let returned_code = call_worker_process(&job);
   assert_eq!(returned_code.get_code(), 1);
   assert_eq!(returned_code.get_message(), "Something went wrong...");
   assert!(returned_code.get_output_paths().is_empty());

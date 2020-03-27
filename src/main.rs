@@ -12,6 +12,7 @@ use amqp_worker::start_worker;
 use amqp_worker::worker::Parameter;
 use amqp_worker::MessageError;
 use amqp_worker::MessageEvent;
+use lapin_futures::Channel;
 use semver::Version;
 
 use crate::worker::*;
@@ -46,17 +47,16 @@ impl MessageEvent for CWorkerEvent {
     get_worker_parameters()
   }
 
-  fn process(&self, message: &str) -> Result<JobResult, MessageError> {
-    let job = Job::new(message)?;
-    debug!("received message: {:?}", job);
-
-    job.check_requirements()?;
-
-    let job_id = job.job_id;
-    debug!("Process job: {:?}", job_id);
+  fn process(
+    &self,
+    _channel: Option<&Channel>,
+    job: &Job,
+    job_result: JobResult,
+  ) -> Result<JobResult, MessageError> {
+    debug!("Process job: {:?}", job.job_id);
     let process_return = call_worker_process(job);
     debug!("Returned: {:?}", process_return);
-    process_return.as_result(job_id)
+    process_return.as_result(job_result)
   }
 }
 
@@ -116,7 +116,10 @@ pub fn test_process() {
     ]
   }"#;
 
-  let result = C_WORKER_EVENT.process(message);
+  let job = Job::new(message).unwrap();
+  let job_result = JobResult::new(job.job_id);
+
+  let result = C_WORKER_EVENT.process(None, &job, job_result);
   assert!(result.is_ok());
   let job_result = result.unwrap();
   assert_eq!(job_result.get_job_id(), 123);
@@ -140,7 +143,10 @@ pub fn test_failing_process() {
     ]
   }"#;
 
-  let result = C_WORKER_EVENT.process(message);
+  let job = Job::new(message).unwrap();
+  let job_result = JobResult::new(job.job_id);
+
+  let result = C_WORKER_EVENT.process(None, &job, job_result);
   assert!(result.is_err());
   let _message_error = result.unwrap_err();
 }

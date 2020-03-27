@@ -45,17 +45,19 @@ impl ProcessReturn {
     &self.output_paths
   }
 
-  pub fn as_result(&self, job_id: u64) -> Result<JobResult, MessageError> {
+  pub fn as_result(&self, job_result: JobResult) -> Result<JobResult, MessageError> {
     if self.code == 0 {
       let mut output_paths = self.output_paths.clone();
 
-      let job_result = JobResult::new(job_id, JobStatus::Completed)
+      let job_result = job_result
+        .with_status(JobStatus::Completed)
         .with_destination_paths(&mut output_paths)
         .with_message(&self.message);
 
       Ok(job_result)
     } else {
-      let result = JobResult::new(job_id, JobStatus::Error)
+      let result = job_result
+        .with_status(JobStatus::Error)
         .with_message(&format!("{} (code: {:?})", self.message, self.code));
 
       Err(MessageError::ProcessingError(result))
