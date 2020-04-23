@@ -5,6 +5,7 @@ use assert_matches::assert_matches;
 
 use crate::amqp_worker::ParametersContainer;
 use amqp_worker::job::*;
+use amqp_worker::parameter::media_segment::MediaSegment;
 use amqp_worker::MessageError;
 
 use std::collections::HashMap;
@@ -65,7 +66,11 @@ fn test_new_job() {
       { "id":"array_of_string_parameter",
         "type":"array_of_strings",
         "default": ["default_value"],
-        "value": ["real_value"] }
+        "value": ["real_value"] },
+      { "id":"array_of_media_segments_parameter",
+        "type":"array_of_media_segments",
+        "default": [{"start": 123, "end": 456}],
+        "value": [{"start": 123, "end": 456}] }
     ]
   }"#;
 
@@ -100,6 +105,13 @@ fn test_new_job() {
   assert_eq!(array_of_values.len(), 1);
   assert_eq!("real_value".to_string(), array_of_values[0]);
 
+  let option_media_segments_array =
+    job.get_array_of_media_segments_parameter("array_of_media_segments_parameter");
+  assert!(option_media_segments_array.is_some());
+  let media_segments_array = option_media_segments_array.unwrap();
+  assert_eq!(media_segments_array.len(), 1);
+  assert_eq!(MediaSegment::new(123, 456), media_segments_array[0]);
+
   let map = job.get_parameters_as_map();
   let mut reference_map = HashMap::new();
   reference_map.insert(
@@ -113,6 +125,10 @@ fn test_new_job() {
   );
   reference_map.insert("integer_parameter".to_string(), "654321".to_string());
   reference_map.insert("string_parameter".to_string(), "real_value".to_string());
+  reference_map.insert(
+    "array_of_media_segments_parameter".to_string(),
+    format!("{:?}", vec![MediaSegment::new(123, 456)]),
+  );
   assert_eq!(
     reference_map.get("credential_parameter"),
     map.get("credential_parameter")
@@ -132,6 +148,10 @@ fn test_new_job() {
   assert_eq!(
     reference_map.get("string_parameter"),
     map.get("string_parameter")
+  );
+  assert_eq!(
+    reference_map.get("array_of_media_segments_parameter"),
+    map.get("array_of_media_segments_parameter")
   );
 }
 
