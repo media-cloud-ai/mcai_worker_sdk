@@ -1,5 +1,8 @@
+use crate::parameter::media_segment::MediaSegment;
+
 pub mod container;
 pub mod credential;
+pub mod media_segment;
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Requirement {
@@ -9,6 +12,12 @@ pub struct Requirement {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum Parameter {
+  #[serde(rename = "array_of_media_segments")]
+  ArrayOfMediaSegmentsParam {
+    id: String,
+    default: Option<Vec<MediaSegment>>,
+    value: Option<Vec<MediaSegment>>,
+  },
   #[serde(rename = "array_of_strings")]
   ArrayOfStringsParam {
     id: String,
@@ -50,7 +59,8 @@ pub enum Parameter {
 impl Parameter {
   pub fn get_id(&self) -> String {
     match self {
-      Parameter::ArrayOfStringsParam { id, .. }
+      Parameter::ArrayOfMediaSegmentsParam { id, .. }
+      | Parameter::ArrayOfStringsParam { id, .. }
       | Parameter::BooleanParam { id, .. }
       | Parameter::CredentialParam { id, .. }
       | Parameter::IntegerParam { id, .. }
@@ -61,6 +71,9 @@ impl Parameter {
 
   pub fn has_value_or_default(&self) -> bool {
     match self {
+      Parameter::ArrayOfMediaSegmentsParam { value, default, .. } => {
+        value.is_some() || default.is_some()
+      }
       Parameter::ArrayOfStringsParam { value, default, .. } => value.is_some() || default.is_some(),
       Parameter::BooleanParam { value, default, .. } => value.is_some() || default.is_some(),
       Parameter::CredentialParam { value, default, .. } => value.is_some() || default.is_some(),
@@ -87,6 +100,9 @@ macro_rules! parameter_to_string {
 impl ToString for Parameter {
   fn to_string(&self) -> String {
     match self {
+      Parameter::ArrayOfMediaSegmentsParam { default, value, .. } => {
+        parameter_to_string!(default, value, "{:?}")
+      }
       Parameter::ArrayOfStringsParam { default, value, .. } => {
         parameter_to_string!(default, value, "{:?}")
       }
