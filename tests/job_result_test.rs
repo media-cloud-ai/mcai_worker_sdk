@@ -3,6 +3,7 @@ extern crate amqp_worker;
 use crate::amqp_worker::ParametersContainer;
 use amqp_worker::job::*;
 
+use amqp_worker::parameter::media_segment::MediaSegment;
 use std::collections::HashMap;
 
 #[test]
@@ -32,7 +33,11 @@ fn test_job_result_from_json() {
       { "id":"array_of_string_parameter",
         "type":"array_of_strings",
         "default": ["default_value"],
-        "value": ["real_value"] }
+        "value": ["real_value"] },
+      { "id":"array_of_media_segments_parameter",
+        "type":"array_of_media_segments",
+        "default": [{"start": 123, "end": 456}],
+        "value": [{"start": 123, "end": 456}] }
     ]
   }"#;
 
@@ -41,7 +46,7 @@ fn test_job_result_from_json() {
   let job_result: JobResult = result.unwrap();
   assert_eq!(job_result.get_job_id(), 456);
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
-  assert_eq!(job_result.get_parameters().len(), 5);
+  assert_eq!(job_result.get_parameters().len(), 6);
 
   let optional_string = job_result.get_string_parameter("string_parameter");
   assert!(optional_string.is_some());
@@ -65,6 +70,13 @@ fn test_job_result_from_json() {
   let array_of_values = option_array.unwrap();
   assert_eq!(1, array_of_values.len());
   assert_eq!("real_value".to_string(), array_of_values[0]);
+
+  let option_media_segments_array =
+    job_result.get_array_of_media_segments_parameter("array_of_media_segments_parameter");
+  assert!(option_media_segments_array.is_some());
+  let media_segments_array = option_media_segments_array.unwrap();
+  assert_eq!(media_segments_array.len(), 1);
+  assert_eq!(MediaSegment::new(123, 456), media_segments_array[0]);
 
   let map = job_result.get_parameters_as_map();
   let mut reference_map = HashMap::new();
@@ -99,6 +111,10 @@ fn test_job_result_from_json() {
     reference_map.get("string_parameter"),
     map.get("string_parameter")
   );
+  assert_eq!(
+    reference_map.get("array_of_media_segments_parameter"),
+    map.get("array_of_media_segments")
+  );
 }
 
 #[test]
@@ -123,7 +139,11 @@ fn test_job_result_from_json_without_value() {
         "default":"default_credential_key" },
       { "id":"array_of_string_parameter",
         "type":"array_of_strings",
-        "default": ["default_value"] }
+        "default": ["default_value"] },
+      { "id":"array_of_media_segments_parameter",
+        "type":"array_of_media_segments",
+        "default": [{"start": 123, "end": 456}],
+        "value": [{"start": 123, "end": 456}] }
     ]
   }"#;
 
@@ -134,7 +154,7 @@ fn test_job_result_from_json_without_value() {
   assert_eq!(job_result.get_job_id(), 456);
   assert_eq!(job_result.get_execution_duration(), 0.0);
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
-  assert_eq!(job_result.get_parameters().len(), 5);
+  assert_eq!(job_result.get_parameters().len(), 6);
 
   let optional_string = job_result.get_string_parameter("string_parameter");
   assert!(optional_string.is_some());
@@ -161,6 +181,13 @@ fn test_job_result_from_json_without_value() {
   let array_of_values = option_array.unwrap();
   assert_eq!(1, array_of_values.len());
   assert_eq!("default_value".to_string(), array_of_values[0]);
+
+  let option_media_segments_array =
+    job_result.get_array_of_media_segments_parameter("array_of_media_segments_parameter");
+  assert!(option_media_segments_array.is_some());
+  let media_segments_array = option_media_segments_array.unwrap();
+  assert_eq!(media_segments_array.len(), 1);
+  assert_eq!(MediaSegment::new(123, 456), media_segments_array[0]);
 
   let map = job_result.get_parameters_as_map();
   let mut reference_map = HashMap::new();
@@ -195,6 +222,10 @@ fn test_job_result_from_json_without_value() {
     reference_map.get("string_parameter"),
     map.get("string_parameter")
   );
+  assert_eq!(
+    reference_map.get("array_of_media_segments_parameter"),
+    map.get("array_of_media_segments")
+  );
 }
 
 #[test]
@@ -221,7 +252,11 @@ fn test_job_result_from_job() {
       { "id":"array_of_string_parameter",
         "type":"array_of_strings",
         "default": ["default_value"],
-        "value": ["real_value"] }
+        "value": ["real_value"] },
+      { "id":"array_of_media_segments_parameter",
+        "type":"array_of_media_segments",
+        "default": [{"start": 123, "end": 456}],
+        "value": [{"start": 123, "end": 456}] }
     ]
   }"#;
 

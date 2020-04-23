@@ -1,3 +1,4 @@
+use crate::parameter::media_segment::MediaSegment;
 use crate::parameter::{credential::Credential, Parameter};
 use std::collections::HashMap;
 
@@ -66,6 +67,21 @@ pub trait ParametersContainer {
   fn get_array_of_strings_parameter(&self, key: &str) -> Option<Vec<String>> {
     for param in self.get_parameters() {
       if let Parameter::ArrayOfStringsParam { id, default, value } = param {
+        if id == key {
+          if let Some(ref v) = value {
+            return Some(v.clone());
+          } else {
+            return default.clone();
+          }
+        }
+      }
+    }
+    None
+  }
+
+  fn get_array_of_media_segments_parameter(&self, key: &str) -> Option<Vec<MediaSegment>> {
+    for param in self.get_parameters() {
+      if let Parameter::ArrayOfMediaSegmentsParam { id, default, value } = param {
         if id == key {
           if let Some(ref v) = value {
             return Some(v.clone());
