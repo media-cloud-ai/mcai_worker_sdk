@@ -72,7 +72,7 @@ pub fn get_amqp_uri() -> AMQPUri {
   info!("AMQP HOSTNAME: {}", amqp_hostname);
   info!("AMQP PORT: {}", amqp_port);
   info!("AMQP USERNAME: {}", amqp_username);
-  info!("AMQP VHOST: {}", amqp_vhost);
+  info!("AMQP VIRTUAL HOST: {}", amqp_vhost);
   info!("AMQP QUEUE: {}", amqp_queue);
 
   let scheme = if amqp_tls {
