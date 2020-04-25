@@ -1,12 +1,12 @@
-extern crate amqp_worker;
+extern crate mcai_worker_sdk;
 extern crate assert_matches;
 
 use assert_matches::assert_matches;
 
-use crate::amqp_worker::ParametersContainer;
-use amqp_worker::job::*;
-use amqp_worker::parameter::media_segment::MediaSegment;
-use amqp_worker::MessageError;
+use crate::mcai_worker_sdk::ParametersContainer;
+use mcai_worker_sdk::job::*;
+use mcai_worker_sdk::parameter::media_segment::MediaSegment;
+use mcai_worker_sdk::MessageError;
 
 use std::collections::HashMap;
 

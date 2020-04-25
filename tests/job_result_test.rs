@@ -1,9 +1,9 @@
-extern crate amqp_worker;
+extern crate mcai_worker_sdk;
 
-use crate::amqp_worker::ParametersContainer;
-use amqp_worker::job::*;
+use crate::mcai_worker_sdk::ParametersContainer;
+use mcai_worker_sdk::job::*;
 
-use amqp_worker::parameter::media_segment::MediaSegment;
+use mcai_worker_sdk::parameter::media_segment::MediaSegment;
 use std::collections::HashMap;
 
 #[test]

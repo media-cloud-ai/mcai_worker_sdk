@@ -5,26 +5,60 @@
 //! It's used for every worker as an abstraction.  
 //! It manage itself requirements, message parsing, direct messaging.  
 //! 
-//! ## Worker implementation  
-//! Steps are:
-//! 1. Create a structure and provide the [MessageEvent](trait.MessageEvent.html) implementation
+//! ## Worker implementation
+//!
+//! 1. Create a Rust project
+//! 2. Add MCAI Worker SDK as a dependency in Cargo.toml: `mcai_worker_sdk = "^1.0"`
+//! 1. Update the main file with the example provided here to implement [MessageEvent](trait.MessageEvent.html) trait,  
+//! and call the [`start_worker`](fn.start_worker.html) to start the worker itself.
+//!
 //! ```rust
+//! use mcai_worker_sdk::{
+//!   MessageEvent,
+//!   Version,
+//!   worker::Parameter,
+//! };
+//! 
 //! #[derive(Debug)]
-//! struct WorkerEvent {}
+//! struct WorkerNameEvent {}
 //! 
-//! impl MessageEvent for WorkerEvent {
-//!   ...
+//! impl MessageEvent for WorkerNameEvent {
+//!   fn get_name(&self) -> String {"sample_worker".to_string()}
+//!   fn get_short_description(&self) -> String {"Short description".to_string()}
+//!   fn get_description(&self) -> String {"Long description".to_string()}
+//!   fn get_version(&self) -> Version { Version::new(0, 0, 1) }
+//!   fn get_parameters(&self) -> Vec<Parameter> { vec![] }
 //! }
-//! ```
-//! 
-//! 2. In main, call the [`start_worker`](fn.start_worker.html) method with the static instance:
-//! ```rust
 //! static WORKER_NAME_EVENT: WorkerNameEvent = WorkerNameEvent {};
 //! 
-//! fn main() {
-//!   mcai_worker_sdk::start_worker(&WORKER_NAME_EVENT);
-//! }
+//! // uncomment it to start the worker
+//! // fn main() {
+//! //   mcai_worker_sdk::start_worker(&WORKER_NAME_EVENT);
+//! // }
 //! ```
+//!
+//! ## Runtime configuration
+//!
+//! ### AMQP connection
+//! 
+//! |    Variable     | Description |
+//! |-----------------|-------------|
+//! | `AMQP_HOSTNAME` | IP or host of AMQP server (default: `localhost`) |
+//! | `AMQP_PORT`     | AMQP server port (default: `5672`) |
+//! | `AMQP_TLS`      | enable secure connection using AMQPS (default: `false`, enable with `true` or `1` or `TRUE` or `True`) |
+//! | `AMQP_USERNAME` | Username used to connect to AMQP server (default: `guest`) |
+//! | `AMQP_PASSWORD` | Password used to connect to AMQP server (default: `guest`) |
+//! | `AMQP_VHOST`    | AMQP virtual host (default: `/`) |
+//! | `AMQP_QUEUE`    | AMQP queue name used to receive job orders (default: `job_undefined`) |
+//!
+//! ### Vault connection
+//! 
+//! |    Variable        | Description |
+//! |--------------------|-------------|
+//! | `BACKEND_HOSTNAME` | URL used to connect to backend server (default: `http://127.0.0.1:4000/api`) |
+//! | `BACKEND_USERNAME` | Username used to connect to backend server |
+//! | `BACKEND_PASSWORD` | Password used to connect to backend server |
+//!
 
 #[macro_use]
 extern crate log;
@@ -40,7 +74,18 @@ mod message;
 pub mod parameter;
 pub mod worker;
 
+/// Re-export from lapin Channel
 pub use lapin::Channel;
+/// Re-export from semver:
+pub use semver::Version;
+pub use log::{
+  debug,
+  error,
+  info,
+  trace,
+  warn,
+};
+
 pub use message::publish_job_progression;
 pub use parameter::container::ParametersContainer;
 pub use parameter::credential::Credential;
@@ -79,6 +124,7 @@ pub trait MessageEvent {
   }
 }
 
+/// Internal error status to manage process errors
 #[derive(Debug, PartialEq)]
 pub enum MessageError {
   RuntimeError(String),

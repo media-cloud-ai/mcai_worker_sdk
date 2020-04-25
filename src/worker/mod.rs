@@ -1,3 +1,5 @@
+//! Module to manage the worker
+
 pub mod docker;
 pub mod system_information;
 use crate::MessageEvent;
