@@ -1,6 +1,30 @@
-#![doc(html_favicon_url = "https://media-io.com/images/mediaio_logo.png")]
-#![doc(html_logo_url = "https://media-io.com/images/mediaio_logo.png")]
-#![doc(html_no_source)]
+
+//! # MCAI Worker SDK
+//!
+//! This library is an SDK to communicate via message broker with [StepFlow](https://hexdocs.pm/step_flow/readme.html).  
+//! It's used for every worker as an abstraction.  
+//! It manage itself requirements, message parsing, direct messaging.  
+//! 
+//! ## Worker implementation  
+//! Steps are:
+//! 1. Create a structure and provide the [MessageEvent](trait.MessageEvent.html) implementation
+//! ```rust
+//! #[derive(Debug)]
+//! struct WorkerEvent {}
+//! 
+//! impl MessageEvent for WorkerEvent {
+//!   ...
+//! }
+//! ```
+//! 
+//! 2. In main, call the [`start_worker`](fn.start_worker.html) method with the static instance:
+//! ```rust
+//! static WORKER_NAME_EVENT: WorkerNameEvent = WorkerNameEvent {};
+//! 
+//! fn main() {
+//!   mcai_worker_sdk::start_worker(&WORKER_NAME_EVENT);
+//! }
+//! ```
 
 #[macro_use]
 extern crate log;
@@ -17,7 +41,7 @@ pub mod parameter;
 pub mod worker;
 
 pub use lapin::Channel;
-pub use message::{parse_and_process_message, publish_job_progression};
+pub use message::publish_job_progression;
 pub use parameter::container::ParametersContainer;
 pub use parameter::credential::Credential;
 pub use parameter::{Parameter, Requirement};
@@ -31,6 +55,9 @@ use job::{Job, JobResult};
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use std::{io::Write, thread, time};
 
+/// Trait to describe a worker
+///
+/// Implement this trait to implement a worker
 pub trait MessageEvent {
   fn get_name(&self) -> String;
   fn get_short_description(&self) -> String;
@@ -60,6 +87,7 @@ pub enum MessageError {
   NotImplemented(),
 }
 
+/// Function to start a worker
 pub fn start_worker<ME: MessageEvent>(message_event: &'static ME)
 where
   ME: std::marker::Sync,
