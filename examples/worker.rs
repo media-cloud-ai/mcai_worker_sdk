@@ -1,8 +1,7 @@
-use amqp_worker::job::{Job, JobResult, JobStatus};
-use amqp_worker::publish_job_progression;
-use amqp_worker::worker::{Parameter, ParameterType};
-use amqp_worker::{MessageError, MessageEvent, ParametersContainer};
-use lapin_futures::Channel;
+use mcai_worker_sdk::job::{Job, JobResult, JobStatus};
+use mcai_worker_sdk::publish_job_progression;
+use mcai_worker_sdk::worker::{Parameter, ParameterType};
+use mcai_worker_sdk::{Channel, MessageError, MessageEvent, ParametersContainer};
 use semver::Version;
 
 #[derive(Debug)]
@@ -24,7 +23,7 @@ Do no use in production, just for developments."#
   }
 
   fn get_version(&self) -> Version {
-    semver::Version::new(1, 2, 3)
+    Version::new(1, 2, 3)
   }
 
   fn get_parameters(&self) -> Vec<Parameter> {
@@ -49,7 +48,7 @@ Do no use in production, just for developments."#
 static WORKER_EVENT: WorkerEvent = WorkerEvent {};
 
 fn main() {
-  amqp_worker::start_worker(&WORKER_EVENT);
+  mcai_worker_sdk::start_worker(&WORKER_EVENT);
 }
 
 pub fn process_message(

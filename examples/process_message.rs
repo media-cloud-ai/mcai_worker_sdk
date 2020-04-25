@@ -1,9 +1,8 @@
-use amqp_worker::job::*;
-use amqp_worker::parameter::container::ParametersContainer;
-use amqp_worker::worker::{Parameter, ParameterType};
-use amqp_worker::{parse_and_process_message, publish_job_progression};
-use amqp_worker::{MessageError, MessageEvent};
-use lapin_futures::Channel;
+use mcai_worker_sdk::job::*;
+use mcai_worker_sdk::parameter::container::ParametersContainer;
+use mcai_worker_sdk::worker::{Parameter, ParameterType};
+use mcai_worker_sdk::{parse_and_process_message, publish_job_progression};
+use mcai_worker_sdk::{Channel, MessageError, MessageEvent};
 use semver::Version;
 use std::env;
 use std::path::Path;

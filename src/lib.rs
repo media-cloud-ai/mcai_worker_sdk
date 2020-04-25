@@ -9,37 +9,27 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
+mod channels;
 mod config;
 pub mod job;
 mod message;
 pub mod parameter;
 pub mod worker;
 
+pub use lapin::Channel;
 pub use message::{parse_and_process_message, publish_job_progression};
 pub use parameter::container::ParametersContainer;
 pub use parameter::credential::Credential;
 pub use parameter::{Parameter, Requirement};
 
-use amq_protocol_types::AMQPValue;
-use amq_protocol_uri::*;
 use chrono::prelude::*;
 use config::*;
 use env_logger::Builder;
-use failure::Error;
-use futures::{future::Future, Stream};
+use futures_executor::LocalPool;
+use futures_util::{future::FutureExt, stream::StreamExt, task::LocalSpawnExt};
 use job::{Job, JobResult};
-use lapin_futures::{
-  options::*, types::FieldTable, BasicProperties, Channel, ConnectionProperties, ExchangeKind,
-};
-use std::{env, fs, io::Write, thread, time};
-use tokio::runtime::Runtime;
-
-static EXCHANGE_NAME_SUBMIT: &str = "job_submit";
-static EXCHANGE_NAME_RESPONSE: &str = "job_response";
-static EXCHANGE_NAME_DELAYED: &str = "job_delayed";
-static EXCHANGE_NAME_RESPONSE_DELAYED: &str = "job_response_delayed";
-
-static QUEUE_NAME_WORKER_DISCOVERY: &str = "worker_discovery";
+use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
+use std::{io::Write, thread, time};
 
 pub trait MessageEvent {
   fn get_name(&self) -> String;
@@ -70,56 +60,15 @@ pub enum MessageError {
   NotImplemented(),
 }
 
-fn load_docker_container_id(filename: &str) -> String {
-  match fs::read_to_string(filename) {
-    Ok(content) => parse_docker_container_id(&content),
-    Err(_msg) => "unknown".to_string(),
-  }
-}
-
-fn parse_docker_container_id(content: &str) -> String {
-  let lines: Vec<&str> = content.split('\n').collect();
-  if lines.is_empty() {
-    return "unknown".to_string();
-  }
-  let items: Vec<&str> = lines[0].split(':').collect();
-  if items.len() != 3 {
-    return "unknown".to_string();
-  }
-
-  let long_identifier: Vec<&str> = items[2].split("/docker/").collect();
-  if long_identifier.len() != 2 {
-    return "unknown".to_string();
-  }
-  let mut identifier = long_identifier[1].to_string();
-  identifier.truncate(12);
-  identifier
-}
-
-#[test]
-fn test_load_docker_container_id() {
-  assert_eq!(
-    load_docker_container_id("./tests/cgroup.sample"),
-    "da9002cb1553".to_string()
-  );
-
-  assert_eq!(
-    load_docker_container_id("/tmp/file_not_exists"),
-    "unknown".to_string()
-  );
-
-  assert_eq!(parse_docker_container_id(""), "unknown".to_string());
-  assert_eq!(parse_docker_container_id("\n"), "unknown".to_string());
-  assert_eq!(parse_docker_container_id("a:b:c\n"), "unknown".to_string());
-}
-
 pub fn start_worker<ME: MessageEvent>(message_event: &'static ME)
 where
   ME: std::marker::Sync,
 {
   let mut builder = Builder::from_default_env();
-  let container_id = load_docker_container_id("/proc/self/cgroup");
-  let queue = get_amqp_queue();
+  let amqp_queue = get_amqp_queue();
+  let worker_configuration = worker::WorkerConfiguration::new(&amqp_queue, message_event);
+
+  let container_id = worker_configuration.get_instance_id();
 
   builder
     .format(move |stream, record| {
@@ -128,7 +77,7 @@ where
         "{} - {} - {} - {} - {} - {}",
         Utc::now(),
         &container_id,
-        queue,
+        amqp_queue,
         record.target().parse::<i64>().unwrap_or(-1),
         record.level(),
         record.args(),
@@ -136,265 +85,87 @@ where
     })
     .init();
 
-  let queue = get_amqp_queue();
-  let version = env::var("VERSION").unwrap_or_else(|_| "unknown".to_string());
+  let amqp_queue = get_amqp_queue();
 
-  info!("Worker: {}, version: {}", queue, version);
+  info!(
+    "Worker: {}, version: {} (MCAI Worker SDK {})",
+    worker_configuration.get_worker_name(),
+    worker_configuration.get_worker_version(),
+    worker_configuration.get_sdk_version(),
+  );
 
   loop {
-    let amqp_tls = get_amqp_tls();
-    let amqp_hostname = get_amqp_hostname();
-    let amqp_port = get_amqp_port();
-    let amqp_username = get_amqp_username();
-    let amqp_password = get_amqp_password();
-    let amqp_vhost = get_amqp_vhost();
-    let amqp_queue = get_amqp_queue();
+    let amqp_uri = get_amqp_uri();
+    let mut executor = LocalPool::new();
+    let spawner = executor.spawner();
 
-    info!("Start connection with configuration:");
-    info!("AMQP TLS: {}", amqp_tls);
-    info!("AMQP HOSTNAME: {}", amqp_hostname);
-    info!("AMQP PORT: {}", amqp_port);
-    info!("AMQP USERNAME: {}", amqp_username);
-    info!("AMQP VHOST: {}", amqp_vhost);
-    info!("AMQP QUEUE: {}", amqp_queue);
+    executor.run_until(async {
+      let conn = Connection::connect_uri(
+        amqp_uri,
+        ConnectionProperties::default().with_default_executor(8),
+      )
+      .wait()
+      .unwrap();
 
-    let scheme = if amqp_tls {
-      AMQPScheme::AMQPS
-    } else {
-      AMQPScheme::AMQP
-    };
+      info!("Connected");
+      let channel = channels::declare_consumer_channel(&conn, &worker_configuration);
 
-    let amqp_uri = AMQPUri {
-      scheme,
-      authority: AMQPAuthority {
-        userinfo: AMQPUserInfo {
-          username: amqp_username,
-          password: amqp_password,
-        },
-        host: amqp_hostname,
-        port: amqp_port,
-      },
-      vhost: amqp_vhost,
-      query: Default::default(),
-    };
+      let consumer = channel
+        .clone()
+        .basic_consume(
+          &amqp_queue,
+          "amqp_worker",
+          BasicConsumeOptions::default(),
+          FieldTable::default(),
+        )
+        .await
+        .unwrap();
 
-    let state = Runtime::new().unwrap().block_on(
-      lapin_futures::Client::connect_uri(amqp_uri, ConnectionProperties::default())
-        .map_err(Error::from)
-        .and_then(|client| client.create_channel().map_err(Error::from))
-        .and_then(move |channel| {
-          let id = channel.id();
-          debug!("created channel with id: {}", id);
+      let status_consumer = channel
+        .clone()
+        .basic_consume(
+          &worker_configuration.get_direct_messaging_queue_name(),
+          "status_amqp_worker",
+          BasicConsumeOptions::default(),
+          FieldTable::default(),
+        )
+        .await
+        .unwrap();
 
-          let prefetch_count = 1;
-          if let Err(msg) = channel
-            .basic_qos(prefetch_count, BasicQosOptions::default())
-            .wait()
-          {
-            error!("Unable to set QoS on channels: {:?}", msg);
-          }
+      let status_channel = channel.clone();
+      let status_worker_configuration = worker_configuration.clone();
 
-          let ch = channel.clone();
+      let _consumer = spawner.spawn_local(async move {
+        status_consumer
+          .for_each(move |delivery| {
+            let delivery = delivery.expect("error caught in in consumer");
 
-          let mut exchange_options = ExchangeDeclareOptions::default();
-          exchange_options.durable = true;
-
-          let mut table = FieldTable::default();
-          table.insert(
-            "alternate-exchange".into(),
-            AMQPValue::LongString("job_queue_not_found".into()),
-          );
-          let mut table_response = FieldTable::default();
-          table_response.insert(
-            "alternate-exchange".into(),
-            AMQPValue::LongString("job_response_not_found".into()),
-          );
-
-          if let Err(msg) = channel
-            .exchange_declare(
-              EXCHANGE_NAME_DELAYED,
-              ExchangeKind::Fanout,
-              exchange_options.clone(),
-              FieldTable::default(),
+            worker::system_information::send_real_time_information(
+              delivery,
+              &status_channel,
+              &status_worker_configuration,
             )
-            .wait()
-          {
-            error!(
-              "Unable to create exchange {}: {:?}",
-              EXCHANGE_NAME_DELAYED, msg
-            );
-          }
+            .map(|_| ())
+          })
+          .await
+      });
 
-          if let Err(msg) = channel
-            .exchange_declare(
-              EXCHANGE_NAME_SUBMIT,
-              ExchangeKind::Topic,
-              exchange_options.clone(),
-              table,
-            )
-            .wait()
-          {
-            error!(
-              "Unable to create exchange {}: {:?}",
-              EXCHANGE_NAME_SUBMIT, msg
-            );
-          }
+      info!("Start to consume on queue {:?}", amqp_queue);
 
-          if let Err(msg) = channel
-            .exchange_declare(
-              EXCHANGE_NAME_RESPONSE,
-              ExchangeKind::Topic,
-              exchange_options,
-              table_response,
-            )
-            .wait()
-          {
-            error!(
-              "Unable to create exchange {}: {:?}",
-              EXCHANGE_NAME_RESPONSE, msg
-            );
-          }
+      let clone_channel = channel.clone();
 
-          let mut delaying_queue_fields = FieldTable::default();
-          delaying_queue_fields.insert(
-            "x-dead-letter-exchange".into(),
-            AMQPValue::LongString("".into()),
-          );
-          delaying_queue_fields.insert("x-message-ttl".into(), AMQPValue::ShortInt(5000));
+      consumer
+        .for_each(move |delivery| {
+          let delivery = delivery.expect("error caught in in consumer");
 
-          if let Err(msg) = channel
-            .queue_declare(
-              &EXCHANGE_NAME_DELAYED,
-              QueueDeclareOptions::default(),
-              delaying_queue_fields,
-            )
-            .wait()
-          {
-            error!(
-              "Unable to create queue {}: {:?}",
-              EXCHANGE_NAME_DELAYED, msg
-            );
-          }
-
-          let routing_key = "*";
-
-          if let Err(msg) = channel
-            .queue_bind(
-              EXCHANGE_NAME_DELAYED,
-              EXCHANGE_NAME_DELAYED,
-              routing_key,
-              QueueBindOptions::default(),
-              FieldTable::default(),
-            )
-            .wait()
-          {
-            error!("Unable to bind queue {}: {:?}", EXCHANGE_NAME_DELAYED, msg);
-          }
-
-          let mut worker_discovery_fields = FieldTable::default();
-          worker_discovery_fields.insert(
-            "x-dead-letter-exchange".into(),
-            AMQPValue::LongString(EXCHANGE_NAME_RESPONSE_DELAYED.into()),
-          );
-          worker_discovery_fields.insert(
-            "x-dead-letter-routing-key".into(),
-            AMQPValue::LongString(QUEUE_NAME_WORKER_DISCOVERY.into()),
-          );
-
-          channel
-            .clone()
-            .queue_declare(
-              QUEUE_NAME_WORKER_DISCOVERY,
-              QueueDeclareOptions {
-                durable: true,
-                ..Default::default()
-              },
-              worker_discovery_fields,
-            )
-            .and_then(|_| {
-              let worker_definition =
-                worker::WorkerConfiguration::new(&get_amqp_queue(), message_event);
-
-              let msg = json!(worker_definition)
-                .to_string()
-                .as_str()
-                .as_bytes()
-                .to_vec();
-              channel.basic_publish(
-                "",
-                QUEUE_NAME_WORKER_DISCOVERY,
-                msg,
-                BasicPublishOptions::default(),
-                BasicProperties::default(),
-              )
-            })
-            .wait()
-            .expect("runtime failure");
-
-          let mut queue_fields = FieldTable::default();
-          queue_fields.insert(
-            "x-dead-letter-exchange".into(),
-            AMQPValue::LongString(EXCHANGE_NAME_DELAYED.into()),
-          );
-          queue_fields.insert(
-            "x-dead-letter-routing-key".into(),
-            AMQPValue::LongString(amqp_queue.clone().into()),
-          );
-          queue_fields.insert("x-max-priority".into(), AMQPValue::ShortInt(100));
-
-          channel
-            .queue_declare(
-              &amqp_queue,
-              QueueDeclareOptions {
-                durable: true,
-                ..Default::default()
-              },
-              queue_fields,
-            )
-            .and_then(move |queue| {
-              info!("channel {} declared queue {}", id, amqp_queue);
-
-              if let Err(msg) = channel
-                .queue_bind(
-                  &amqp_queue,
-                  EXCHANGE_NAME_SUBMIT,
-                  &amqp_queue,
-                  QueueBindOptions::default(),
-                  FieldTable::default(),
-                )
-                .wait()
-              {
-                error!(
-                  "Unable to bind queue to exchange {}: {:?}",
-                  EXCHANGE_NAME_SUBMIT, msg
-                );
-              }
-
-              channel.basic_consume(
-                &queue,
-                "amqp_worker",
-                BasicConsumeOptions::default(),
-                FieldTable::default(),
-              )
-            })
-            .and_then(move |stream| {
-              // process_stream(message_event, channel, stream);
-              warn!("start listening stream");
-
-              stream.for_each(move |message| {
-                trace!("raw message: {:?}", message);
-                message::process_message(message_event, message, &ch);
-                Ok(())
-              })
-            })
-            .map_err(Error::from)
+          message::process_message(message_event, delivery, &clone_channel).map(|_| ())
         })
-        .map_err(Error::from),
-    );
+        .await
+    });
 
-    warn!("{:?}", state);
     let sleep_duration = time::Duration::new(1, 0);
     thread::sleep(sleep_duration);
+    info!("Reconnection...");
   }
 }
 

@@ -4,9 +4,7 @@ use crate::{
   job::{Job, JobProgression, JobResult, JobStatus},
   MessageError, MessageEvent,
 };
-
-use futures::future::Future;
-use lapin_futures::{message::Delivery, options::*, BasicProperties, Channel};
+use lapin::{message::Delivery, options::*, BasicProperties, Channel, Promise};
 
 static RESPONSE_EXCHANGE: &str = "job_response";
 static QUEUE_JOB_COMPLETED: &str = "job_completed";
@@ -17,7 +15,7 @@ pub fn process_message<ME: MessageEvent>(
   message_event: &'static ME,
   message: Delivery,
   channel: &Channel,
-) {
+) -> Promise<()> {
   let count = helpers::get_message_death_count(&message);
   let message_data = std::str::from_utf8(&message.data).unwrap();
 
@@ -30,20 +28,18 @@ pub fn process_message<ME: MessageEvent>(
   ) {
     Ok(job_result) => {
       info!(target: &job_result.get_str_job_id(), "Completed");
-      publish_job_completed(channel, message, job_result);
+      publish_job_completed(channel, message, job_result)
     }
     Err(error) => match error {
       MessageError::RequirementsError(details) => {
-        publish_missing_requirements(channel, message, &details);
+        publish_missing_requirements(channel, message, &details)
       }
-      MessageError::NotImplemented() => {
-        publish_not_implemented(channel, message);
-      }
+      MessageError::NotImplemented() => publish_not_implemented(channel, message),
       MessageError::ProcessingError(job_result) => {
-        publish_processing_error(channel, message, job_result);
+        publish_processing_error(channel, message, job_result)
       }
       MessageError::RuntimeError(error_message) => {
-        publish_runtime_error(channel, message, &error_message);
+        publish_runtime_error(channel, message, &error_message)
       }
     },
   }
@@ -73,35 +69,34 @@ pub fn parse_and_process_message<
   MessageEvent::process(message_event, channel, &job, job_result)
 }
 
-fn publish_job_completed(channel: &Channel, message: Delivery, job_result: JobResult) {
+fn publish_job_completed(
+  channel: &Channel,
+  message: Delivery,
+  job_result: JobResult,
+) -> Promise<()> {
   let msg = json!(job_result).to_string();
 
   let result = channel
     .basic_publish(
       RESPONSE_EXCHANGE,
       QUEUE_JOB_COMPLETED,
-      msg.as_str().as_bytes().to_vec(),
       BasicPublishOptions::default(),
+      msg.as_bytes().to_vec(),
       BasicProperties::default(),
     )
     .wait()
     .is_ok();
 
   if result {
-    if let Err(msg) = channel
-      .basic_ack(message.delivery_tag, false /*not requeue*/)
-      .wait()
-    {
-      error!(target: &job_result.get_str_job_id(), "Unable to ack message {:?}", msg);
-    }
-  } else if let Err(msg) = channel
-    .basic_reject(
+    channel.basic_ack(
+      message.delivery_tag,
+      BasicAckOptions::default(), /*not requeue*/
+    )
+  } else {
+    channel.basic_reject(
       message.delivery_tag,
       BasicRejectOptions { requeue: true }, /*requeue*/
     )
-    .wait()
-  {
-    error!(target: &job_result.get_str_job_id(), "Unable to reject message {:?}", msg);
   }
 }
 
@@ -112,12 +107,13 @@ pub fn publish_job_progression(
 ) -> Result<(), MessageError> {
   if let Some(channel) = channel {
     let msg = json!(JobProgression::new(job, progression)).to_string();
+
     channel
       .basic_publish(
         RESPONSE_EXCHANGE,
         QUEUE_JOB_PROGRESSION,
-        msg.as_str().as_bytes().to_vec(),
         BasicPublishOptions::default(),
+        msg.as_bytes().to_vec(),
         BasicProperties::default(),
       )
       .wait()
@@ -127,100 +123,94 @@ pub fn publish_job_progression(
           .with_message(&e.to_string());
         MessageError::ProcessingError(result)
       })
+      .map(|_| ())
   } else {
     info!("progression: {}%", progression);
     Ok(())
   }
 }
 
-fn publish_missing_requirements(channel: &Channel, message: Delivery, details: &str) {
+fn publish_missing_requirements(
+  channel: &Channel,
+  message: Delivery,
+  details: &str,
+) -> Promise<()> {
   debug!("{}", details);
-  if let Err(msg) = channel
-    .basic_reject(message.delivery_tag, BasicRejectOptions::default())
-    .wait()
-  {
-    error!("Unable to reject message {:?}", msg);
-  }
+  channel.basic_reject(message.delivery_tag, BasicRejectOptions::default())
 }
 
-fn publish_not_implemented(channel: &Channel, message: Delivery) {
+fn publish_not_implemented(channel: &Channel, message: Delivery) -> Promise<()> {
   error!("Not implemented feature");
-  if let Err(msg) = channel
-    .basic_reject(
-      message.delivery_tag,
-      BasicRejectOptions { requeue: true }, /*requeue*/
-    )
-    .wait()
-  {
-    error!("Unable to reject message {:?}", msg);
-  }
+  channel.basic_reject(
+    message.delivery_tag,
+    BasicRejectOptions { requeue: true }, /*requeue*/
+  )
 }
 
-fn publish_processing_error(channel: &Channel, message: Delivery, job_result: JobResult) {
+fn publish_processing_error(
+  channel: &Channel,
+  message: Delivery,
+  job_result: JobResult,
+) -> Promise<()> {
   error!(target: &job_result.get_str_job_id(), "Job returned in error: {:?}", job_result.get_parameters());
 
   let content = json!(JobResult::new(job_result.get_job_id())
     .with_status(JobStatus::Error)
-    .with_parameters(&mut job_result.get_parameters().clone()));
+    .with_parameters(&mut job_result.get_parameters().clone()))
+  .to_string();
 
   if channel
     .basic_publish(
       RESPONSE_EXCHANGE,
       QUEUE_JOB_ERROR,
-      content.to_string().as_str().as_bytes().to_vec(),
       BasicPublishOptions::default(),
+      content.as_bytes().to_vec(),
       BasicProperties::default(),
     )
     .wait()
     .is_ok()
   {
-    if let Err(msg) = channel
-      .basic_ack(message.delivery_tag, false /*not requeue*/)
-      .wait()
-    {
-      error!(target: &job_result.get_str_job_id(), "Unable to ack message {:?}", msg);
-    }
-  } else if let Err(msg) = channel
-    .basic_reject(
+    channel.basic_ack(
+      message.delivery_tag,
+      BasicAckOptions::default(), /*not requeue*/
+    )
+  } else {
+    channel.basic_reject(
       message.delivery_tag,
       BasicRejectOptions { requeue: true }, /*requeue*/
     )
-    .wait()
-  {
-    error!(target: &job_result.get_str_job_id(), "Unable to reject message {:?}", msg);
   }
 }
 
-fn publish_runtime_error(channel: &Channel, message: Delivery, details: &str) {
+fn publish_runtime_error(channel: &Channel, message: Delivery, details: &str) -> Promise<()> {
   error!("An error occurred: {:?}", details);
   let content = json!({
     "status": "error",
     "message": details
-  });
+  })
+  .to_string();
+
   if channel
     .basic_publish(
       RESPONSE_EXCHANGE,
       QUEUE_JOB_ERROR,
-      content.to_string().as_str().as_bytes().to_vec(),
       BasicPublishOptions::default(),
+      content.as_bytes().to_vec(),
       BasicProperties::default(),
     )
     .wait()
     .is_ok()
   {
-    if let Err(msg) = channel
-      .basic_ack(message.delivery_tag, false /*not requeue*/)
-      .wait()
-    {
-      error!("Unable to ack message {:?}", msg);
-    }
-  } else if let Err(msg) = channel
-    .basic_reject(
+    channel.basic_ack(
+      message.delivery_tag,
+      BasicAckOptions::default(), /*not requeue*/
+    )
+  // .map(|_| ())
+  } else {
+    channel.basic_reject(
       message.delivery_tag,
       BasicRejectOptions { requeue: true }, /*requeue*/
     )
-    .wait()
-  {
-    error!("Unable to reject message {:?}", msg);
+    // .map(|_| ())
   }
 }
