@@ -100,9 +100,8 @@ fn publish_job_completed(
   }
 }
 
-
 /// Function to publish a progression event
-/// 
+///
 /// It will be an integer between 0 and 100.
 pub fn publish_job_progression(
   channel: Option<&Channel>,

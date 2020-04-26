@@ -1,7 +1,6 @@
 language: rust
 
 rust:
-  - 1.39.0
   - 1.40.0
   - 1.41.0
   - 1.41.1
@@ -25,6 +24,7 @@ matrix:
         - cargo fmt --version
       script:
         - cargo fmt -- --check
+      env: CHECK_FORMAT=TRUE
 
     # Clippy
     - rust: stable
@@ -33,6 +33,7 @@ matrix:
       script:
         # Fail if clippy output contains "error:" or "warning:"
         - cargo clippy 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+      env: CHECK_SYNTAX=TRUE
 
     # Test coverage (with Tarpaulin)
     - rust: stable
@@ -42,7 +43,9 @@ matrix:
         - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
         - cargo tarpaulin -v --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
-      env: ALLOW_FAILURE=TRUE
+      env:
+        - ALLOW_FAILURE=TRUE
+        - COVERAGE=TRUE
 
 script:
   - cargo test

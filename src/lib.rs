@@ -1,10 +1,9 @@
-
 //! # MCAI Worker SDK
 //!
 //! This library is an SDK to communicate via message broker with [StepFlow](https://hexdocs.pm/step_flow/readme.html).  
 //! It's used for every worker as an abstraction.  
 //! It manage itself requirements, message parsing, direct messaging.  
-//! 
+//!
 //! ## Worker implementation
 //!
 //! 1. Create a Rust project
@@ -18,10 +17,10 @@
 //!   Version,
 //!   worker::Parameter,
 //! };
-//! 
+//!
 //! #[derive(Debug)]
 //! struct WorkerNameEvent {}
-//! 
+//!
 //! impl MessageEvent for WorkerNameEvent {
 //!   fn get_name(&self) -> String {"sample_worker".to_string()}
 //!   fn get_short_description(&self) -> String {"Short description".to_string()}
@@ -30,7 +29,7 @@
 //!   fn get_parameters(&self) -> Vec<Parameter> { vec![] }
 //! }
 //! static WORKER_NAME_EVENT: WorkerNameEvent = WorkerNameEvent {};
-//! 
+//!
 //! // uncomment it to start the worker
 //! // fn main() {
 //! //   mcai_worker_sdk::start_worker(&WORKER_NAME_EVENT);
@@ -40,7 +39,7 @@
 //! ## Runtime configuration
 //!
 //! ### AMQP connection
-//! 
+//!
 //! |    Variable     | Description |
 //! |-----------------|-------------|
 //! | `AMQP_HOSTNAME` | IP or host of AMQP server (default: `localhost`) |
@@ -52,7 +51,7 @@
 //! | `AMQP_QUEUE`    | AMQP queue name used to receive job orders (default: `job_undefined`) |
 //!
 //! ### Vault connection
-//! 
+//!
 //! |    Variable        | Description |
 //! |--------------------|-------------|
 //! | `BACKEND_HOSTNAME` | URL used to connect to backend server (default: `http://127.0.0.1:4000/api`) |
@@ -76,15 +75,9 @@ pub mod worker;
 
 /// Re-export from lapin Channel
 pub use lapin::Channel;
+pub use log::{debug, error, info, trace, warn};
 /// Re-export from semver:
 pub use semver::Version;
-pub use log::{
-  debug,
-  error,
-  info,
-  trace,
-  warn,
-};
 
 pub use message::publish_job_progression;
 pub use parameter::container::ParametersContainer;

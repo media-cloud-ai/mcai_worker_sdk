@@ -1,5 +1,5 @@
-extern crate mcai_worker_sdk;
 extern crate assert_matches;
+extern crate mcai_worker_sdk;
 
 use assert_matches::assert_matches;
 
