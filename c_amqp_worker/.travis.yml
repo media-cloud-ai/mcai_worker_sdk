@@ -1,0 +1,64 @@
+language: rust
+
+os: linux
+
+rust:
+  - 1.39.0
+  - 1.40.0
+  - 1.41.0
+  - 1.42.0
+  - stable
+  - beta
+  - nightly
+
+env:
+  - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
+
+jobs:
+  allow_failures:
+    - rust: nightly
+  include:
+    # Rustfmt
+    - rust: stable
+      install:
+        - rustup component add rustfmt-preview
+      before_script:
+        - cargo fmt --version
+      script:
+        - cargo fmt -- --check
+      env: FORMAT_CODE_CHECK=TRUE
+
+    # Clippy
+    - rust: stable
+      install:
+        - rustup component add clippy-preview
+      script:
+        # Fail if clippy output contains "error:" or "warning:"
+        - cargo clippy 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+      env: CLIPPY_CHECK=TRUE
+
+    # Test coverage (with Tarpaulin)
+    - rust: stable
+      install:
+        - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
+      script:
+        - gcc -c -Wall -Werror -fpic worker.cpp && gcc -shared -o libworker.so worker.o
+        - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+      env:
+        - COVERAGE_CHECK=TRUE
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
+
+script:
+  - gcc -c -Wall -Werror -fpic worker.cpp && gcc -shared -o libworker.so worker.o
+  - cargo test
+cache:
+  cargo: true
+before_cache:
+  # Travis can't cache files that are not readable by "others"
+  - chmod -R a+r $HOME/.cargo
+
+addons:
+  apt:
+    packages:
+      - libssl-dev  # Required for tarpaulin
+      - gcc
