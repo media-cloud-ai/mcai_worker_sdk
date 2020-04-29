@@ -10,10 +10,10 @@ RUN apt-get update && \
     cargo install --path .
 
 FROM debian:stretch
-COPY --from=builder /usr/local/cargo/bin/py_amqp_worker /usr/bin
+COPY --from=builder /usr/local/cargo/bin/py_mcai_worker_sdk /usr/bin
 
 RUN apt update && \
     apt install -y libssl1.1 ca-certificates
 
 ENV AMQP_QUEUE=job_python_worker
-CMD py_amqp_worker
+CMD py_mcai_worker_sdk

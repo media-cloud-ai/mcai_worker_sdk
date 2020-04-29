@@ -47,36 +47,26 @@ matrix:
         - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
     # Clippy Python SDK
-    - rust: nightly
-      install:
-        - rustup component add clippy-preview
-      script:
-        # Fail if clippy output contains "error:" or "warning:"
-        - cargo clippy --package py_mcai_worker_sdk 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
-      env:
-        - CHECK_SYNTAX_PY_SDK=TRUE
-        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
+    # - rust: nightly
+    #   install:
+    #     - rustup component add clippy-preview
+    #   script:
+    #     # Fail if clippy output contains "error:" or "warning:"
+    #     - cargo clippy --package py_mcai_worker_sdk 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+    #   env:
+    #     - CHECK_SYNTAX_PY_SDK=TRUE
+    #     - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
     # Test coverage
-    - rust: stable
-      install:
-        - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
-      script:
-        - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
-        - cd rs_mcai_worker_sdk && cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
-      env:
-        - COVERAGE_CHECK=TRUE
-        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
-
-    # Test coverage Python SDK
     - rust: nightly
       install:
         - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
         - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
-        - cargo tarpaulin --packages py_mcai_worker_sdk --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+        - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
       env:
-        - COVERAGE_CHECK_PY_SDK=TRUE
+        - COVERAGE_CHECK=TRUE
+        - TRAVIS_RUST_VERSION=nightly-2020-01-21
         - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
     - rust: nightly

@@ -8,7 +8,7 @@ RUN rustup default && \
     cargo install --path .
 
 FROM debian:stretch
-COPY --from=builder /usr/local/cargo/bin/c_amqp_worker /usr/bin
+COPY --from=builder /usr/local/cargo/bin/c_mcai_worker_sdk /usr/bin
 
 RUN apt update && \
     apt install -y libssl1.1 ca-certificates
