@@ -57,4 +57,3 @@ addons:
   apt:
     packages:
       - libssl-dev  # Required for tarpaulin
-
