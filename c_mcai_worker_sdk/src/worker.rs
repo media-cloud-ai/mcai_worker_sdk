@@ -4,10 +4,11 @@ use std::os::raw::{c_char, c_int, c_uint, c_void};
 
 use crate::constants;
 use crate::process_return::ProcessReturn;
-use amqp_worker::job::Job;
-use amqp_worker::worker::{Parameter, ParameterType};
-use amqp_worker::ParametersContainer;
 use libloading::Library;
+use mcai_worker_sdk::job::Job;
+use mcai_worker_sdk::worker::{Parameter, ParameterType};
+use mcai_worker_sdk::ParametersContainer;
+use mcai_worker_sdk::{debug, error, info, trace};
 
 macro_rules! get_c_string {
   ($name:expr) => {

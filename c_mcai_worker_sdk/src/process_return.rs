@@ -1,5 +1,5 @@
-use amqp_worker::job::*;
-use amqp_worker::MessageError;
+use mcai_worker_sdk::job::*;
+use mcai_worker_sdk::MessageError;
 
 #[derive(Debug)]
 pub struct ProcessReturn {

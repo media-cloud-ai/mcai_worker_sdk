@@ -10,3 +10,11 @@ Cargo.lock
 **/*.rs.bk
 
 .DS_Store
+
+# C/C++ objects and libs
+*.o
+*.so
+
+# IDE
+.idea/
+*.iml

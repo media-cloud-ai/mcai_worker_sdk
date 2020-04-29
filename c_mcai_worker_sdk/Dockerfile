@@ -14,4 +14,4 @@ RUN apt update && \
     apt install -y libssl1.1 ca-certificates
 
 ENV AMQP_QUEUE=job_c_worker
-CMD c_amqp_worker
+CMD c_mcai_worker_sdk

@@ -1,17 +1,14 @@
-#[macro_use]
-extern crate log;
-
 use crate::helpers::get_destination_paths;
-use amqp_worker::{
+use mcai_worker_sdk::{
+  error,
   job::*,
   publish_job_progression, start_worker,
   worker::{Parameter, ParameterType},
-  MessageError, MessageEvent,
+  Channel, Credential, MessageError, MessageEvent,
   Parameter::*,
+  Version,
 };
-use lapin_futures::Channel;
 use pyo3::{prelude::*, types::*};
-use semver::Version;
 use std::{env, fs};
 
 mod helpers;
@@ -245,7 +242,7 @@ impl PythonWorkerEvent {
           };
 
           if let Some(credential_key) = credential_key {
-            let credential = amqp_worker::Credential {
+            let credential = Credential {
               key: credential_key.to_string(),
             };
             if let Ok(retrieved_value) = credential.request_value(&job) {
@@ -264,7 +261,7 @@ impl PythonWorkerEvent {
             list_of_parameters.set_item(id.to_string(), v)?;
           }
         }
-        RequirementParam { .. } => {
+        ArrayOfMediaSegmentsParam { .. } | RequirementParam { .. } => {
           // do nothing
         }
         StringParam { id, default, value } => {

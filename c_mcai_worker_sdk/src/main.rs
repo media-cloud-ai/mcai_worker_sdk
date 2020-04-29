@@ -1,21 +1,11 @@
-extern crate libc;
-extern crate libloading;
-#[macro_use]
-extern crate log;
-
 mod constants;
 mod process_return;
 mod worker;
 
-use amqp_worker::job::*;
-use amqp_worker::start_worker;
-use amqp_worker::worker::Parameter;
-use amqp_worker::MessageError;
-use amqp_worker::MessageEvent;
-use lapin_futures::Channel;
-use semver::Version;
-
 use crate::worker::*;
+use mcai_worker_sdk::{
+  debug, job::*, start_worker, worker::Parameter, Channel, MessageError, MessageEvent, Version,
+};
 
 #[derive(Debug)]
 struct CWorkerEvent {}
@@ -68,7 +58,7 @@ fn main() {
 
 #[test]
 pub fn test_c_binding_worker_info() {
-  use amqp_worker::worker::ParameterType;
+  use mcai_worker_sdk::worker::ParameterType;
 
   let name = C_WORKER_EVENT.get_name();
   let short_description = C_WORKER_EVENT.get_short_description();

@@ -1,5 +1,5 @@
 [package]
-name = "c_amqp_worker"
+name = "c_mcai_worker_sdk"
 version = "0.3.1"
 authors = [
   "Valentin NOEL <valentin.noel@media-io.com>",
@@ -9,9 +9,6 @@ edition = "2018"
 
 [dependencies]
 libc = "0.2"
-amqp_worker = "0.9.0"
-lapin-futures = "0.28.4"
-log = "0.4.8"
-semver = "^0.9"
+mcai_worker_sdk = { path = "../rs_mcai_worker_sdk" }
 serde_json = "^1.0"
 libloading = "0.5"

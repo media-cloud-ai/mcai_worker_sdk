@@ -10,12 +10,21 @@ rust:
   - beta
   - nightly
 
+env:
+  - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
+
 matrix:
   allow_failures:
     - rust: nightly
     - env: ALLOW_FAILURE=TRUE
 
   include:
+    # Test Python SDK on nighlty
+    - rust: nighlty
+      script:
+        - cargo test --package py_mcai_worker_sdk
+      env: CHECK_FORMAT=TRUE
+
     # Rustfmt
     - rust: stable
       install:
@@ -32,28 +41,46 @@ matrix:
         - rustup component add clippy-preview
       script:
         # Fail if clippy output contains "error:" or "warning:"
-        - cargo clippy 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+        - cargo clippy --package mcai_worker_sdk --package c_mcai_worker_sdk 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
       env: CHECK_SYNTAX=TRUE
 
-    # Test coverage (with Tarpaulin)
+    # Clippy Python SDK
+    - rust: nightly
+      install:
+        - rustup component add clippy-preview
+      script:
+        # Fail if clippy output contains "error:" or "warning:"
+        - cargo clippy --package py_mcai_worker_sdk 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+      env: CHECK_SYNTAX_PY_SDK=TRUE
+
+    # Test coverage
     - rust: stable
-      # To avoid "Error: EPERM: operation not permitted" error (see https://github.com/valery-barysok/session-file-store/issues/58)
-      sudo: true
       install:
         - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
-        - cargo tarpaulin -v --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
-      env: COVERAGE=TRUE
+        - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
+        - cargo tarpaulin --packages mcai_worker_sdk --packages c_mcai_worker_sdk --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+      env:
+        - COVERAGE_CHECK=TRUE
+
+    # Test coverage Python SDK
+    - rust: nightly
+      install:
+        - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
+      script:
+        - cargo tarpaulin --packages py_mcai_worker_sdk --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+      env:
+        - COVERAGE_CHECK=TRUE
 
 script:
-  - cargo test
+  - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
+  - cargo test --package mcai_worker_sdk --package c_mcai_worker_sdk
+
 cache:
   cargo: true
-before_cache:
-  # Travis can't cache files that are not readable by "others"
-  - chmod -R a+r $HOME/.cargo
 
 addons:
   apt:
     packages:
       - libssl-dev  # Required for tarpaulin
+      - gcc

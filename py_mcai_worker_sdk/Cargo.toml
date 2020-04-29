@@ -1,12 +1,9 @@
 [package]
-name = "py_amqp_worker"
+name = "py_mcai_worker_sdk"
 version = "0.3.1"
 edition = "2018"
 
 [dependencies]
-amqp_worker = "0.9.0"
-lapin-futures = "0.28.4"
-log = "0.4.5"
+mcai_worker_sdk = { path = "../rs_mcai_worker_sdk" }
 pyo3 = "0.8.5"
-semver = "^0.9"
 serde_json = "^1.0"
