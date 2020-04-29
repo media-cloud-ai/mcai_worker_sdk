@@ -1,5 +1,5 @@
 use amq_protocol_types::{AMQPValue, FieldTable};
-use lapin_futures::message::Delivery;
+use lapin::message::Delivery;
 
 pub fn get_message_death_count(message: &Delivery) -> Option<i64> {
   get_count_from_header(message.properties.headers())

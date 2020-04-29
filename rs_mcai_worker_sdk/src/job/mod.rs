@@ -1,3 +1,5 @@
+//! Module to manage Job
+
 use crate::{parameter::container::ParametersContainer, MessageError, Parameter, Requirement};
 use std::path::Path;
 

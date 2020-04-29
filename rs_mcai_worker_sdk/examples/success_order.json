@@ -1,0 +1,10 @@
+{
+	"job_id": 1234,
+	"parameters": [
+		{
+			"id": "action",
+			"type": "string",
+			"value": "completed"
+		}
+	]
+}

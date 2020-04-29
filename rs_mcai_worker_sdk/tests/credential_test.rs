@@ -1,8 +1,8 @@
-extern crate amqp_worker;
+extern crate mcai_worker_sdk;
 
-use crate::amqp_worker::ParametersContainer;
-use amqp_worker::job::*;
-use amqp_worker::{MessageError, Parameter};
+use crate::mcai_worker_sdk::ParametersContainer;
+use mcai_worker_sdk::job::*;
+use mcai_worker_sdk::{Credential, MessageError, Parameter};
 
 #[test]
 fn test_credential_request_value() {
@@ -40,7 +40,7 @@ fn test_credential_request_value() {
 
   assert_eq!(
     job.get_credential_parameter("test_credential"),
-    Some(amqp_worker::Credential {
+    Some(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
@@ -74,14 +74,14 @@ fn test_credential_request_value_no_session() {
 
   assert_eq!(
     job.get_credential_parameter("test_credential"),
-    Some(amqp_worker::Credential {
+    Some(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
 
   assert_eq!(
     job.get_credential_parameter("test_credential"),
-    Some(amqp_worker::Credential {
+    Some(mcai_worker_sdk::Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
@@ -129,14 +129,14 @@ fn test_credential_request_value_invalid_session() {
 
   assert_eq!(
     job.get_credential_parameter("test_credential"),
-    Some(amqp_worker::Credential {
+    Some(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
 
   assert_eq!(
     job.get_credential_parameter("test_credential"),
-    Some(amqp_worker::Credential {
+    Some(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
@@ -188,14 +188,14 @@ fn test_credential_request_value_no_credential() {
 
   assert_eq!(
     job.get_credential_parameter("test_credential"),
-    Some(amqp_worker::Credential {
+    Some(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
 
   assert_eq!(
     job.get_credential_parameter("test_credential"),
-    Some(amqp_worker::Credential {
+    Some(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
@@ -248,14 +248,14 @@ fn test_credential_request_value_invalid_credential() {
 
   assert_eq!(
     job.get_credential_parameter("test_credential"),
-    Some(amqp_worker::Credential {
+    Some(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
 
   assert_eq!(
     job.get_credential_parameter("test_credential"),
-    Some(amqp_worker::Credential {
+    Some(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );

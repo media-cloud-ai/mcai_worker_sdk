@@ -1,35 +1,6 @@
-[package]
-name = "amqp_worker"
-version = "0.9.0"
-authors = [
-  "Marc-Antoine Arnaud <maarnaud@media-io.com>",
-  "Valentin Noel <valentin.noel@media-io.com>"
+[workspace]
+members = [
+  "c_mcai_worker_sdk",
+  "py_mcai_worker_sdk",
+  "rs_mcai_worker_sdk",
 ]
-description = "AMQP Worker to listen and provide trait to process message"
-keywords = ["AMQP", "micro-service"]
-license = "MIT"
-repository = "https://github.com/media-io/rs_amqp_worker"
-homepage = "https://github.com/media-io/rs_amqp_worker"
-documentation = "https://docs.rs/amqp_worker"
-readme = "README.md"
-edition = "2018"
-
-[dependencies]
-amq-protocol-types = "^3.1"
-amq-protocol-uri = "^3.1"
-chrono = {version = "0.4", features = ["serde"]}
-env_logger = "^0.7"
-failure = "^0.1"
-futures = "^0.1"
-lapin-futures = "^0.28"
-log = "0.4.5"
-reqwest = { version = "0.10", features = ["blocking", "json"] }
-semver = { version = "0.9", features = ["serde"] }
-serde = "^1.0"
-serde_derive = "^1.0"
-serde_json = "^1.0"
-tokio = "^0.1"
-
-[dev-dependencies]
-assert_matches = "1.3.0"
-mockito = "0.25"

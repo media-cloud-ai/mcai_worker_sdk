@@ -1,0 +1,14 @@
+[package]
+name = "c_mcai_worker_sdk"
+version = "0.3.1"
+authors = [
+  "Valentin NOEL <valentin.noel@media-io.com>",
+  "Marc-Antoine Arnaud <maarnaud@media-io.com>",
+]
+edition = "2018"
+
+[dependencies]
+libc = "0.2"
+mcai_worker_sdk = { path = "../rs_mcai_worker_sdk" }
+serde_json = "^1.0"
+libloading = "0.5"

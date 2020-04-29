@@ -1,20 +1,28 @@
 language: rust
 
 rust:
-  - 1.39.0
   - 1.40.0
   - 1.41.0
   - 1.41.1
+  - 1.42.0
+  - 1.43.0
   - stable
   - beta
   - nightly
 
-matrix:
-  allow_failures:
-    - rust: nightly
-    - env: ALLOW_FAILURE=TRUE
+env:
+  - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
+matrix:
   include:
+    # Test Python SDK on nighlty
+    - rust: nightly
+      script:
+        - cargo test --package py_mcai_worker_sdk
+      env:
+        - TEST_PYTHON_SDK=TRUE
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
+
     # Rustfmt
     - rust: stable
       install:
@@ -23,6 +31,9 @@ matrix:
         - cargo fmt --version
       script:
         - cargo fmt -- --check
+      env:
+        - CHECK_FORMAT=TRUE
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
     # Clippy
     - rust: stable
@@ -30,28 +41,55 @@ matrix:
         - rustup component add clippy-preview
       script:
         # Fail if clippy output contains "error:" or "warning:"
-        - cargo clippy 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+        - cargo clippy --package mcai_worker_sdk --package c_mcai_worker_sdk 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+      env:
+        - CHECK_SYNTAX=TRUE
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
-    # Test coverage (with Tarpaulin)
-    - rust: stable
-      # To avoid "Error: EPERM: operation not permitted" error (see https://github.com/valery-barysok/session-file-store/issues/58)
-      sudo: true
+    # Clippy Python SDK
+    # - rust: nightly
+    #   install:
+    #     - rustup component add clippy-preview
+    #   script:
+    #     # Fail if clippy output contains "error:" or "warning:"
+    #     - cargo clippy --package py_mcai_worker_sdk 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+    #   env:
+    #     - CHECK_SYNTAX_PY_SDK=TRUE
+    #     - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
+
+    # Test coverage
+    - rust: nightly
       install:
         - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
-        - cargo tarpaulin -v --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
-      env: ALLOW_FAILURE=TRUE
+        - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
+        - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+      env:
+        - COVERAGE_CHECK=TRUE
+        - TRAVIS_RUST_VERSION=nightly-2020-01-21
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
+
+    - rust: nightly
+      script:
+        - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
+        - cargo test
+      env:
+        - ALLOW_FAILURE=TRUE
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
+
+jobs:
+  allow_failures:
+    - env: ALLOW_FAILURE=TRUE
 
 script:
-  - cargo test
+  - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
+  - cargo test --package mcai_worker_sdk --package c_mcai_worker_sdk
+
 cache:
   cargo: true
-before_cache:
-  # Travis can't cache files that are not readable by "others"
-  - chmod -R a+r $HOME/.cargo
 
 addons:
   apt:
     packages:
       - libssl-dev  # Required for tarpaulin
-
+      - gcc
