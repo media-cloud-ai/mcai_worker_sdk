@@ -15,15 +15,16 @@ env:
 
 matrix:
   allow_failures:
-    - rust: nightly
     - env: ALLOW_FAILURE=TRUE
 
   include:
     # Test Python SDK on nighlty
-    - rust: nighlty
+    - rust: nightly
       script:
         - cargo test --package py_mcai_worker_sdk
-      env: CHECK_FORMAT=TRUE
+      env:
+        - TEST_PYTHON_SDK=TRUE
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
     # Rustfmt
     - rust: stable
@@ -33,7 +34,9 @@ matrix:
         - cargo fmt --version
       script:
         - cargo fmt -- --check
-      env: CHECK_FORMAT=TRUE
+      env:
+        - CHECK_FORMAT=TRUE
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
     # Clippy
     - rust: stable
@@ -42,7 +45,9 @@ matrix:
       script:
         # Fail if clippy output contains "error:" or "warning:"
         - cargo clippy --package mcai_worker_sdk --package c_mcai_worker_sdk 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
-      env: CHECK_SYNTAX=TRUE
+      env:
+        - CHECK_SYNTAX=TRUE
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
     # Clippy Python SDK
     - rust: nightly
@@ -51,7 +56,9 @@ matrix:
       script:
         # Fail if clippy output contains "error:" or "warning:"
         - cargo clippy --package py_mcai_worker_sdk 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
-      env: CHECK_SYNTAX_PY_SDK=TRUE
+      env:
+        - CHECK_SYNTAX_PY_SDK=TRUE
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
     # Test coverage
     - rust: stable
@@ -59,9 +66,10 @@ matrix:
         - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
         - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
-        - cargo tarpaulin --packages mcai_worker_sdk --packages c_mcai_worker_sdk --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+        - cd mcai_worker_sdk && cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
       env:
         - COVERAGE_CHECK=TRUE
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
     # Test coverage Python SDK
     - rust: nightly
@@ -70,7 +78,16 @@ matrix:
       script:
         - cargo tarpaulin --packages py_mcai_worker_sdk --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
       env:
-        - COVERAGE_CHECK=TRUE
+        - COVERAGE_CHECK_PY_SDK=TRUE
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
+
+    - rust: nightly
+      script:
+        - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
+        - cargo test
+      env:
+        - ALLOW_FAILURE=TRUE
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
 script:
   - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
