@@ -1,6 +1,6 @@
 [package]
 name = "mcai_worker_sdk"
-version = "0.9.0"
+version = "0.10.0"
 authors = [
   "Marc-Antoine Arnaud <maarnaud@media-io.com>",
   "Valentin Noel <valentin.noel@media-io.com>"
@@ -8,9 +8,9 @@ authors = [
 description = "AMQP Worker to listen and provide trait to process message"
 keywords = ["AMQP", "micro-service"]
 license = "MIT"
-repository = "https://github.com/media-io/rs_amqp_worker"
-homepage = "https://github.com/media-io/rs_amqp_worker"
-documentation = "https://docs.rs/amqp_worker"
+repository = "https://github.com/media-cloud-ai/mcai_worker_sdk"
+homepage = "https://github.com/media-cloud-ai/mcai_worker_sdk"
+documentation = "https://docs.rs/mcai_worker_sdk"
 readme = "README.md"
 edition = "2018"
 
@@ -32,7 +32,7 @@ serde = "^1.0"
 serde_derive = "^1.0"
 serde_json = "^1.0"
 sysinfo = "^0.14"
-tokio = "^0.1"
+tokio = "^0.2"
 uuid = { version = "^0.8", features = ["serde", "v4"] }
 
 [dev-dependencies]

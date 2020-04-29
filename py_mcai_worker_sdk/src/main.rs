@@ -84,13 +84,13 @@ impl MessageEvent for PythonWorkerEvent {
     let response = python_module
       .call0("get_parameters")
       .unwrap_or_else(|_| panic!("unable to call get_parameters in your module".to_string()))
-      .downcast_ref::<PyList>()
+      .downcast::<PyList>()
       .unwrap();
 
     let mut parameters = vec![];
 
     for item in response.iter() {
-      let object = item.downcast_ref::<PyDict>().expect("not a python dict");
+      let object = item.downcast::<PyDict>().expect("not a python dict");
 
       let label = object
         .get_item("label")
@@ -104,14 +104,14 @@ impl MessageEvent for PythonWorkerEvent {
       let kind_list = object
         .get_item("kind")
         .expect("missing kind in parameter")
-        .downcast_ref::<PyList>()
+        .downcast::<PyList>()
         .unwrap();
 
       let mut parameter_types = vec![];
 
       for kind in kind_list.iter() {
         let value = kind
-          .downcast_ref::<PyString>()
+          .downcast::<PyString>()
           .expect("not a python string")
           .to_string()
           .unwrap();
