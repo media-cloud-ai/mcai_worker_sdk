@@ -8,9 +8,9 @@ authors = [
 description = "AMQP Worker to listen and provide trait to process message"
 keywords = ["AMQP", "micro-service"]
 license = "MIT"
-repository = "https://github.com/media-io/rs_amqp_worker"
-homepage = "https://github.com/media-io/rs_amqp_worker"
-documentation = "https://docs.rs/amqp_worker"
+repository = "https://github.com/media-cloud-ai/mcai_worker_sdk"
+homepage = "https://github.com/media-cloud-ai/mcai_worker_sdk"
+documentation = "https://docs.rs/mcai_worker_sdk"
 readme = "README.md"
 edition = "2018"
 
