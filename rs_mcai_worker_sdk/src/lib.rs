@@ -102,7 +102,7 @@ use config::*;
 use env_logger::Builder;
 use futures_executor::LocalPool;
 use futures_util::{future::FutureExt, stream::StreamExt, task::LocalSpawnExt};
-use job::{Job, JobResult};
+use job::{Job, JobResult, JobStatus};
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use std::{fs, io::Write, thread, time};
 
@@ -137,6 +137,16 @@ pub enum MessageError {
   ProcessingError(JobResult),
   RequirementsError(String),
   NotImplemented(),
+}
+
+impl MessageError {
+  pub fn from(error: std::io::Error, job_result: JobResult) -> Self {
+    let result = job_result
+      .with_status(JobStatus::Error)
+      .with_message(&format!("IO Error: {}", error.to_string()));
+
+    MessageError::ProcessingError(result)
+  }
 }
 
 /// Function to start a worker
