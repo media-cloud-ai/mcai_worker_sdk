@@ -6,18 +6,18 @@ pub fn get_destination_paths(response: &PyAny) -> Option<Vec<String>> {
   }
 
   response
-    .downcast_ref::<PyDict>()
+    .downcast::<PyDict>()
     .map(|object| {
       object
         .get_item("destination_paths")
         .map(|response_paths| {
           response_paths
-            .downcast_ref::<PyList>()
+            .downcast::<PyList>()
             .map(|path_list| {
               let mut destination_paths: Vec<String> = vec![];
 
               for path in path_list.iter() {
-                if let Ok(value) = path.downcast_ref::<PyString>() {
+                if let Ok(value) = path.downcast::<PyString>() {
                   if let Ok(string_value) = value.to_string() {
                     destination_paths.push(string_value.to_string());
                   }
