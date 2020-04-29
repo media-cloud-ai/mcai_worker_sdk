@@ -63,7 +63,10 @@ pub fn process_message(
     .unwrap_or("error".to_string())
     .as_str()
   {
-    "completed" => Ok(job_result.with_status(JobStatus::Completed)),
+    "completed" => {
+      publish_job_progression(channel, &job, 100)?;
+      Ok(job_result.with_status(JobStatus::Completed))
+    }
     action_label => {
       let result = job_result.with_message(&format!("Unknown action named {}", action_label));
       Err(MessageError::ProcessingError(result))

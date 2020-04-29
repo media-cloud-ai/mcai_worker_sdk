@@ -96,6 +96,19 @@ pub fn get_amqp_uri() -> AMQPUri {
   }
 }
 
+pub fn get_source_orders() -> Option<Vec<String>> {
+  env::var("SOURCE_ORDERS")
+    .map(|source_orders| {
+      Some(
+        source_orders
+          .split(':')
+          .map(|path| path.to_string())
+          .collect(),
+      )
+    })
+    .unwrap_or(None)
+}
+
 #[test]
 fn configuration() {
   assert!(get_amqp_tls() == true);

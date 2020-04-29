@@ -58,6 +58,19 @@
 //! | `BACKEND_USERNAME` | Username used to connect to backend server |
 //! | `BACKEND_PASSWORD` | Password used to connect to backend server |
 //!
+//! ## Start worker locally
+//!
+//! MCAI Worker SDK can be launched locally - without RabbitMQ.  
+//! It can process some message for different purpose (functional tests, message order examples, etc.).  
+//!   
+//! To start worker in this mode, setup the environment variable `SOURCE_ORDERS` with path(s) to json orders.  
+//! It can take multiple orders, joined with `:` on unix platform, `;` on windows os.  
+//!   
+//! ### Examples:
+//!   
+//! ```bash
+//! RUST_LOG=info SOURCE_ORDERS=./examples/success_order.json:./examples/error_order.json cargo run --example worker
+//! ```
 
 #[macro_use]
 extern crate log;
@@ -91,7 +104,7 @@ use futures_executor::LocalPool;
 use futures_util::{future::FutureExt, stream::StreamExt, task::LocalSpawnExt};
 use job::{Job, JobResult};
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
-use std::{io::Write, thread, time};
+use std::{fs, io::Write, thread, time};
 
 /// Trait to describe a worker
 ///
@@ -160,6 +173,34 @@ where
     worker_configuration.get_worker_version(),
     worker_configuration.get_sdk_version(),
   );
+
+  if let Some(source_orders) = get_source_orders() {
+    warn!("Worker will process source orders");
+    for source_order in &source_orders {
+      info!("Start to process order: {:?}", source_order);
+
+      let count = None;
+      let channel = None;
+      let message_data = fs::read_to_string(source_order).unwrap();
+
+      let result = message::parse_and_process_message(
+        message_event,
+        &message_data,
+        count,
+        channel,
+        message::publish_job_progression,
+      );
+
+      match result {
+        Ok(job_result) => info!("Succeed process: {:?}", job_result),
+        Err(message) => {
+          error!("Error {:?}", message);
+        }
+      }
+    }
+
+    return;
+  }
 
   loop {
     let amqp_uri = get_amqp_uri();
