@@ -42,6 +42,12 @@ pub enum Parameter {
     default: Option<i64>,
     value: Option<i64>,
   },
+  #[serde(rename = "json")]
+  JsonParam {
+    id: String,
+    default: Option<String>,
+    value: Option<String>,
+  },
   #[serde(rename = "requirements")]
   RequirementParam {
     id: String,
@@ -64,6 +70,7 @@ impl Parameter {
       | Parameter::BooleanParam { id, .. }
       | Parameter::CredentialParam { id, .. }
       | Parameter::IntegerParam { id, .. }
+      | Parameter::JsonParam { id, .. }
       | Parameter::RequirementParam { id, .. }
       | Parameter::StringParam { id, .. } => id.clone(),
     }
@@ -78,6 +85,7 @@ impl Parameter {
       Parameter::BooleanParam { value, default, .. } => value.is_some() || default.is_some(),
       Parameter::CredentialParam { value, default, .. } => value.is_some() || default.is_some(),
       Parameter::IntegerParam { value, default, .. } => value.is_some() || default.is_some(),
+      Parameter::JsonParam { value, default, .. } => value.is_some() || default.is_some(),
       Parameter::RequirementParam { value, default, .. } => value.is_some() || default.is_some(),
       Parameter::StringParam { value, default, .. } => value.is_some() || default.is_some(),
     }
@@ -114,6 +122,7 @@ impl ToString for Parameter {
         parameter_to_string!(default, value, "{}")
       }
       Parameter::IntegerParam { default, value, .. } => parameter_to_string!(default, value, "{}"),
+      Parameter::JsonParam { default, value, .. } => parameter_to_string!(default, value, "{}"),
       Parameter::StringParam { default, value, .. } => parameter_to_string!(default, value, "{}"),
     }
   }
