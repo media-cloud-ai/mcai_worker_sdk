@@ -7,9 +7,9 @@ use libloading::Library;
 use mcai_worker_sdk::job::Job;
 use mcai_worker_sdk::worker::{Parameter, ParameterType};
 use mcai_worker_sdk::ParametersContainer;
-use mcai_worker_sdk::{debug, error, info, trace};
+use mcai_worker_sdk::{debug, error, info, trace, warn};
 use mcai_worker_sdk::{publish_job_progression, McaiChannel};
-use std::ptr::null_mut;
+use std::ptr::{null, null_mut};
 
 macro_rules! get_c_string {
   ($name:expr) => {
@@ -57,6 +57,11 @@ extern "C" fn get_parameter_value(
   mut job: *mut c_void,
   parameter_id: *const c_char,
 ) -> *const c_char {
+  if job.is_null() {
+    error!("Null Job pointer");
+    return null();
+  }
+
   let job_ptr: Box<Job> = unsafe { Box::from_raw(job as *mut Job) };
 
   let key = unsafe { get_c_string!(parameter_id) };
@@ -65,7 +70,7 @@ extern "C" fn get_parameter_value(
   let param_value = if let Some(value) = job_ptr.get_parameters_as_map().get(&key) {
     CString::new(value.as_str()).unwrap().as_ptr()
   } else {
-    std::ptr::null()
+    null()
   };
 
   // reset job parameters pointer
@@ -88,6 +93,9 @@ extern "C" fn logger(level: *const c_char, raw_value: *const c_char) {
       "info" => {
         info!("[Worker] {}", value);
       }
+      "warn" => {
+        warn!("[Worker] {}", value);
+      }
       "error" => {
         error!("[Worker] {}", value);
       }
@@ -103,22 +111,24 @@ extern "C" fn progress(
   progress: c_uint,
   total: c_uint,
 ) {
+  let progression = (progress as f32 / total as f32 * 100.) as u8;
+
+  if job.is_null() {
+    warn!("Null Job pointer. Progression: {}%", progression);
+    return;
+  }
+
   let job_ptr: Box<Job> = unsafe { Box::from_raw(job as *mut Job) };
-  let progress_per_cent = (progress as f32 / total as f32 * 100.) as u8;
 
   if channel.is_null() {
-    publish_job_progression(None, job_ptr.as_ref(), progress_per_cent)
+    publish_job_progression(None, job_ptr.as_ref(), progression)
       .map_err(|error| error!("Could not publish job progression: {:?}", error))
       .unwrap();
   } else {
     let channel_ptr: Box<McaiChannel> = unsafe { Box::from_raw(channel as *mut McaiChannel) };
-    publish_job_progression(
-      Some((*channel_ptr).clone()),
-      job_ptr.as_ref(),
-      progress_per_cent,
-    )
-    .map_err(|error| error!("Could not publish job progression: {:?}", error))
-    .unwrap();
+    publish_job_progression(Some((*channel_ptr).clone()), job_ptr.as_ref(), progression)
+      .map_err(|error| error!("Could not publish job progression: {:?}", error))
+      .unwrap();
     channel = Box::into_raw(channel_ptr) as *mut c_void;
   };
   job = Box::into_raw(job_ptr) as *mut c_void;
