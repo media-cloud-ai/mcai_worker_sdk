@@ -4,7 +4,7 @@ mod worker;
 
 use crate::worker::*;
 use mcai_worker_sdk::{
-  debug, job::*, start_worker, worker::Parameter, Channel, MessageError, MessageEvent, Version,
+  debug, job::*, start_worker, worker::Parameter, McaiChannel, MessageError, MessageEvent, Version,
 };
 
 #[derive(Debug)]
@@ -39,7 +39,7 @@ impl MessageEvent for CWorkerEvent {
 
   fn process(
     &self,
-    _channel: Option<&Channel>,
+    _channel: Option<McaiChannel>,
     job: &Job,
     job_result: JobResult,
   ) -> Result<JobResult, MessageError> {

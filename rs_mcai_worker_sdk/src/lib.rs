@@ -103,8 +103,11 @@ use env_logger::Builder;
 use futures_executor::LocalPool;
 use futures_util::{future::FutureExt, stream::StreamExt, task::LocalSpawnExt};
 use job::{Job, JobResult, JobStatus};
-use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
+use lapin::{options::*, types::FieldTable, CloseOnDrop, Connection, ConnectionProperties};
 use std::{fs, io::Write, sync::Arc, thread, time};
+
+/// Exposed Channel type
+pub type McaiChannel = Arc<CloseOnDrop<Channel>>;
 
 /// Trait to describe a worker
 ///
@@ -119,7 +122,7 @@ pub trait MessageEvent {
 
   fn process(
     &self,
-    _channel: Option<&Channel>,
+    _channel: Option<McaiChannel>,
     _job: &Job,
     _job_result: JobResult,
   ) -> Result<JobResult, MessageError>
@@ -226,7 +229,10 @@ where
       .unwrap();
 
       info!("Connected");
-      let channel = Arc::new(channels::declare_consumer_channel(&conn, &worker_configuration));
+      let channel = Arc::new(channels::declare_consumer_channel(
+        &conn,
+        &worker_configuration,
+      ));
 
       let consumer = channel
         .clone()
@@ -276,7 +282,7 @@ where
         .for_each(move |delivery| {
           let delivery = delivery.expect("error caught in in consumer");
 
-          message::process_message(message_event, delivery, &clone_channel).map(|_| ())
+          message::process_message(message_event, delivery, clone_channel.clone()).map(|_| ())
         })
         .await
     });

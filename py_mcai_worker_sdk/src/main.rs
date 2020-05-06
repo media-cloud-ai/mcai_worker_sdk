@@ -4,7 +4,7 @@ use mcai_worker_sdk::{
   job::*,
   publish_job_progression, start_worker,
   worker::{Parameter, ParameterType},
-  Channel, Credential, MessageError, MessageEvent,
+  Credential, McaiChannel, MessageError, MessageEvent,
   Parameter::*,
   Version,
 };
@@ -44,14 +44,14 @@ impl PythonWorkerEvent {
 
 #[pyclass]
 struct CallbackHandle {
-  channel: Channel,
+  channel: Option<McaiChannel>,
   job: Job,
 }
 
 #[pymethods]
 impl CallbackHandle {
   fn publish_job_progression(&self, value: u8) -> bool {
-    publish_job_progression(Some(&self.channel), &self.job, value).is_ok()
+    publish_job_progression(self.channel.clone(), &self.job, value).is_ok()
   }
 }
 
@@ -138,7 +138,7 @@ impl MessageEvent for PythonWorkerEvent {
 
   fn process(
     &self,
-    channel: Option<&Channel>,
+    channel: Option<McaiChannel>,
     job: &Job,
     mut job_result: JobResult,
   ) -> Result<JobResult, MessageError> {
@@ -166,7 +166,7 @@ impl MessageEvent for PythonWorkerEvent {
     }
 
     let callback_handle = CallbackHandle {
-      channel: channel.unwrap().clone(),
+      channel,
       job: job.clone(),
     };
 
