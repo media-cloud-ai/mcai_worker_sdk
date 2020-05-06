@@ -1,7 +1,7 @@
 FROM rust:1.42-stretch as builder
 
 ADD . /src
-WORKDIR /src
+WORKDIR /src/c_mcai_worker_sdk
 
 RUN rustup default && \
     cargo build --verbose --release && \

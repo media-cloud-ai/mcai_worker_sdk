@@ -2,9 +2,9 @@ mod helpers;
 
 use crate::{
   job::{Job, JobProgression, JobResult, JobStatus},
-  MessageError, MessageEvent,
+  McaiChannel, MessageError, MessageEvent,
 };
-use lapin::{message::Delivery, options::*, BasicProperties, Channel, Promise};
+use lapin::{message::Delivery, options::*, BasicProperties, Promise};
 
 static RESPONSE_EXCHANGE: &str = "job_response";
 static QUEUE_JOB_COMPLETED: &str = "job_completed";
@@ -14,7 +14,7 @@ static QUEUE_JOB_PROGRESSION: &str = "job_progression";
 pub fn process_message<ME: MessageEvent>(
   message_event: &'static ME,
   message: Delivery,
-  channel: &Channel,
+  channel: McaiChannel,
 ) -> Promise<()> {
   let count = helpers::get_message_death_count(&message);
   let message_data = std::str::from_utf8(&message.data).unwrap();
@@ -23,7 +23,7 @@ pub fn process_message<ME: MessageEvent>(
     message_event,
     message_data,
     count,
-    Some(channel),
+    Some(channel.clone()),
     publish_job_progression,
   ) {
     Ok(job_result) => {
@@ -47,12 +47,12 @@ pub fn process_message<ME: MessageEvent>(
 
 pub fn parse_and_process_message<
   ME: MessageEvent,
-  F: Fn(Option<&Channel>, &Job, u8) -> Result<(), MessageError> + 'static,
+  F: Fn(Option<McaiChannel>, &Job, u8) -> Result<(), MessageError> + 'static,
 >(
   message_event: &'static ME,
   message_data: &str,
   count: Option<i64>,
-  channel: Option<&Channel>,
+  channel: Option<McaiChannel>,
   publish_job_progression: F,
 ) -> Result<JobResult, MessageError> {
   let job = Job::new(message_data)?;
@@ -63,14 +63,14 @@ pub fn parse_and_process_message<
 
   job.check_requirements()?;
 
-  publish_job_progression(channel, &job, 0)?;
+  publish_job_progression(channel.clone(), &job, 0)?;
 
   let job_result = JobResult::new(job.job_id);
   MessageEvent::process(message_event, channel, &job, job_result)
 }
 
 fn publish_job_completed(
-  channel: &Channel,
+  channel: McaiChannel,
   message: Delivery,
   job_result: JobResult,
 ) -> Promise<()> {
@@ -104,7 +104,7 @@ fn publish_job_completed(
 ///
 /// It will be an integer between 0 and 100.
 pub fn publish_job_progression(
-  channel: Option<&Channel>,
+  channel: Option<McaiChannel>,
   job: &Job,
   progression: u8,
 ) -> Result<(), MessageError> {
@@ -134,7 +134,7 @@ pub fn publish_job_progression(
 }
 
 fn publish_missing_requirements(
-  channel: &Channel,
+  channel: McaiChannel,
   message: Delivery,
   details: &str,
 ) -> Promise<()> {
@@ -142,7 +142,7 @@ fn publish_missing_requirements(
   channel.basic_reject(message.delivery_tag, BasicRejectOptions::default())
 }
 
-fn publish_not_implemented(channel: &Channel, message: Delivery) -> Promise<()> {
+fn publish_not_implemented(channel: McaiChannel, message: Delivery) -> Promise<()> {
   error!("Not implemented feature");
   channel.basic_reject(
     message.delivery_tag,
@@ -151,7 +151,7 @@ fn publish_not_implemented(channel: &Channel, message: Delivery) -> Promise<()> 
 }
 
 fn publish_processing_error(
-  channel: &Channel,
+  channel: McaiChannel,
   message: Delivery,
   job_result: JobResult,
 ) -> Promise<()> {
@@ -185,7 +185,7 @@ fn publish_processing_error(
   }
 }
 
-fn publish_runtime_error(channel: &Channel, message: Delivery, details: &str) -> Promise<()> {
+fn publish_runtime_error(channel: McaiChannel, message: Delivery, details: &str) -> Promise<()> {
   error!("An error occurred: {:?}", details);
   let content = json!({
     "status": "error",
@@ -208,12 +208,10 @@ fn publish_runtime_error(channel: &Channel, message: Delivery, details: &str) ->
       message.delivery_tag,
       BasicAckOptions::default(), /*not requeue*/
     )
-  // .map(|_| ())
   } else {
     channel.basic_reject(
       message.delivery_tag,
       BasicRejectOptions { requeue: true }, /*requeue*/
     )
-    // .map(|_| ())
   }
 }
