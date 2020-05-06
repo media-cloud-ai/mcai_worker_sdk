@@ -68,7 +68,8 @@ extern "C" fn get_parameter_value(
   debug!("Get parameter value from id: {:?}", key);
 
   let param_value = if let Some(value) = job_ptr.get_parameters_as_map().get(&key) {
-    CString::new(value.as_str()).unwrap().as_ptr()
+    let string = CString::new(value.as_str()).unwrap();
+    string.as_ptr()
   } else {
     null()
   };
