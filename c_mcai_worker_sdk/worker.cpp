@@ -63,8 +63,7 @@ void get_parameters(Parameter* parameters) {
 
 /**
  * Worker main process function
- * @param job_pointer              Job pointer
- * @param channel_pointer          Channel pointer
+ * @param handle                   Handle
  * @param parameters_value_getter  Get job parameter value callback
  * @param progress_callback        Progress callback
  * @param logger                   Rust Logger
@@ -72,8 +71,7 @@ void get_parameters(Parameter* parameters) {
  * @param output_paths             Output paths pointer
  */
 int process(
-    JobPointer job_pointer,
-    ChannelPointer channel_pointer,
+    Handle handle,
     GetParameterValueCallback parametersValueGetter,
     ProgressCallback progressCallback,
     Logger logger,
@@ -84,10 +82,10 @@ int process(
     logger("debug", "Start C Worker process...");
 
     // Notify with progression
-    progressCallback(job_pointer, channel_pointer, 0, 0);
+    progressCallback(handle, 0);
 
     // Retrieve "path" job parameter value
-    char* value = parametersValueGetter(job_pointer, "path");
+    char* value = parametersValueGetter(handle, "path");
 
     // Check whether an error occurred parsing job parameters
     if(value == NULL) {
@@ -96,7 +94,7 @@ int process(
     }
 
     // Notify with progression
-    progressCallback(job_pointer, channel_pointer, 1, 2);
+    progressCallback(handle, 33);
 
     // Print value through the Rust Logger
     logger("debug", value);
@@ -108,7 +106,7 @@ int process(
     output_paths[0][1] = 0;
 
     // Notify with progression
-    progressCallback(job_pointer, channel_pointer, 100000, 100000);
+    progressCallback(handle, 100);
 
     return 0;
 }
