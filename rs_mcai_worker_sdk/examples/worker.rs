@@ -1,7 +1,7 @@
 use mcai_worker_sdk::job::{Job, JobResult, JobStatus};
-use mcai_worker_sdk::publish_job_progression;
 use mcai_worker_sdk::worker::{Parameter, ParameterType};
-use mcai_worker_sdk::{Channel, MessageError, MessageEvent, ParametersContainer};
+use mcai_worker_sdk::{publish_job_progression, McaiChannel};
+use mcai_worker_sdk::{MessageError, MessageEvent, ParametersContainer};
 use semver::Version;
 
 #[derive(Debug)]
@@ -37,7 +37,7 @@ Do no use in production, just for developments."#
 
   fn process(
     &self,
-    channel: Option<&Channel>,
+    channel: Option<McaiChannel>,
     job: &Job,
     job_result: JobResult,
   ) -> Result<JobResult, MessageError> {
@@ -52,11 +52,11 @@ fn main() {
 }
 
 pub fn process_message(
-  channel: Option<&Channel>,
+  channel: Option<McaiChannel>,
   job: &Job,
   job_result: JobResult,
 ) -> Result<JobResult, MessageError> {
-  publish_job_progression(channel, &job, 50)?;
+  publish_job_progression(channel.clone(), &job, 50)?;
 
   match job
     .get_string_parameter("action")
