@@ -34,3 +34,5 @@ This worker uses Rust FFI to load a C/C++ Shared Object library, and to execute 
  * `int process(void*, char* (*)(void*, const char*), void* ()(void*, unsigned char), void* (*)(const char*, const char*), const char**, const char***)`: to execute the worker process
 
 For more details, see the provided [worker.cpp](worker.cpp) example.
+
+Set the `WORKER_LIBRARY_FILE` environment variable to specify the path of your C/C++ worker shared-library. Otherwise, the `libworker.so` file will be loaded by default.

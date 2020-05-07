@@ -28,3 +28,5 @@ This worker uses Rust FFI to load a C/C++ Shared Object library, and to execute 
  * `void process(parameters)`: to execute the worker process
 
 For more details, see the provided [worker.py](worker.py) example.
+
+Set the `PYTHON_WORKER_FILENAME` environment variable to specify the path of your Python worker. Otherwise, the `worker.py` file will be loaded by default.
