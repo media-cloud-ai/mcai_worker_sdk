@@ -1,7 +1,7 @@
 FROM rust:1.40-stretch as builder
 
 ADD . /src
-WORKDIR /src
+WORKDIR /src/py_mcai_worker_sdk
 
 RUN apt-get update && \
     apt-get install -y libpython3.5-dev && \
