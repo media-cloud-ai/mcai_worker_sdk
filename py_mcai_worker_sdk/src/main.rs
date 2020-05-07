@@ -271,6 +271,13 @@ impl PythonWorkerEvent {
             list_of_parameters.set_item(id.to_string(), v)?;
           }
         }
+        JsonParam { id, default, value } => {
+          if let Some(v) = value {
+            list_of_parameters.set_item(id.to_string(), v)?;
+          } else if let Some(v) = default {
+            list_of_parameters.set_item(id.to_string(), v)?;
+          }
+        }
       }
     }
 

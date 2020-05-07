@@ -3,6 +3,7 @@ use crate::job::Job;
 use crate::parameter::container::ParametersContainer;
 use crate::parameter::Parameter;
 use reqwest::Error;
+use serde::Serialize;
 use std::time::Instant;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -65,6 +66,20 @@ impl JobResult {
   pub fn with_destination_paths(mut self, destination_paths: &mut Vec<String>) -> Self {
     self.destination_paths.append(destination_paths);
     self
+  }
+
+  pub fn with_json<T>(mut self, id: &str, serializable: &T) -> Result<Self, String>
+  where
+    T: Serialize + Sized,
+  {
+    let json_string = serde_json::to_string(serializable)
+      .map_err(|error| format!("Unable to serialize object: {:?}", error))?;
+    self.parameters.push(Parameter::JsonParam {
+      id: id.to_string(),
+      default: None,
+      value: Some(json_string),
+    });
+    Ok(self)
   }
 
   pub fn get_job_id(&self) -> u64 {

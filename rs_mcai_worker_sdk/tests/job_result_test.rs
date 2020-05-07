@@ -1,10 +1,17 @@
 extern crate mcai_worker_sdk;
 
+use serde_derive::{Deserialize, Serialize};
+
 use crate::mcai_worker_sdk::ParametersContainer;
 use mcai_worker_sdk::job::*;
 
 use mcai_worker_sdk::parameter::media_segment::MediaSegment;
 use std::collections::HashMap;
+
+#[derive(Deserialize, Serialize)]
+struct JsonParamTestStruct {
+  key: String,
+}
 
 #[test]
 fn test_job_result_from_json() {
@@ -26,6 +33,10 @@ fn test_job_result_from_json() {
         "type":"integer",
         "default": 123456,
         "value": 654321 },
+      { "id":"json_parameter",
+        "type":"json",
+        "default": "{\"key\":\"default\"}",
+        "value": "{\"key\":\"value\"}" },
       { "id":"credential_parameter",
         "type":"credential",
         "default":"default_credential_key",
@@ -46,7 +57,7 @@ fn test_job_result_from_json() {
   let job_result: JobResult = result.unwrap();
   assert_eq!(job_result.get_job_id(), 456);
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
-  assert_eq!(job_result.get_parameters().len(), 6);
+  assert_eq!(job_result.get_parameters().len(), 7);
 
   let optional_string = job_result.get_string_parameter("string_parameter");
   assert!(optional_string.is_some());
@@ -59,6 +70,11 @@ fn test_job_result_from_json() {
   let optional_integer = job_result.get_integer_parameter("integer_parameter");
   assert!(optional_integer.is_some());
   assert_eq!(654321, optional_integer.unwrap());
+
+  let optional_json = job_result.get_json_parameter("json_parameter");
+  assert!(optional_json.is_some());
+  let json_param: JsonParamTestStruct = serde_json::from_str(&optional_json.unwrap()).unwrap();
+  assert_eq!("value", &json_param.key);
 
   let optional_credential = job_result.get_credential_parameter("credential_parameter");
   assert!(optional_credential.is_some());
@@ -90,6 +106,10 @@ fn test_job_result_from_json() {
     "[\"real_value\"]".to_string(),
   );
   reference_map.insert("integer_parameter".to_string(), "654321".to_string());
+  reference_map.insert(
+    "json_parameter".to_string(),
+    "{\"key\":\"value\"}".to_string(),
+  );
   reference_map.insert("string_parameter".to_string(), "real_value".to_string());
   assert_eq!(
     reference_map.get("credential_parameter"),
@@ -106,6 +126,10 @@ fn test_job_result_from_json() {
   assert_eq!(
     reference_map.get("integer_parameter"),
     map.get("integer_parameter")
+  );
+  assert_eq!(
+    reference_map.get("json_parameter"),
+    map.get("json_parameter")
   );
   assert_eq!(
     reference_map.get("string_parameter"),
@@ -134,6 +158,9 @@ fn test_job_result_from_json_without_value() {
       { "id":"integer_parameter",
         "type":"integer",
         "default": 123456 },
+      { "id":"json_parameter",
+        "type":"json",
+        "default": "{\"key\":\"default\"}" },
       { "id":"credential_parameter",
         "type":"credential",
         "default":"default_credential_key" },
@@ -142,8 +169,7 @@ fn test_job_result_from_json_without_value() {
         "default": ["default_value"] },
       { "id":"array_of_media_segments_parameter",
         "type":"array_of_media_segments",
-        "default": [{"start": 123, "end": 456}],
-        "value": [{"start": 123, "end": 456}] }
+        "default": [{"start": 123, "end": 456}] }
     ]
   }"#;
 
@@ -154,7 +180,7 @@ fn test_job_result_from_json_without_value() {
   assert_eq!(job_result.get_job_id(), 456);
   assert_eq!(job_result.get_execution_duration(), 0.0);
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
-  assert_eq!(job_result.get_parameters().len(), 6);
+  assert_eq!(job_result.get_parameters().len(), 7);
 
   let optional_string = job_result.get_string_parameter("string_parameter");
   assert!(optional_string.is_some());
@@ -170,6 +196,11 @@ fn test_job_result_from_json_without_value() {
   assert!(optional_integer.is_some());
   let integer_value = optional_integer.unwrap();
   assert_eq!(123456, integer_value);
+
+  let optional_json = job_result.get_json_parameter("json_parameter");
+  assert!(optional_json.is_some());
+  let json_param: JsonParamTestStruct = serde_json::from_str(&optional_json.unwrap()).unwrap();
+  assert_eq!("default", &json_param.key);
 
   let optional_credential = job_result.get_credential_parameter("credential_parameter");
   assert!(optional_credential.is_some());
@@ -201,6 +232,10 @@ fn test_job_result_from_json_without_value() {
     "[\"default_value\"]".to_string(),
   );
   reference_map.insert("integer_parameter".to_string(), "123456".to_string());
+  reference_map.insert(
+    "json_parameter".to_string(),
+    "{\"key\":\"default\"}".to_string(),
+  );
   reference_map.insert("string_parameter".to_string(), "default_value".to_string());
   assert_eq!(
     reference_map.get("credential_parameter"),
@@ -217,6 +252,10 @@ fn test_job_result_from_json_without_value() {
   assert_eq!(
     reference_map.get("integer_parameter"),
     map.get("integer_parameter")
+  );
+  assert_eq!(
+    reference_map.get("json_parameter"),
+    map.get("json_parameter")
   );
   assert_eq!(
     reference_map.get("string_parameter"),
@@ -245,6 +284,10 @@ fn test_job_result_from_job() {
         "type":"integer",
         "default": 123456,
         "value": 654321 },
+      { "id":"json_parameter",
+        "type":"json",
+        "default": "{\"key\":\"default\"}",
+        "value": "{\"key\":\"value\"}" },
       { "id":"credential_parameter",
         "type":"credential",
         "default":"default_credential_key",
@@ -306,4 +349,17 @@ fn test_job_result_with_setters() {
     Some(content.to_string()),
     job_result.get_string_parameter("message")
   );
+
+  job_result = job_result
+    .with_json(
+      "json_param_id",
+      &JsonParamTestStruct {
+        key: "json".to_string(),
+      },
+    )
+    .unwrap();
+  assert_eq!(job_result.get_status(), &JobStatus::Completed);
+
+  let json_param = job_result.get_json_parameter("json_param_id");
+  assert_eq!(Some("{\"key\":\"json\"}".to_string()), json_param);
 }

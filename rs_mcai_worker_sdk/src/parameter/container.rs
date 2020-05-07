@@ -94,6 +94,21 @@ pub trait ParametersContainer {
     None
   }
 
+  fn get_json_parameter(&self, key: &str) -> Option<String> {
+    for param in self.get_parameters() {
+      if let Parameter::JsonParam { id, default, value } = param {
+        if id == key {
+          if let Some(ref v) = value {
+            return Some(v.to_string());
+          } else {
+            return default.clone();
+          }
+        }
+      }
+    }
+    None
+  }
+
   fn get_parameters_as_map(&self) -> HashMap<String, String> {
     let mut map = HashMap::new();
     for param in self.get_parameters() {
