@@ -1,6 +1,6 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_uchar, c_uint, c_void};
-use std::ptr::{null, null_mut};
+use std::ptr::null;
 
 use libloading::Library;
 
@@ -385,7 +385,7 @@ pub fn test_c_progress_ptr() {
 
 #[test]
 pub fn test_c_progress_with_null_ptr() {
-  let null_handler = null_mut();
+  let null_handler = std::ptr::null_mut();
   progress(null_handler, 50);
   assert!(null_handler.is_null());
 }
@@ -461,7 +461,7 @@ pub fn test_c_get_unknown_parameter_value() {
 
 #[test]
 pub fn test_c_get_parameter_value_with_null_ptr() {
-  let null_handler = null_mut();
+  let null_handler = std::ptr::null_mut();
   let parameter_key = CString::new("path").unwrap();
 
   let c_value = get_parameter_value(null_handler, parameter_key.as_ptr());
