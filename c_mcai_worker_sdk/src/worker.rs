@@ -23,7 +23,7 @@ macro_rules! get_c_string {
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct Handle {
+pub struct Handler {
   pub job: Job,
   pub channel: Option<McaiChannel>,
 }
@@ -49,7 +49,7 @@ type GetParametersFunc = unsafe fn(parameters: *mut WorkerParameter);
 type GetParameterValueCallback = extern "C" fn(*mut c_void, *const c_char) -> *const c_char;
 type LoggerCallback = extern "C" fn(*const c_char, *const c_char);
 type ProcessFunc = unsafe fn(
-  handle: *mut c_void,
+  handler: *mut c_void,
   callback: GetParameterValueCallback,
   progress: ProgressCallback,
   logger: LoggerCallback,
@@ -60,20 +60,20 @@ type ProgressCallback = extern "C" fn(*mut c_void, c_uchar);
 
 #[allow(unused_assignments)]
 extern "C" fn get_parameter_value(
-  mut c_handle: *mut c_void,
+  mut c_handler: *mut c_void,
   parameter_id: *const c_char,
 ) -> *const c_char {
-  if c_handle.is_null() {
-    error!("Null Handle");
+  if c_handler.is_null() {
+    error!("Null handler");
     return null();
   }
 
-  let handle: Box<Handle> = unsafe { Box::from_raw(c_handle as *mut Handle) };
+  let handler: Box<Handler> = unsafe { Box::from_raw(c_handler as *mut Handler) };
 
   let key = unsafe { get_c_string!(parameter_id) };
   debug!("Get parameter value from id: {:?}", key);
 
-  let param_value = if let Some(value) = handle.job.get_parameters_as_map().get(&key) {
+  let param_value = if let Some(value) = handler.job.get_parameters_as_map().get(&key) {
     let string = CString::new(value.as_str()).unwrap();
     string.as_ptr()
   } else {
@@ -81,7 +81,7 @@ extern "C" fn get_parameter_value(
   };
 
   // reset job parameters pointer
-  c_handle = Box::into_raw(handle) as *mut c_void;
+  c_handler = Box::into_raw(handler) as *mut c_void;
   param_value
 }
 
@@ -112,19 +112,19 @@ extern "C" fn logger(level: *const c_char, raw_value: *const c_char) {
 }
 
 #[allow(unused_assignments)]
-extern "C" fn progress(mut c_handle: *mut c_void, progression: c_uchar) {
-  if c_handle.is_null() {
-    warn!("Null Handle. Progression: {}%", progression);
+extern "C" fn progress(mut c_handler: *mut c_void, progression: c_uchar) {
+  if c_handler.is_null() {
+    warn!("Null handler. Progression: {}%", progression);
     return;
   }
 
-  let handle: Box<Handle> = unsafe { Box::from_raw(c_handle as *mut Handle) };
+  let handler: Box<Handler> = unsafe { Box::from_raw(c_handler as *mut Handler) };
 
-  publish_job_progression(handle.channel.clone(), &handle.job, progression)
+  publish_job_progression(handler.channel.clone(), &handler.job, progression)
     .map_err(|error| error!("Could not publish job progression: {:?}", error))
     .unwrap();
 
-  c_handle = Box::into_raw(handle) as *mut c_void;
+  c_handler = Box::into_raw(handler) as *mut c_void;
 }
 
 /************************
@@ -244,13 +244,13 @@ pub fn call_worker_process(job: &Job, channel: Option<McaiChannel>) -> ProcessRe
         as Result<libloading::Symbol<ProcessFunc>, String>
       {
         Ok(process_func) => {
-          let handle = Handle {
+          let handler = Handler {
             job: job.clone(),
             channel,
           };
 
-          let boxed_handle = Box::new(handle);
-          let handle_ptr = Box::into_raw(boxed_handle);
+          let boxed_handler = Box::new(handler);
+          let handler_ptr = Box::into_raw(boxed_handler);
 
           let message_ptr = std::ptr::null();
 
@@ -259,7 +259,7 @@ pub fn call_worker_process(job: &Job, channel: Option<McaiChannel>) -> ProcessRe
 
           // Call C worker process function
           let return_code = process_func(
-            handle_ptr as *mut c_void,
+            handler_ptr as *mut c_void,
             get_parameter_value,
             progress,
             logger,

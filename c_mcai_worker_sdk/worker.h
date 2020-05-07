@@ -18,14 +18,14 @@ typedef struct Parameter {
 } Parameter;
 
 /**
- * Handle
+ * Handler
  */
-typedef void* Handle;
+typedef void* Handler;
 
 /**
  * Get job parameter value callback
  */
-typedef char* (*GetParameterValueCallback)(Handle, const char*);
+typedef char* (*GetParameterValueCallback)(Handler, const char*);
 
 /**
  * Rust Logger
@@ -35,7 +35,7 @@ typedef void* (*Logger)(const char*, const char*);
 /**
  * Progress callback
  */
-typedef void* (*ProgressCallback)(Handle, unsigned char);
+typedef void* (*ProgressCallback)(Handler, unsigned char);
 
 /**
  * Get worker name
@@ -70,7 +70,7 @@ void get_parameters(Parameter* parameters);
 
 /**
  * Worker main process function
- * @param handle                   Handle
+ * @param handler                  Handler
  * @param parameters_value_getter  Get job parameter value callback
  * @param progress_callback        Progress callback
  * @param logger                   Rust Logger
@@ -78,7 +78,7 @@ void get_parameters(Parameter* parameters);
  * @param output_paths             Output paths pointer
  */
 int process(
-    Handle handle,
+    Handler handler,
     GetParameterValueCallback parameters_value_getter,
     ProgressCallback progress_callback,
     Logger logger,
