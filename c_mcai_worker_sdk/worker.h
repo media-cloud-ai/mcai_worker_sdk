@@ -18,24 +18,30 @@ typedef struct Parameter {
 } Parameter;
 
 /**
- * Handler
+ * Job & channel handler
  */
 typedef void* Handler;
 
 /**
  * Get job parameter value callback
+ * @param _handler          the job & channel handler
+ * @param _parameter_key    the name of the parameter to get
  */
-typedef char* (*GetParameterValueCallback)(Handler, const char*);
+typedef char* (*GetParameterValueCallback)(Handler _handler, const char* _parameter_key);
 
 /**
  * Rust Logger
+ * @param _level      the log level: 'trace', 'debug', 'info', 'warn' or 'error'
+ * @param _message    the message to log
  */
-typedef void* (*Logger)(const char*, const char*);
+typedef void* (*Logger)(const char* _level, const char* _message);
 
 /**
  * Progress callback
+ * @param _handler                   the job & channel handler
+ * @param _progression_percentage    the progression percentage (between 0 and 100)
  */
-typedef void* (*ProgressCallback)(Handler, unsigned char);
+typedef void* (*ProgressCallback)(Handler _handler, unsigned char _progression_percentage);
 
 /**
  * Get worker name

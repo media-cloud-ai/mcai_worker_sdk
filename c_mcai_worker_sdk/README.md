@@ -31,6 +31,6 @@ This worker uses Rust FFI to load a C/C++ Shared Object library, and to execute 
  * `char* get_version()`: to retrieve the worker version
  * `unsigned int get_parameters_size()`: to return the number of parameter, before calling...
  * `void get_parameters(Parameter*) `: to fill the allocated pointer with the worker parameters
- * `int process(void*, void*, char* (*)(void*, const char*), void* ()(void*, void*, unsigned int, unsigned int), int* (*)(), void* (*)(const char*))`: to execute the worker process
+ * `int process(void*, char* (*)(void*, const char*), void* ()(void*, unsigned char), void* (*)(const char*, const char*), const char**, const char***)`: to execute the worker process
 
 For more details, see the provided [worker.cpp](worker.cpp) example.
