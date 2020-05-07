@@ -1,14 +1,17 @@
-use std::collections::HashMap;
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_uint, c_void};
+use std::os::raw::{c_char, c_int, c_uchar, c_uint, c_void};
+use std::ptr::null;
 
-use crate::constants;
-use crate::process_return::ProcessReturn;
 use libloading::Library;
+
 use mcai_worker_sdk::job::Job;
 use mcai_worker_sdk::worker::{Parameter, ParameterType};
 use mcai_worker_sdk::ParametersContainer;
-use mcai_worker_sdk::{debug, error, info, trace};
+use mcai_worker_sdk::{debug, error, info, trace, warn};
+use mcai_worker_sdk::{publish_job_progression, McaiChannel};
+
+use crate::constants;
+use crate::process_return::ProcessReturn;
 
 macro_rules! get_c_string {
   ($name:expr) => {
@@ -18,6 +21,13 @@ macro_rules! get_c_string {
       std::str::from_utf8_unchecked(CStr::from_ptr($name).to_bytes()).to_string()
     }
   };
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct Handler {
+  pub job: Job,
+  pub channel: Option<McaiChannel>,
 }
 
 /************************
@@ -41,32 +51,40 @@ type GetParametersFunc = unsafe fn(parameters: *mut WorkerParameter);
 type GetParameterValueCallback = extern "C" fn(*mut c_void, *const c_char) -> *const c_char;
 type LoggerCallback = extern "C" fn(*const c_char, *const c_char);
 type ProcessFunc = unsafe fn(
-  job: *mut c_void,
+  handler: *mut c_void,
   callback: GetParameterValueCallback,
+  progress: ProgressCallback,
   logger: LoggerCallback,
   output_message: &*const c_char,
   output_paths: &*mut *const c_char,
 ) -> c_int;
+type ProgressCallback = extern "C" fn(*mut c_void, c_uchar);
 
 #[allow(unused_assignments)]
 extern "C" fn get_parameter_value(
-  mut c_worker_job: *mut c_void,
+  mut c_handler: *mut c_void,
   parameter_id: *const c_char,
 ) -> *const c_char {
-  let job_params_ptrs: Box<HashMap<String, *const c_char>> =
-    unsafe { Box::from_raw(c_worker_job as *mut HashMap<String, *const c_char>) };
+  if c_handler.is_null() {
+    error!("Null handler");
+    return null();
+  }
+
+  let handler: Box<Handler> = unsafe { Box::from_raw(c_handler as *mut Handler) };
 
   let key = unsafe { get_c_string!(parameter_id) };
-  debug!("Get parameter value from id: {:?}", key);
 
-  let param_value = if let Some(value) = job_params_ptrs.get(&key) {
-    *value
+  let param_value = if let Some(value) = handler.job.get_parameters_as_map().get(&key) {
+    let string = CString::new(value.as_str()).unwrap();
+    let string_ptr = string.as_ptr();
+    std::mem::forget(string);
+    string_ptr
   } else {
-    std::ptr::null()
+    null()
   };
 
   // reset job parameters pointer
-  c_worker_job = Box::into_raw(job_params_ptrs) as *mut c_void;
+  c_handler = Box::into_raw(handler) as *mut c_void;
   param_value
 }
 
@@ -85,12 +103,31 @@ extern "C" fn logger(level: *const c_char, raw_value: *const c_char) {
       "info" => {
         info!("[Worker] {}", value);
       }
+      "warn" => {
+        warn!("[Worker] {}", value);
+      }
       "error" => {
         error!("[Worker] {}", value);
       }
       _ => {}
     }
   }
+}
+
+#[allow(unused_assignments)]
+extern "C" fn progress(mut c_handler: *mut c_void, progression: c_uchar) {
+  if c_handler.is_null() {
+    warn!("Null handler. Progression: {}%", progression);
+    return;
+  }
+
+  let handler: Box<Handler> = unsafe { Box::from_raw(c_handler as *mut Handler) };
+
+  publish_job_progression(handler.channel.clone(), &handler.job, progression)
+    .map_err(|error| error!("Could not publish job progression: {:?}", error))
+    .unwrap();
+
+  c_handler = Box::into_raw(handler) as *mut c_void;
 }
 
 /************************
@@ -200,30 +237,23 @@ pub fn get_worker_parameters() -> Vec<Parameter> {
   parameters
 }
 
-pub fn call_worker_process(job: &Job) -> ProcessReturn {
+pub fn call_worker_process(job: &Job, channel: Option<McaiChannel>) -> ProcessReturn {
   let library = get_library_file_path();
   debug!("Call worker process from library: {}", library);
+
   match libloading::Library::new(library) {
     Ok(worker_lib) => unsafe {
       match get_library_function(&worker_lib, constants::PROCESS_FUNCTION)
         as Result<libloading::Symbol<ProcessFunc>, String>
       {
         Ok(process_func) => {
-          // Get job parameters C pointers, and cache references
-          let mut job_params_ptrs = HashMap::new();
-          let mut job_param_c_string_values_cache: Vec<CString> = vec![];
-          job.get_parameters_as_map().iter().for_each(|(key, value)| {
-            let c_string = CString::new(value.as_str()).unwrap();
-            job_param_c_string_values_cache.push(c_string);
-            job_params_ptrs.insert(
-              key.clone(),
-              job_param_c_string_values_cache.last().unwrap().as_ptr(),
-            );
-          });
+          let handler = Handler {
+            job: job.clone(),
+            channel,
+          };
 
-          // Get job parameters map pointer
-          let boxed_job_params_ptrs = Box::new(job_params_ptrs);
-          let job_params_ptrs_ptr = Box::into_raw(boxed_job_params_ptrs);
+          let boxed_handler = Box::new(handler);
+          let handler_ptr = Box::into_raw(boxed_handler);
 
           let message_ptr = std::ptr::null();
 
@@ -232,8 +262,9 @@ pub fn call_worker_process(job: &Job) -> ProcessReturn {
 
           // Call C worker process function
           let return_code = process_func(
-            job_params_ptrs_ptr as *mut c_void,
+            handler_ptr as *mut c_void,
             get_parameter_value,
+            progress,
             logger,
             &message_ptr,
             &ptr,
@@ -297,7 +328,7 @@ pub fn test_c_binding_process() {
   }"#;
 
   let job = Job::new(message).unwrap();
-  let returned_code = call_worker_process(&job);
+  let returned_code = call_worker_process(&job, None);
   assert_eq!(returned_code.get_code(), 0);
   assert_eq!(returned_code.get_message(), "Everything worked well!");
   assert_eq!(
@@ -320,8 +351,125 @@ pub fn test_c_binding_failing_process() {
   }"#;
 
   let job = Job::new(message).unwrap();
-  let returned_code = call_worker_process(&job);
+  let returned_code = call_worker_process(&job, None);
   assert_eq!(returned_code.get_code(), 1);
   assert_eq!(returned_code.get_message(), "Something went wrong...");
   assert!(returned_code.get_output_paths().is_empty());
+}
+
+#[test]
+pub fn test_c_progress_ptr() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id": "path",
+        "type": "string",
+        "value": "/path/to/file"
+      }
+    ]
+  }"#;
+
+  let job = Job::new(message).unwrap();
+  let handler = Handler {
+    job: job.clone(),
+    channel: None,
+  };
+
+  let boxed_handler = Box::new(handler);
+  let handler_ptr = Box::into_raw(boxed_handler) as *mut c_void;
+
+  progress(handler_ptr, 25);
+  assert!(!handler_ptr.is_null());
+}
+
+#[test]
+pub fn test_c_progress_with_null_ptr() {
+  let null_handler = std::ptr::null_mut();
+  progress(null_handler, 50);
+  assert!(null_handler.is_null());
+}
+
+#[test]
+pub fn test_c_get_parameter_value() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id": "path",
+        "type": "string",
+        "value": "/path/to/file"
+      }
+    ]
+  }"#;
+
+  let job = Job::new(message).unwrap();
+  let handler = Handler {
+    job: job.clone(),
+    channel: None,
+  };
+
+  let boxed_handler = Box::new(handler);
+  let handler_ptr = Box::into_raw(boxed_handler) as *mut c_void;
+
+  unsafe {
+    let parameter_key = CString::new("path").unwrap();
+    let parameter_id = parameter_key.as_ptr();
+
+    let c_value = get_parameter_value(handler_ptr, parameter_id);
+    assert!(!handler_ptr.is_null());
+    assert!(!c_value.is_null());
+
+    let value = get_c_string!(c_value);
+    assert_eq!("/path/to/file".to_string(), value);
+  }
+}
+
+#[test]
+pub fn test_c_get_unknown_parameter_value() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id": "path",
+        "type": "string",
+        "value": "/path/to/file"
+      }
+    ]
+  }"#;
+
+  let job = Job::new(message).unwrap();
+  let handler = Handler {
+    job: job.clone(),
+    channel: None,
+  };
+
+  let boxed_handler = Box::new(handler);
+  let handler_ptr = Box::into_raw(boxed_handler) as *mut c_void;
+
+  let parameter_key = CString::new("other_parameter").unwrap();
+
+  let c_value = get_parameter_value(handler_ptr, parameter_key.as_ptr());
+  assert!(!handler_ptr.is_null());
+  assert!(c_value.is_null());
+
+  unsafe {
+    let value = get_c_string!(c_value);
+    assert_eq!("".to_string(), value);
+  }
+}
+
+#[test]
+pub fn test_c_get_parameter_value_with_null_ptr() {
+  let null_handler = std::ptr::null_mut();
+  let parameter_key = CString::new("path").unwrap();
+
+  let c_value = get_parameter_value(null_handler, parameter_key.as_ptr());
+  assert!(null_handler.is_null());
+  assert!(c_value.is_null());
+
+  unsafe {
+    let value = get_c_string!(c_value);
+    assert_eq!("".to_string(), value);
+  }
 }

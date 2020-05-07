@@ -63,13 +63,17 @@ void get_parameters(Parameter* parameters) {
 
 /**
  * Worker main process function
- * @param job                      Job parameters handler
- * @param parametersValueGetter    Get job parameter value callback
+ * @param handler                  Handler
+ * @param parameters_value_getter  Get job parameter value callback
+ * @param progress_callback        Progress callback
  * @param logger                   Rust Logger
+ * @param message                  Output message pointer
+ * @param output_paths             Output paths pointer
  */
 int process(
-    JobHandle job_handle,
+    Handler handler,
     GetParameterValueCallback parametersValueGetter,
+    ProgressCallback progressCallback,
     Logger logger,
     const char** message,
     const char*** output_paths
@@ -77,8 +81,11 @@ int process(
     // Print message through the Rust Logger
     logger("debug", "Start C Worker process...");
 
+    // Notify with progression
+    progressCallback(handler, 0);
+
     // Retrieve "path" job parameter value
-    char* value = parametersValueGetter(job_handle, "path");
+    char* value = parametersValueGetter(handler, "path");
 
     // Check whether an error occurred parsing job parameters
     if(value == NULL) {
@@ -86,14 +93,23 @@ int process(
         return 1;
     }
 
+    // Notify with progression
+    progressCallback(handler, 33);
+
     // Print value through the Rust Logger
     logger("debug", value);
+
+    // Free the parameter value pointer
+    free(value);
 
     set_str_on_ptr(message, "Everything worked well!\0");
 
     output_paths[0] = (const char **)malloc(sizeof(int) * 2);
     set_str_on_ptr(&output_paths[0][0], "/path/out.mxf\0");
     output_paths[0][1] = 0;
+
+    // Notify with progression
+    progressCallback(handler, 100);
 
     return 0;
 }

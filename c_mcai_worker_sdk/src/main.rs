@@ -39,12 +39,12 @@ impl MessageEvent for CWorkerEvent {
 
   fn process(
     &self,
-    _channel: Option<McaiChannel>,
+    channel: Option<McaiChannel>,
     job: &Job,
     job_result: JobResult,
   ) -> Result<JobResult, MessageError> {
     debug!("Process job: {:?}", job.job_id);
-    let process_return = call_worker_process(job);
+    let process_return = call_worker_process(job, channel);
     debug!("Returned: {:?}", process_return);
     process_return.as_result(job_result)
   }
