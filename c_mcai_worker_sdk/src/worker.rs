@@ -1,15 +1,17 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_uchar, c_uint, c_void};
+use std::ptr::{null, null_mut};
 
-use crate::constants;
-use crate::process_return::ProcessReturn;
 use libloading::Library;
+
 use mcai_worker_sdk::job::Job;
 use mcai_worker_sdk::worker::{Parameter, ParameterType};
 use mcai_worker_sdk::ParametersContainer;
 use mcai_worker_sdk::{debug, error, info, trace, warn};
 use mcai_worker_sdk::{publish_job_progression, McaiChannel};
-use std::ptr::null;
+
+use crate::constants;
+use crate::process_return::ProcessReturn;
 
 macro_rules! get_c_string {
   ($name:expr) => {
@@ -71,11 +73,12 @@ extern "C" fn get_parameter_value(
   let handler: Box<Handler> = unsafe { Box::from_raw(c_handler as *mut Handler) };
 
   let key = unsafe { get_c_string!(parameter_id) };
-  debug!("Get parameter value from id: {:?}", key);
 
   let param_value = if let Some(value) = handler.job.get_parameters_as_map().get(&key) {
     let string = CString::new(value.as_str()).unwrap();
-    string.as_ptr()
+    let string_ptr = string.as_ptr();
+    std::mem::forget(string);
+    string_ptr
   } else {
     null()
   };
@@ -352,4 +355,121 @@ pub fn test_c_binding_failing_process() {
   assert_eq!(returned_code.get_code(), 1);
   assert_eq!(returned_code.get_message(), "Something went wrong...");
   assert!(returned_code.get_output_paths().is_empty());
+}
+
+#[test]
+pub fn test_c_progress_ptr() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id": "path",
+        "type": "string",
+        "value": "/path/to/file"
+      }
+    ]
+  }"#;
+
+  let job = Job::new(message).unwrap();
+  let handler = Handler {
+    job: job.clone(),
+    channel: None,
+  };
+
+  let boxed_handler = Box::new(handler);
+  let handler_ptr = Box::into_raw(boxed_handler) as *mut c_void;
+
+  progress(handler_ptr, 25);
+  assert!(!handler_ptr.is_null());
+}
+
+#[test]
+pub fn test_c_progress_with_null_ptr() {
+  let null_handler = null_mut();
+  progress(null_handler, 50);
+  assert!(null_handler.is_null());
+}
+
+#[test]
+pub fn test_c_get_parameter_value() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id": "path",
+        "type": "string",
+        "value": "/path/to/file"
+      }
+    ]
+  }"#;
+
+  let job = Job::new(message).unwrap();
+  let handler = Handler {
+    job: job.clone(),
+    channel: None,
+  };
+
+  let boxed_handler = Box::new(handler);
+  let handler_ptr = Box::into_raw(boxed_handler) as *mut c_void;
+
+  unsafe {
+    let parameter_key = CString::new("path").unwrap();
+    let parameter_id = parameter_key.as_ptr();
+
+    let c_value = get_parameter_value(handler_ptr, parameter_id);
+    assert!(!handler_ptr.is_null());
+    assert!(!c_value.is_null());
+
+    let value = get_c_string!(c_value);
+    assert_eq!("/path/to/file".to_string(), value);
+  }
+}
+
+#[test]
+pub fn test_c_get_unknown_parameter_value() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id": "path",
+        "type": "string",
+        "value": "/path/to/file"
+      }
+    ]
+  }"#;
+
+  let job = Job::new(message).unwrap();
+  let handler = Handler {
+    job: job.clone(),
+    channel: None,
+  };
+
+  let boxed_handler = Box::new(handler);
+  let handler_ptr = Box::into_raw(boxed_handler) as *mut c_void;
+
+  let parameter_key = CString::new("other_parameter").unwrap();
+
+  let c_value = get_parameter_value(handler_ptr, parameter_key.as_ptr());
+  assert!(!handler_ptr.is_null());
+  assert!(c_value.is_null());
+
+  unsafe {
+    let value = get_c_string!(c_value);
+    assert_eq!("".to_string(), value);
+  }
+}
+
+#[test]
+pub fn test_c_get_parameter_value_with_null_ptr() {
+  let null_handler = null_mut();
+  let parameter_key = CString::new("path").unwrap();
+
+  let c_value = get_parameter_value(null_handler, parameter_key.as_ptr());
+  assert!(null_handler.is_null());
+  assert!(c_value.is_null());
+
+  unsafe {
+    let value = get_c_string!(c_value);
+    assert_eq!("".to_string(), value);
+  }
 }

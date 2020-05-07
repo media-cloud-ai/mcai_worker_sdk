@@ -99,6 +99,9 @@ int process(
     // Print value through the Rust Logger
     logger("debug", value);
 
+    // Free the parameter value pointer
+    free(value);
+
     set_str_on_ptr(message, "Everything worked well!\0");
 
     output_paths[0] = (const char **)malloc(sizeof(int) * 2);

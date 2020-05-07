@@ -26,6 +26,8 @@ typedef void* Handler;
  * Get job parameter value callback
  * @param _handler          the job & channel handler
  * @param _parameter_key    the name of the parameter to get
+ * @return the parameter value
+ * @note   the returned pointer must be freed by user.
  */
 typedef char* (*GetParameterValueCallback)(Handler _handler, const char* _parameter_key);
 
