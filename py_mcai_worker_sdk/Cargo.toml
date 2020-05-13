@@ -9,5 +9,5 @@ edition = "2018"
 
 [dependencies]
 mcai_worker_sdk = { path = "../rs_mcai_worker_sdk" }
-pyo3 = "0.9"
+pyo3 = "0.10"
 serde_json = "^1.0"
