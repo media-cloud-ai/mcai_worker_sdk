@@ -60,7 +60,7 @@ matrix:
     # Test coverage
     - rust: nightly
       install:
-        - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
+        - travis_wait RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
         - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
         - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
