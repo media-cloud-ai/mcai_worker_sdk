@@ -206,7 +206,7 @@ where
 
       match result {
         Ok(job_result) => {
-          info!(target: &job_result.get_job_id().to_string(), "Succeed process: {:?}", job_result)
+          info!(target: &job_result.get_job_id().to_string(), "Process succeeded: {:?}", job_result)
         }
         Err(message) => {
           error!("Error {:?}", message);
