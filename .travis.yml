@@ -14,8 +14,6 @@ env:
   - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
 jobs:
-  allow_failures:
-    - env: ALLOW_FAILURE=TRUE
   include:
     # Test Python SDK on nighlty
     - rust: nightly
@@ -78,7 +76,9 @@ jobs:
         - cargo test
       env:
         - ALLOW_FAILURE=TRUE
-        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so  
+  allow_failures:
+    - env: ALLOW_FAILURE=TRUE
 
 script:
   - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
