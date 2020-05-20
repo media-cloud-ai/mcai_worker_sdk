@@ -78,7 +78,9 @@ jobs:
         - ALLOW_FAILURE=TRUE
         - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so  
   allow_failures:
-    - env: ALLOW_FAILURE=TRUE
+    - env:
+      - ALLOW_FAILURE=TRUE
+      - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so  
 
 script:
   - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
