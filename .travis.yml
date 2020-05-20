@@ -13,7 +13,9 @@ rust:
 env:
   - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
-matrix:
+jobs:
+  allow_failures:
+    - env: ALLOW_FAILURE=TRUE
   include:
     # Test Python SDK on nighlty
     - rust: nightly
@@ -65,6 +67,7 @@ matrix:
         - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
         - travis_wait cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
       env:
+        - ALLOW_FAILURE=TRUE
         - COVERAGE_CHECK=TRUE
         - TRAVIS_RUST_VERSION=nightly-2020-01-21
         - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
@@ -76,10 +79,6 @@ matrix:
       env:
         - ALLOW_FAILURE=TRUE
         - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
-
-jobs:
-  allow_failures:
-    - env: ALLOW_FAILURE=TRUE
 
 script:
   - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
