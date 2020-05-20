@@ -128,7 +128,7 @@ pub fn publish_job_progression(
       })
       .map(|_| ())
   } else {
-    info!("progression: {}%", progression);
+    info!(target: &job.job_id.to_string(), "progression: {}%", progression);
     Ok(())
   }
 }

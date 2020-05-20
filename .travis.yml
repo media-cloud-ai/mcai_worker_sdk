@@ -13,7 +13,7 @@ rust:
 env:
   - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
-matrix:
+jobs:
   include:
     # Test Python SDK on nighlty
     - rust: nightly
@@ -60,11 +60,12 @@ matrix:
     # Test coverage
     - rust: nightly
       install:
-        - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
+        - travis_wait RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
         - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
-        - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+        - travis_wait cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
       env:
+        - ALLOW_FAILURE=TRUE
         - COVERAGE_CHECK=TRUE
         - TRAVIS_RUST_VERSION=nightly-2020-01-21
         - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
@@ -75,11 +76,17 @@ matrix:
         - cargo test
       env:
         - ALLOW_FAILURE=TRUE
-        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
-
-jobs:
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so  
   allow_failures:
-    - env: ALLOW_FAILURE=TRUE
+    - env:
+      - ALLOW_FAILURE=TRUE
+      - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so  
+  allow_failures:
+    - env:
+      - ALLOW_FAILURE=TRUE
+      - COVERAGE_CHECK=TRUE
+      - TRAVIS_RUST_VERSION=nightly-2020-01-21
+      - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
 
 script:
   - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
