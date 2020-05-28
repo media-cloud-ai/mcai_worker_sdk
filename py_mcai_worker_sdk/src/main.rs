@@ -4,9 +4,7 @@ use mcai_worker_sdk::{
   job::*,
   publish_job_progression, start_worker,
   worker::{Parameter, ParameterType},
-  Credential, McaiChannel, MessageError, MessageEvent,
-  Parameter::*,
-  Version,
+  Credential, McaiChannel, MessageError, MessageEvent, ParameterValue, Version,
 };
 use pyo3::{prelude::*, types::*};
 use std::{env, fs};
@@ -152,16 +150,9 @@ impl MessageEvent for PythonWorkerEvent {
 
     let list_of_parameters = PyDict::new(py);
     if let Err(error) = self.build_parameters(job, py, list_of_parameters) {
-      let locals = [("error", error)].into_py_dict(py);
-
-      let error_msg = py
-        .eval("repr(error)", None, Some(locals))
-        .expect("Unknown python error, unable to get the error message")
-        .to_string();
-
       let result = job_result
         .with_status(JobStatus::Error)
-        .with_message(&error_msg);
+        .with_message(&error);
       return Err(MessageError::ProcessingError(result));
     }
 
@@ -209,74 +200,65 @@ impl MessageEvent for PythonWorkerEvent {
   }
 }
 
+fn py_err_to_string(py: Python, error: PyErr) -> String {
+  let locals = [("error", error)].into_py_dict(py);
+
+  py.eval("repr(error)", None, Some(locals))
+    .expect("Unknown python error, unable to get the error message")
+    .to_string()
+}
+
 impl PythonWorkerEvent {
   fn build_parameters(
     &self,
     job: &Job,
     py: Python,
     list_of_parameters: &PyDict,
-  ) -> Result<(), PyErr> {
+  ) -> Result<(), String> {
     for parameter in &job.parameters {
-      match parameter {
-        ArrayOfStringsParam { id, default, value } => {
-          if let Some(v) = value {
-            list_of_parameters.set_item(id.to_string(), PyList::new(py, v))?;
-          } else if let Some(v) = default {
-            list_of_parameters.set_item(id.to_string(), PyList::new(py, v))?;
-          }
-        }
-        BooleanParam { id, default, value } => {
-          if let Some(v) = value {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          } else if let Some(v) = default {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          }
-        }
-        CredentialParam { id, default, value } => {
-          let credential_key = if let Some(v) = value {
-            Some(v)
-          } else if let Some(v) = default {
-            Some(v)
-          } else {
-            None
-          };
+      let current_value = if let Some(value) = &parameter.value {
+        value
+      } else if let Some(default) = &parameter.default {
+        default
+      } else {
+        continue;
+      };
 
-          if let Some(credential_key) = credential_key {
-            let credential = Credential {
-              key: credential_key.to_string(),
-            };
-            if let Ok(retrieved_value) = credential.request_value(&job) {
-              list_of_parameters.set_item(id.to_string(), retrieved_value)?;
-            } else {
-              error!("unable to retrieve the credential value");
-            }
-          } else {
-            error!("no value or default for the credential value");
-          }
-        }
-        IntegerParam { id, default, value } => {
-          if let Some(v) = value {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          } else if let Some(v) = default {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          }
-        }
-        ArrayOfMediaSegmentsParam { .. } | RequirementParam { .. } => {
-          // do nothing
-        }
-        StringParam { id, default, value } => {
-          if let Some(v) = value {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          } else if let Some(v) = default {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          }
-        }
-        JsonParam { id, default, value } => {
-          if let Some(v) = value {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          } else if let Some(v) = default {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          }
+      let id = parameter.get_id();
+
+      if parameter.kind == Vec::<String>::get_type_as_string() {
+        let v = Vec::<String>::parse_value(current_value).map_err(|e| format!("{:?}", e))?;
+        list_of_parameters
+          .set_item(id.to_string(), PyList::new(py, v))
+          .map_err(|e| py_err_to_string(py, e))?
+      } else if parameter.kind == String::get_type_as_string() {
+        let v = String::parse_value(current_value).map_err(|e| format!("{:?}", e))?;
+        list_of_parameters
+          .set_item(id.to_string(), v)
+          .map_err(|e| py_err_to_string(py, e))?;
+      } else if parameter.kind == bool::get_type_as_string() {
+        let v = bool::parse_value(current_value).map_err(|e| format!("{:?}", e))?;
+        list_of_parameters
+          .set_item(id.to_string(), v)
+          .map_err(|e| py_err_to_string(py, e))?;
+      } else if parameter.kind == i64::get_type_as_string() {
+        let v = i64::parse_value(current_value).map_err(|e| format!("{:?}", e))?;
+        list_of_parameters
+          .set_item(id.to_string(), v)
+          .map_err(|e| py_err_to_string(py, e))?;
+      } else if parameter.kind == f64::get_type_as_string() {
+        let v = f64::parse_value(current_value).map_err(|e| format!("{:?}", e))?;
+        list_of_parameters
+          .set_item(id.to_string(), v)
+          .map_err(|e| py_err_to_string(py, e))?;
+      } else if parameter.kind == Credential::get_type_as_string() {
+        let credential = Credential::parse_value(current_value).map_err(|e| format!("{:?}", e))?;
+        if let Ok(retrieved_value) = credential.request_value(&job) {
+          list_of_parameters
+            .set_item(id.to_string(), retrieved_value)
+            .map_err(|e| py_err_to_string(py, e))?;
+        } else {
+          error!("unable to retrieve the credential value");
         }
       }
     }
