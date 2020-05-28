@@ -6,6 +6,7 @@ use crate::mcai_worker_sdk::ParametersContainer;
 use mcai_worker_sdk::job::*;
 
 use mcai_worker_sdk::parameter::media_segment::MediaSegment;
+use mcai_worker_sdk::Credential;
 use std::collections::HashMap;
 
 #[derive(Deserialize, Serialize)]
@@ -34,7 +35,7 @@ fn test_job_result_from_json() {
         "default": 123456,
         "value": 654321 },
       { "id":"json_parameter",
-        "type":"json",
+        "type":"string",
         "default": "{\"key\":\"default\"}",
         "value": "{\"key\":\"value\"}" },
       { "id":"credential_parameter",
@@ -59,37 +60,37 @@ fn test_job_result_from_json() {
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
   assert_eq!(job_result.get_parameters().len(), 7);
 
-  let optional_string = job_result.get_string_parameter("string_parameter");
-  assert!(optional_string.is_some());
+  let optional_string = job_result.get_parameter::<String>("string_parameter");
+  assert!(optional_string.is_ok());
   assert_eq!("real_value".to_string(), optional_string.unwrap());
 
-  let optional_boolean = job_result.get_boolean_parameter("boolean_parameter");
-  assert!(optional_boolean.is_some());
+  let optional_boolean = job_result.get_parameter::<bool>("boolean_parameter");
+  assert!(optional_boolean.is_ok());
   assert_eq!(true, optional_boolean.unwrap());
 
-  let optional_integer = job_result.get_integer_parameter("integer_parameter");
-  assert!(optional_integer.is_some());
+  let optional_integer = job_result.get_parameter::<i64>("integer_parameter");
+  assert!(optional_integer.is_ok());
   assert_eq!(654321, optional_integer.unwrap());
 
-  let optional_json = job_result.get_json_parameter("json_parameter");
-  assert!(optional_json.is_some());
+  let optional_json = job_result.get_parameter::<String>("json_parameter");
+  assert!(optional_json.is_ok());
   let json_param: JsonParamTestStruct = serde_json::from_str(&optional_json.unwrap()).unwrap();
   assert_eq!("value", &json_param.key);
 
-  let optional_credential = job_result.get_credential_parameter("credential_parameter");
-  assert!(optional_credential.is_some());
+  let optional_credential = job_result.get_parameter::<Credential>("credential_parameter");
+  assert!(optional_credential.is_ok());
   let credential_value = optional_credential.unwrap();
   assert_eq!("credential_key", credential_value.key);
 
-  let option_array = job_result.get_array_of_strings_parameter("array_of_string_parameter");
-  assert!(option_array.is_some());
+  let option_array = job_result.get_parameter::<Vec<String>>("array_of_string_parameter");
+  assert!(option_array.is_ok());
   let array_of_values = option_array.unwrap();
   assert_eq!(1, array_of_values.len());
   assert_eq!("real_value".to_string(), array_of_values[0]);
 
   let option_media_segments_array =
-    job_result.get_array_of_media_segments_parameter("array_of_media_segments_parameter");
-  assert!(option_media_segments_array.is_some());
+    job_result.get_parameter::<Vec<MediaSegment>>("array_of_media_segments_parameter");
+  assert!(option_media_segments_array.is_ok());
   let media_segments_array = option_media_segments_array.unwrap();
   assert_eq!(media_segments_array.len(), 1);
   assert_eq!(MediaSegment::new(123, 456), media_segments_array[0]);
@@ -159,7 +160,7 @@ fn test_job_result_from_json_without_value() {
         "type":"integer",
         "default": 123456 },
       { "id":"json_parameter",
-        "type":"json",
+        "type":"string",
         "default": "{\"key\":\"default\"}" },
       { "id":"credential_parameter",
         "type":"credential",
@@ -182,40 +183,40 @@ fn test_job_result_from_json_without_value() {
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
   assert_eq!(job_result.get_parameters().len(), 7);
 
-  let optional_string = job_result.get_string_parameter("string_parameter");
-  assert!(optional_string.is_some());
+  let optional_string = job_result.get_parameter::<String>("string_parameter");
+  assert!(optional_string.is_ok());
   let string_value = optional_string.unwrap();
   assert_eq!("default_value".to_string(), string_value);
 
-  let optional_boolean = job_result.get_boolean_parameter("boolean_parameter");
-  assert!(optional_boolean.is_some());
+  let optional_boolean = job_result.get_parameter::<bool>("boolean_parameter");
+  assert!(optional_boolean.is_ok());
   let boolean_value = optional_boolean.unwrap();
   assert_eq!(false, boolean_value);
 
-  let optional_integer = job_result.get_integer_parameter("integer_parameter");
-  assert!(optional_integer.is_some());
+  let optional_integer = job_result.get_parameter::<i64>("integer_parameter");
+  assert!(optional_integer.is_ok());
   let integer_value = optional_integer.unwrap();
   assert_eq!(123456, integer_value);
 
-  let optional_json = job_result.get_json_parameter("json_parameter");
-  assert!(optional_json.is_some());
+  let optional_json = job_result.get_parameter::<String>("json_parameter");
+  assert!(optional_json.is_ok());
   let json_param: JsonParamTestStruct = serde_json::from_str(&optional_json.unwrap()).unwrap();
   assert_eq!("default", &json_param.key);
 
-  let optional_credential = job_result.get_credential_parameter("credential_parameter");
-  assert!(optional_credential.is_some());
+  let optional_credential = job_result.get_parameter::<Credential>("credential_parameter");
+  assert!(optional_credential.is_ok());
   let credential_value = optional_credential.unwrap();
   assert_eq!("default_credential_key", credential_value.key);
 
-  let option_array = job_result.get_array_of_strings_parameter("array_of_string_parameter");
-  assert!(option_array.is_some());
+  let option_array = job_result.get_parameter::<Vec<String>>("array_of_string_parameter");
+  assert!(option_array.is_ok());
   let array_of_values = option_array.unwrap();
   assert_eq!(1, array_of_values.len());
   assert_eq!("default_value".to_string(), array_of_values[0]);
 
   let option_media_segments_array =
-    job_result.get_array_of_media_segments_parameter("array_of_media_segments_parameter");
-  assert!(option_media_segments_array.is_some());
+    job_result.get_parameter::<Vec<MediaSegment>>("array_of_media_segments_parameter");
+  assert!(option_media_segments_array.is_ok());
   let media_segments_array = option_media_segments_array.unwrap();
   assert_eq!(media_segments_array.len(), 1);
   assert_eq!(MediaSegment::new(123, 456), media_segments_array[0]);
@@ -346,8 +347,8 @@ fn test_job_result_with_setters() {
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
 
   assert_eq!(
-    Some(content.to_string()),
-    job_result.get_string_parameter("message")
+    Ok(content.to_string()),
+    job_result.get_parameter::<String>("message")
   );
 
   job_result = job_result
@@ -360,6 +361,6 @@ fn test_job_result_with_setters() {
     .unwrap();
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
 
-  let json_param = job_result.get_json_parameter("json_param_id");
-  assert_eq!(Some("{\"key\":\"json\"}".to_string()), json_param);
+  let json_param = job_result.get_parameter::<String>("json_param_id");
+  assert_eq!(Ok("{\"key\":\"json\"}".to_string()), json_param);
 }

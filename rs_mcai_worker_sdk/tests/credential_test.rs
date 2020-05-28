@@ -1,6 +1,6 @@
 extern crate mcai_worker_sdk;
 
-use crate::mcai_worker_sdk::ParametersContainer;
+use crate::mcai_worker_sdk::{ParameterValue, ParametersContainer};
 use mcai_worker_sdk::job::*;
 use mcai_worker_sdk::{Credential, MessageError, Parameter};
 
@@ -39,13 +39,13 @@ fn test_credential_request_value() {
   let job = Job::new(message).unwrap();
 
   assert_eq!(
-    job.get_credential_parameter("test_credential"),
-    Some(Credential {
+    job.get_parameter::<Credential>("test_credential"),
+    Ok(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
 
-  let credential = job.get_credential_parameter("test_credential").unwrap();
+  let credential = job.get_parameter::<Credential>("test_credential").unwrap();
 
   assert_eq!(
     Ok("TEST_CREDENTIAL_VALUE".to_string()),
@@ -73,32 +73,34 @@ fn test_credential_request_value_no_session() {
   let job = Job::new(message).unwrap();
 
   assert_eq!(
-    job.get_credential_parameter("test_credential"),
-    Some(Credential {
+    job.get_parameter::<Credential>("test_credential"),
+    Ok(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
 
   assert_eq!(
-    job.get_credential_parameter("test_credential"),
-    Some(mcai_worker_sdk::Credential {
+    job.get_parameter::<Credential>("test_credential"),
+    Ok(mcai_worker_sdk::Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
 
-  let credential = job.get_credential_parameter("test_credential").unwrap();
+  let credential = job.get_parameter::<Credential>("test_credential").unwrap();
 
   assert_eq!(
     Err(MessageError::ProcessingError(
       JobResult::new(123)
         .with_status(JobStatus::Error)
-        .with_parameters(&mut vec![Parameter::StringParam {
+        .with_parameters(&mut vec![Parameter {
           id: "message".to_string(),
+          kind: String::get_type_as_string(),
           default: None,
-          value: Some(
+          value: serde_json::to_value(
             "error decoding response body: EOF while parsing a value at line 1 column 0"
               .to_string()
           )
+          .ok()
         }])
     )),
     credential.request_value(&job)
@@ -128,32 +130,34 @@ fn test_credential_request_value_invalid_session() {
   let job = Job::new(message).unwrap();
 
   assert_eq!(
-    job.get_credential_parameter("test_credential"),
-    Some(Credential {
+    job.get_parameter::<Credential>("test_credential"),
+    Ok(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
 
   assert_eq!(
-    job.get_credential_parameter("test_credential"),
-    Some(Credential {
+    job.get_parameter::<Credential>("test_credential"),
+    Ok(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
 
-  let credential = job.get_credential_parameter("test_credential").unwrap();
+  let credential = job.get_parameter::<Credential>("test_credential").unwrap();
 
   assert_eq!(
     Err(MessageError::ProcessingError(
       JobResult::new(123)
         .with_status(JobStatus::Error)
-        .with_parameters(&mut vec![Parameter::StringParam {
+        .with_parameters(&mut vec![Parameter {
           id: "message".to_string(),
+          kind: String::get_type_as_string(),
           default: None,
-          value: Some(
+          value: serde_json::to_value(
             "error decoding response body: missing field `access_token` at line 1 column 26"
               .to_string()
           )
+          .ok()
         }])
     )),
     credential.request_value(&job)
@@ -187,32 +191,34 @@ fn test_credential_request_value_no_credential() {
   let job = Job::new(message).unwrap();
 
   assert_eq!(
-    job.get_credential_parameter("test_credential"),
-    Some(Credential {
+    job.get_parameter::<Credential>("test_credential"),
+    Ok(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
 
   assert_eq!(
-    job.get_credential_parameter("test_credential"),
-    Some(Credential {
+    job.get_parameter::<Credential>("test_credential"),
+    Ok(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
 
-  let credential = job.get_credential_parameter("test_credential").unwrap();
+  let credential = job.get_parameter::<Credential>("test_credential").unwrap();
 
   assert_eq!(
     Err(MessageError::ProcessingError(
       JobResult::new(123)
         .with_status(JobStatus::Error)
-        .with_parameters(&mut vec![Parameter::StringParam {
+        .with_parameters(&mut vec![Parameter {
           id: "message".to_string(),
+          kind: String::get_type_as_string(),
           default: None,
-          value: Some(
+          value: serde_json::to_value(
             "error decoding response body: EOF while parsing a value at line 1 column 0"
               .to_string()
           )
+          .ok()
         }])
     )),
     credential.request_value(&job)
@@ -247,31 +253,33 @@ fn test_credential_request_value_invalid_credential() {
   let job = Job::new(message).unwrap();
 
   assert_eq!(
-    job.get_credential_parameter("test_credential"),
-    Some(Credential {
+    job.get_parameter::<Credential>("test_credential"),
+    Ok(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
 
   assert_eq!(
-    job.get_credential_parameter("test_credential"),
-    Some(Credential {
+    job.get_parameter::<Credential>("test_credential"),
+    Ok(Credential {
       key: "TEST_CREDENTIAL_KEY".to_string()
     })
   );
 
-  let credential = job.get_credential_parameter("test_credential").unwrap();
+  let credential = job.get_parameter::<Credential>("test_credential").unwrap();
 
   assert_eq!(
     Err(MessageError::ProcessingError(
       JobResult::new(123)
         .with_status(JobStatus::Error)
-        .with_parameters(&mut vec![Parameter::StringParam {
+        .with_parameters(&mut vec![Parameter {
           id: "message".to_string(),
+          kind: String::get_type_as_string(),
           default: None,
-          value: Some(
+          value: serde_json::to_value(
             "error decoding response body: missing field `id` at line 1 column 11".to_string()
           )
+          .ok()
         }])
     )),
     credential.request_value(&job)
