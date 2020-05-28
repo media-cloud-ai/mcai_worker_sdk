@@ -3,4 +3,5 @@ members = [
   "c_mcai_worker_sdk",
   "py_mcai_worker_sdk",
   "rs_mcai_worker_sdk",
+  "jl_mcai_worker_sdk",
 ]
