@@ -54,9 +54,7 @@ impl Job {
   }
 
   pub fn check_requirements(&self) -> Result<(), MessageError> {
-    if let Some(requirements) = self
-      .get_parameter::<Requirement>("requirements")
-      .ok() {
+    if let Ok(requirements) = self.get_parameter::<Requirement>("requirements") {
       if let Some(paths) = requirements.paths {
         for path in paths.iter() {
           let p = Path::new(path);
