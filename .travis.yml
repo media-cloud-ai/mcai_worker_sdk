@@ -88,8 +88,15 @@ script:
   - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
   - cargo test --package mcai_worker_sdk --package c_mcai_worker_sdk
 
+# Need to cache the whole `.cargo` directory to keep .crates.toml for
+# cargo-update to work
 cache:
-  cargo: true
+  directories:
+    - /home/travis/.cargo
+
+# But don't cache the cargo registry
+before_cache:
+  - rm -rf /home/travis/.cargo/registry
 
 addons:
   apt:
