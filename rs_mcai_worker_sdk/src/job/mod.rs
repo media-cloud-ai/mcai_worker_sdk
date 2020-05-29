@@ -54,18 +54,18 @@ impl Job {
   }
 
   pub fn check_requirements(&self) -> Result<(), MessageError> {
-    let requirements = self
+    if let Some(requirements) = self
       .get_parameter::<Requirement>("requirements")
-      .map_err(|error| MessageError::RequirementsError(format!("{:?}", error)))?;
-
-    if let Some(paths) = requirements.paths {
-      for path in paths.iter() {
-        let p = Path::new(path);
-        if !p.exists() {
-          return Err(MessageError::RequirementsError(format!(
-            "Warning: Required file does not exists: {:?}",
-            p
-          )));
+      .ok() {
+      if let Some(paths) = requirements.paths {
+        for path in paths.iter() {
+          let p = Path::new(path);
+          if !p.exists() {
+            return Err(MessageError::RequirementsError(format!(
+              "Warning: Required file does not exists: {:?}",
+              p
+            )));
+          }
         }
       }
     }
