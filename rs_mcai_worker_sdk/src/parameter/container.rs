@@ -12,9 +12,9 @@ pub trait ParametersContainer {
     for parameter in self.get_parameters() {
       if parameter.id == key && T::get_type_as_string() == parameter.kind {
         if let Some(value) = parameter.value.clone() {
-          return T::parse_value(value);
+          return T::parse_value(value, &parameter.store);
         } else if let Some(default) = parameter.default.clone() {
-          return T::parse_value(default);
+          return T::parse_value(default, &parameter.store);
         }
       }
     }

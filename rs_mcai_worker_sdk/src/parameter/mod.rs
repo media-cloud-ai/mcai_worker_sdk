@@ -15,7 +15,7 @@ pub struct ParameterValueError {
 }
 
 impl ParameterValueError {
-  fn new(message: &str) -> ParameterValueError {
+  pub fn new(message: &str) -> ParameterValueError {
     ParameterValueError {
       description: message.to_string(),
     }
@@ -37,10 +37,32 @@ impl std::fmt::Display for ParameterValueError {
 pub trait ParameterValue {
   fn parse_value(
     content: serde_json::Value,
+    store: &Option<String>,
   ) -> Result<Self, ParameterValueError>
   where
     Self: Sized + DeserializeOwned,
   {
+    let content = if let Some(store_code) = store {
+      debug!(
+        "Retrieve credential value {} from store {}",
+        content.to_string(),
+        store_code
+      );
+
+      if let serde_json::Value::String(credential_key) = content {
+        let value = credential::request_value(&credential_key, &store_code)
+          .map_err(|e| ParameterValueError::new(&format!("{:?}", e)))?;
+        // TODO handle other types...
+        Ok(serde_json::Value::String(value))
+      } else {
+        Err(ParameterValueError::new(&format!(
+          "Cannot handle credential type for {:?}",
+          content
+        )))
+      }?
+    } else {
+      content
+    };
     serde_json::value::from_value(content)
       .map_err(|e| ParameterValueError::new(&format!("{:?}", e)))
   }
@@ -105,6 +127,7 @@ pub struct Parameter {
   pub id: String,
   #[serde(rename = "type")]
   pub kind: String,
+  pub store: Option<String>,
   pub value: Option<serde_json::Value>,
   pub default: Option<serde_json::Value>,
 }

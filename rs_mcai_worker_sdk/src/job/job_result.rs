@@ -45,6 +45,7 @@ impl JobResult {
     self.parameters.push(Parameter {
       id: "message".to_string(),
       kind: String::get_type_as_string(),
+      store: None,
       default: None,
       value: serde_json::to_value(error.to_string()).ok(),
     });
@@ -55,6 +56,7 @@ impl JobResult {
     self.parameters.push(Parameter {
       id: "message".to_string(),
       kind: String::get_type_as_string(),
+      store: None,
       default: None,
       value: serde_json::to_value(message.to_string()).ok(),
     });
@@ -80,6 +82,7 @@ impl JobResult {
     self.parameters.push(Parameter {
       id: id.to_string(),
       kind: String::get_type_as_string(),
+      store: None,
       default: None,
       value: serde_json::to_value(json_string).ok(),
     });

@@ -98,7 +98,7 @@ fn test_new_job() {
   let optional_credential = job.get_parameter::<Credential>("credential_parameter");
   assert!(optional_credential.is_ok());
   let credential_value = optional_credential.unwrap();
-  assert_eq!("credential_key", credential_value.key);
+  assert_eq!("credential_key", credential_value.value);
 
   let option_array = job.get_parameter::<Vec<String>>("array_of_string_parameter");
   assert!(option_array.is_ok());

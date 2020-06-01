@@ -80,7 +80,7 @@ fn test_job_result_from_json() {
   let optional_credential = job_result.get_parameter::<Credential>("credential_parameter");
   assert!(optional_credential.is_ok());
   let credential_value = optional_credential.unwrap();
-  assert_eq!("credential_key", credential_value.key);
+  assert_eq!("credential_key", credential_value.value);
 
   let option_array = job_result.get_parameter::<Vec<String>>("array_of_string_parameter");
   assert!(option_array.is_ok());
@@ -206,7 +206,7 @@ fn test_job_result_from_json_without_value() {
   let optional_credential = job_result.get_parameter::<Credential>("credential_parameter");
   assert!(optional_credential.is_ok());
   let credential_value = optional_credential.unwrap();
-  assert_eq!("default_credential_key", credential_value.key);
+  assert_eq!("default_credential_key", credential_value.value);
 
   let option_array = job_result.get_parameter::<Vec<String>>("array_of_string_parameter");
   assert!(option_array.is_ok());
