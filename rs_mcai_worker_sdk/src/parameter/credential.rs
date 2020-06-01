@@ -5,9 +5,12 @@ use crate::{
 };
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
+use serde::Deserialize;
 
 #[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Deserialize)]
 pub struct Credential {
+  #[serde(flatten)]
   pub key: String,
 }
 

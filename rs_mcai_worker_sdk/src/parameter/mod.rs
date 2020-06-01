@@ -1,5 +1,8 @@
 use crate::parameter::media_segment::MediaSegment;
 use crate::Credential;
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
+use serde::Serialize;
 use std::error::Error;
 
 pub mod container;
@@ -24,6 +27,7 @@ impl Error for ParameterValueError {
     self.description.as_ref()
   }
 }
+
 impl std::fmt::Display for ParameterValueError {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     f.write_str(&self.to_string())
@@ -31,170 +35,61 @@ impl std::fmt::Display for ParameterValueError {
 }
 
 pub trait ParameterValue {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError>
+  fn parse_value(
+    content: serde_json::Value,
+  ) -> Result<Self, ParameterValueError>
   where
-    Self: Sized;
+    Self: Sized + DeserializeOwned,
+  {
+    serde_json::value::from_value(content)
+      .map_err(|e| ParameterValueError::new(&format!("{:?}", e)))
+  }
   fn get_type_as_string() -> String;
 }
 
 impl ParameterValue for String {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::String(content) = content {
-      Ok(content.clone())
-    } else {
-      Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
-      )))
-    }
-  }
-
   fn get_type_as_string() -> String {
     "string".to_string()
   }
 }
 
 impl ParameterValue for i64 {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::Number(content) = content {
-      Ok(content.as_i64().unwrap())
-    } else {
-      Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
-      )))
-    }
-  }
-
   fn get_type_as_string() -> String {
     "integer".to_string()
   }
 }
 
 impl ParameterValue for f64 {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::Number(content) = content {
-      Ok(content.as_f64().unwrap())
-    } else {
-      Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
-      )))
-    }
-  }
-
   fn get_type_as_string() -> String {
     "float".to_string()
   }
 }
 
 impl ParameterValue for bool {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::Bool(content) = content {
-      Ok(*content)
-    } else {
-      Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
-      )))
-    }
-  }
-
   fn get_type_as_string() -> String {
     "boolean".to_string()
   }
 }
 
 impl ParameterValue for Vec<String> {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::Array(array) = content {
-      let mut ret = Vec::<String>::new();
-      for item in array.iter() {
-        if let serde_json::Value::String(value) = item {
-          ret.push(value.clone());
-        }
-      }
-      Ok(ret)
-    } else {
-      Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
-      )))
-    }
-  }
-
   fn get_type_as_string() -> String {
     "array_of_strings".to_string()
   }
 }
 
 impl ParameterValue for Credential {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::String(content) = content {
-      Ok(Credential {
-        key: content.clone(),
-      })
-    } else {
-      Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
-      )))
-    }
-  }
-
   fn get_type_as_string() -> String {
     "credential".to_string()
   }
 }
 
 impl ParameterValue for Requirement {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::Object(content) = content {
-      if let Some(paths_value) = content.get("paths") {
-        let paths = Vec::<String>::parse_value(paths_value).map_err(|_e| {
-          ParameterValueError::new(&format!(
-            "Could not parse paths into {}.",
-            Self::get_type_as_string()
-          ))
-        })?;
-        return Ok(Requirement { paths: Some(paths) });
-      }
-    }
-    Err(ParameterValueError::new(&format!(
-      "Could not find {} content to parse.",
-      Self::get_type_as_string()
-    )))
-  }
-
   fn get_type_as_string() -> String {
     "requirements".to_string()
   }
 }
 
 impl ParameterValue for Vec<MediaSegment> {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::Array(array) = content {
-      let mut ret = Vec::<MediaSegment>::new();
-      for item in array.iter() {
-        let media_segment =
-          serde_json::from_value::<MediaSegment>(item.clone()).map_err(|error| {
-            ParameterValueError::new(&format!(
-              "Could not deserialize {} value: {:?}",
-              Self::get_type_as_string(),
-              error
-            ))
-          })?;
-        ret.push(media_segment);
-      }
-      Ok(ret)
-    } else {
-      Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
-      )))
-    }
-  }
-
   fn get_type_as_string() -> String {
     "array_of_media_segments".to_string()
   }

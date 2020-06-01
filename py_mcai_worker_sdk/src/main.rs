@@ -216,9 +216,9 @@ impl PythonWorkerEvent {
     list_of_parameters: &PyDict,
   ) -> Result<(), String> {
     for parameter in &job.parameters {
-      let current_value = if let Some(value) = &parameter.value {
+      let current_value = if let Some(value) = parameter.value.clone() {
         value
-      } else if let Some(default) = &parameter.default {
+      } else if let Some(default) = parameter.default.clone() {
         default
       } else {
         continue;
