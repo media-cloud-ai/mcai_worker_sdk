@@ -3,7 +3,7 @@ use mcai_worker_sdk::{
   job::*,
   publish_job_progression, start_worker,
   worker::{Parameter, ParameterType},
-  Credential, McaiChannel, MessageError, MessageEvent, ParameterValue, Version,
+  McaiChannel, MessageError, MessageEvent, ParameterValue, Version,
 };
 use pyo3::{prelude::*, types::*};
 use std::{env, fs};
@@ -255,8 +255,8 @@ impl PythonWorkerEvent {
         list_of_parameters
           .set_item(id.to_string(), v)
           .map_err(|e| py_err_to_string(py, e))?;
-      } else if parameter.kind == Credential::get_type_as_string() {
-        let credential = Credential::parse_value(current_value, &parameter.store)
+      } else if parameter.kind == mcai_worker_sdk::Credential::get_type_as_string() {
+        let credential = mcai_worker_sdk::Credential::parse_value(current_value, &parameter.store)
           .map_err(|e| format!("{:?}", e))?;
         list_of_parameters
           .set_item(id.to_string(), credential.value)

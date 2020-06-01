@@ -11,14 +11,15 @@ use serde::Serialize;
 use serde::Serializer;
 
 #[deprecated(
-  since = "0.10.3",
-  note = "Please use the store field in Parameter instead"
+  since = "0.10.4",
+  note = "Please use the `store` field in Parameter instead"
 )]
 #[derive(Debug, PartialEq)]
 pub struct Credential {
   pub value: String,
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
 impl Serialize for Credential {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
   where
@@ -30,6 +31,7 @@ impl Serialize for Credential {
 
 struct CredentialVisitor;
 
+#[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
 impl<'de> Visitor<'de> for CredentialVisitor {
   type Value = Credential;
 
@@ -54,6 +56,7 @@ impl<'de> Visitor<'de> for CredentialVisitor {
   }
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
 impl<'de> Deserialize<'de> for Credential {
   fn deserialize<D>(deserializer: D) -> Result<Credential, D::Error>
   where

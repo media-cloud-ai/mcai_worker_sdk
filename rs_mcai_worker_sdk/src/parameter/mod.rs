@@ -1,5 +1,4 @@
 use crate::parameter::media_segment::MediaSegment;
-use crate::Credential;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -99,7 +98,8 @@ impl ParameterValue for Vec<String> {
   }
 }
 
-impl ParameterValue for Credential {
+#[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
+impl ParameterValue for credential::Credential {
   fn get_type_as_string() -> String {
     "credential".to_string()
   }
