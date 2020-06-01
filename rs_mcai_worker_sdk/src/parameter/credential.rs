@@ -63,11 +63,10 @@ impl<'de> Deserialize<'de> for Credential {
   }
 }
 
-// TODO handle store code
-pub fn request_value(credential_key: &str, _store_code: &str) -> Result<String, String> {
-  let backend_endpoint = get_backend_hostname();
-  let backend_username = get_backend_username();
-  let backend_password = get_backend_password();
+pub fn request_value(credential_key: &str, store_code: &str) -> Result<String, String> {
+  let backend_endpoint = get_store_hostname(store_code);
+  let backend_username = get_store_username(store_code);
+  let backend_password = get_store_password(store_code);
 
   let session_url = format!("{}/sessions", backend_endpoint);
   let credential_url = format!("{}/credentials/{}", backend_endpoint, credential_key);
