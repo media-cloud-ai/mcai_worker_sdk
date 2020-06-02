@@ -1,5 +1,8 @@
 use crate::parameter::media_segment::MediaSegment;
-use crate::Credential;
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
+use serde::Serialize;
+use serde_json::Value;
 use std::error::Error;
 
 pub mod container;
@@ -12,7 +15,7 @@ pub struct ParameterValueError {
 }
 
 impl ParameterValueError {
-  fn new(message: &str) -> ParameterValueError {
+  pub fn new(message: &str) -> ParameterValueError {
     ParameterValueError {
       description: message.to_string(),
     }
@@ -24,6 +27,7 @@ impl Error for ParameterValueError {
     self.description.as_ref()
   }
 }
+
 impl std::fmt::Display for ParameterValueError {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     f.write_str(&self.to_string())
@@ -31,38 +35,72 @@ impl std::fmt::Display for ParameterValueError {
 }
 
 pub trait ParameterValue {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError>
+  fn parse_value(content: Value, store: &Option<String>) -> Result<Self, ParameterValueError>
   where
-    Self: Sized;
+    Self: Sized + DeserializeOwned,
+  {
+    let content = if let Some(store_code) = store {
+      debug!(
+        "Retrieve credential value {} from store {}",
+        content.to_string(),
+        store_code
+      );
+
+      if let Value::String(credential_key) = content {
+        Self::from_store(&credential_key, &store_code)
+      } else {
+        Err(ParameterValueError::new(&format!(
+          "Cannot handle credential type for {:?}",
+          content
+        )))
+      }?
+    } else {
+      content
+    };
+
+    Self::from_value(content)
+  }
+
+  fn from_store(key: &str, store_code: &str) -> Result<Value, ParameterValueError> {
+    credential::request_value(&key, &store_code)
+      .map_err(|e| ParameterValueError::new(&format!("{:?}", e)))
+  }
+
+  fn from_value(content: Value) -> Result<Self, ParameterValueError>
+  where
+    Self: Sized + DeserializeOwned,
+  {
+    serde_json::value::from_value(content)
+      .map_err(|e| ParameterValueError::new(&format!("{:?}", e)))
+  }
+
   fn get_type_as_string() -> String;
 }
 
 impl ParameterValue for String {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::String(content) = content {
-      Ok(content.clone())
-    } else {
-      Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
-      )))
-    }
-  }
-
   fn get_type_as_string() -> String {
     "string".to_string()
   }
 }
 
 impl ParameterValue for i64 {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::Number(content) = content {
-      Ok(content.as_i64().unwrap())
-    } else {
-      Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
-      )))
+  fn from_value(value: Value) -> Result<i64, ParameterValueError> {
+    match value {
+      Value::String(value) => value
+        .parse()
+        .map_err(|e| ParameterValueError::new(&format!("{:?}", e))),
+      Value::Number(value) => value.as_i64().ok_or_else(|| {
+        ParameterValueError::new(&format!(
+          "Cannot convert value type '{:?}' to type {}",
+          value,
+          std::any::type_name::<Self>()
+        ))
+      }),
+      _ => Err(ParameterValueError::new(&format!(
+        "Cannot convert value type '{:?}' to type {}",
+        value,
+        std::any::type_name::<Self>()
+      ))),
     }
   }
 
@@ -72,14 +110,23 @@ impl ParameterValue for i64 {
 }
 
 impl ParameterValue for f64 {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::Number(content) = content {
-      Ok(content.as_f64().unwrap())
-    } else {
-      Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
-      )))
+  fn from_value(value: Value) -> Result<f64, ParameterValueError> {
+    match value {
+      Value::String(value) => value
+        .parse()
+        .map_err(|e| ParameterValueError::new(&format!("{:?}", e))),
+      Value::Number(value) => value.as_f64().ok_or_else(|| {
+        ParameterValueError::new(&format!(
+          "Cannot convert value type '{:?}' to type {}",
+          value,
+          std::any::type_name::<Self>()
+        ))
+      }),
+      _ => Err(ParameterValueError::new(&format!(
+        "Cannot convert value type '{:?}' to type {}",
+        value,
+        std::any::type_name::<Self>()
+      ))),
     }
   }
 
@@ -89,14 +136,18 @@ impl ParameterValue for f64 {
 }
 
 impl ParameterValue for bool {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::Bool(content) = content {
-      Ok(*content)
-    } else {
-      Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
-      )))
+  fn from_value(value: Value) -> Result<bool, ParameterValueError> {
+    match value {
+      Value::String(value) => value
+        .parse()
+        .map_err(|e| ParameterValueError::new(&format!("{:?}", e))),
+      Value::Number(value) => Ok(value.as_i64().map_or_else(|| false, |v| v > 0)),
+      Value::Bool(value) => Ok(value),
+      _ => Err(ParameterValueError::new(&format!(
+        "Cannot convert value type '{:?}' to type {}",
+        value,
+        std::any::type_name::<Self>()
+      ))),
     }
   }
 
@@ -106,38 +157,32 @@ impl ParameterValue for bool {
 }
 
 impl ParameterValue for Vec<String> {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::Array(array) = content {
-      let mut ret = Vec::<String>::new();
-      for item in array.iter() {
-        if let serde_json::Value::String(value) = item {
-          ret.push(value.clone());
-        }
-      }
-      Ok(ret)
-    } else {
-      Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
-      )))
-    }
-  }
-
   fn get_type_as_string() -> String {
     "array_of_strings".to_string()
   }
 }
 
-impl ParameterValue for Credential {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::String(content) = content {
-      Ok(Credential {
-        key: content.clone(),
-      })
+#[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
+impl ParameterValue for credential::Credential {
+  fn parse_value(content: Value, store: &Option<String>) -> Result<Self, ParameterValueError>
+  where
+    Self: Sized + DeserializeOwned,
+  {
+    let store_code = store.clone().unwrap_or_else(|| "BACKEND".to_string());
+
+    debug!(
+      "Retrieve credential value {} from store {}",
+      content.to_string(),
+      store_code
+    );
+
+    if let Value::String(credential_key) = &content {
+      let value = Self::from_store(&credential_key, &store_code)?;
+      Self::from_value(value)
     } else {
       Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
+        "Cannot handle credential type for {:?}",
+        content
       )))
     }
   }
@@ -148,53 +193,12 @@ impl ParameterValue for Credential {
 }
 
 impl ParameterValue for Requirement {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::Object(content) = content {
-      if let Some(paths_value) = content.get("paths") {
-        let paths = Vec::<String>::parse_value(paths_value).map_err(|_e| {
-          ParameterValueError::new(&format!(
-            "Could not parse paths into {}.",
-            Self::get_type_as_string()
-          ))
-        })?;
-        return Ok(Requirement { paths: Some(paths) });
-      }
-    }
-    Err(ParameterValueError::new(&format!(
-      "Could not find {} content to parse.",
-      Self::get_type_as_string()
-    )))
-  }
-
   fn get_type_as_string() -> String {
     "requirements".to_string()
   }
 }
 
 impl ParameterValue for Vec<MediaSegment> {
-  fn parse_value(content: &serde_json::Value) -> Result<Self, ParameterValueError> {
-    if let serde_json::Value::Array(array) = content {
-      let mut ret = Vec::<MediaSegment>::new();
-      for item in array.iter() {
-        let media_segment =
-          serde_json::from_value::<MediaSegment>(item.clone()).map_err(|error| {
-            ParameterValueError::new(&format!(
-              "Could not deserialize {} value: {:?}",
-              Self::get_type_as_string(),
-              error
-            ))
-          })?;
-        ret.push(media_segment);
-      }
-      Ok(ret)
-    } else {
-      Err(ParameterValueError::new(&format!(
-        "Could not find {} content to parse.",
-        Self::get_type_as_string()
-      )))
-    }
-  }
-
   fn get_type_as_string() -> String {
     "array_of_media_segments".to_string()
   }
@@ -210,8 +214,9 @@ pub struct Parameter {
   pub id: String,
   #[serde(rename = "type")]
   pub kind: String,
-  pub value: Option<serde_json::Value>,
-  pub default: Option<serde_json::Value>,
+  pub store: Option<String>,
+  pub value: Option<Value>,
+  pub default: Option<Value>,
 }
 
 impl Parameter {
@@ -235,12 +240,12 @@ impl ToString for Parameter {
     };
 
     match current_value {
-      serde_json::Value::Null => format!("{:?}", current_value),
-      serde_json::Value::Object(_content) => serde_json::to_string(current_value).unwrap(),
-      serde_json::Value::Array(_content) => serde_json::to_string(current_value).unwrap(),
-      serde_json::Value::Bool(content) => format!("{}", content),
-      serde_json::Value::Number(content) => format!("{}", content),
-      serde_json::Value::String(content) => content.to_string(),
+      Value::Null => format!("{:?}", current_value),
+      Value::Object(_content) => serde_json::to_string(current_value).unwrap(),
+      Value::Array(_content) => serde_json::to_string(current_value).unwrap(),
+      Value::Bool(content) => format!("{}", content),
+      Value::Number(content) => format!("{}", content),
+      Value::String(content) => content.to_string(),
     }
   }
 }

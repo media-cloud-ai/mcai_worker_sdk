@@ -1,10 +1,9 @@
 use crate::helpers::get_destination_paths;
 use mcai_worker_sdk::{
-  error,
   job::*,
   publish_job_progression, start_worker,
   worker::{Parameter, ParameterType},
-  Credential, McaiChannel, MessageError, MessageEvent, ParameterValue, Version,
+  McaiChannel, MessageError, MessageEvent, ParameterValue, Version,
 };
 use pyo3::{prelude::*, types::*};
 use std::{env, fs};
@@ -216,9 +215,9 @@ impl PythonWorkerEvent {
     list_of_parameters: &PyDict,
   ) -> Result<(), String> {
     for parameter in &job.parameters {
-      let current_value = if let Some(value) = &parameter.value {
+      let current_value = if let Some(value) = parameter.value.clone() {
         value
-      } else if let Some(default) = &parameter.default {
+      } else if let Some(default) = parameter.default.clone() {
         default
       } else {
         continue;
@@ -227,39 +226,41 @@ impl PythonWorkerEvent {
       let id = parameter.get_id();
 
       if parameter.kind == Vec::<String>::get_type_as_string() {
-        let v = Vec::<String>::parse_value(current_value).map_err(|e| format!("{:?}", e))?;
+        let v = Vec::<String>::parse_value(current_value, &parameter.store)
+          .map_err(|e| format!("{:?}", e))?;
         list_of_parameters
           .set_item(id.to_string(), PyList::new(py, v))
           .map_err(|e| py_err_to_string(py, e))?
       } else if parameter.kind == String::get_type_as_string() {
-        let v = String::parse_value(current_value).map_err(|e| format!("{:?}", e))?;
+        let v =
+          String::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
         list_of_parameters
           .set_item(id.to_string(), v)
           .map_err(|e| py_err_to_string(py, e))?;
       } else if parameter.kind == bool::get_type_as_string() {
-        let v = bool::parse_value(current_value).map_err(|e| format!("{:?}", e))?;
+        let v =
+          bool::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
         list_of_parameters
           .set_item(id.to_string(), v)
           .map_err(|e| py_err_to_string(py, e))?;
       } else if parameter.kind == i64::get_type_as_string() {
-        let v = i64::parse_value(current_value).map_err(|e| format!("{:?}", e))?;
+        let v =
+          i64::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
         list_of_parameters
           .set_item(id.to_string(), v)
           .map_err(|e| py_err_to_string(py, e))?;
       } else if parameter.kind == f64::get_type_as_string() {
-        let v = f64::parse_value(current_value).map_err(|e| format!("{:?}", e))?;
+        let v =
+          f64::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
         list_of_parameters
           .set_item(id.to_string(), v)
           .map_err(|e| py_err_to_string(py, e))?;
-      } else if parameter.kind == Credential::get_type_as_string() {
-        let credential = Credential::parse_value(current_value).map_err(|e| format!("{:?}", e))?;
-        if let Ok(retrieved_value) = credential.request_value(&job) {
-          list_of_parameters
-            .set_item(id.to_string(), retrieved_value)
-            .map_err(|e| py_err_to_string(py, e))?;
-        } else {
-          error!("unable to retrieve the credential value");
-        }
+      } else if parameter.kind == mcai_worker_sdk::Credential::get_type_as_string() {
+        let credential = mcai_worker_sdk::Credential::parse_value(current_value, &parameter.store)
+          .map_err(|e| format!("{:?}", e))?;
+        list_of_parameters
+          .set_item(id.to_string(), credential.value)
+          .map_err(|e| py_err_to_string(py, e))?;
       }
     }
 

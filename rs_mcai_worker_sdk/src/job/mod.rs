@@ -1,6 +1,7 @@
 //! Module to manage Job
 
 use crate::{parameter::container::ParametersContainer, MessageError, Parameter, Requirement};
+use serde_json::Value;
 use std::path::Path;
 
 mod job_progression;
@@ -37,7 +38,7 @@ pub struct SessionResponseBody {
 pub struct DataResponseBody {
   id: u32,
   key: String,
-  pub value: String,
+  pub value: Value,
   inserted_at: String,
 }
 

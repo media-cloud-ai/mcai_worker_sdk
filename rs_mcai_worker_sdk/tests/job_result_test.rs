@@ -6,6 +6,7 @@ use crate::mcai_worker_sdk::ParametersContainer;
 use mcai_worker_sdk::job::*;
 
 use mcai_worker_sdk::parameter::media_segment::MediaSegment;
+use mcai_worker_sdk::parameter::ParameterValueError;
 use mcai_worker_sdk::Credential;
 use std::collections::HashMap;
 
@@ -78,9 +79,9 @@ fn test_job_result_from_json() {
   assert_eq!("value", &json_param.key);
 
   let optional_credential = job_result.get_parameter::<Credential>("credential_parameter");
-  assert!(optional_credential.is_ok());
-  let credential_value = optional_credential.unwrap();
-  assert_eq!("credential_key", credential_value.key);
+  assert!(optional_credential.is_err());
+  let credential_value = optional_credential.unwrap_err();
+  assert_eq!(ParameterValueError::new("\"error sending request for url (http://127.0.0.1:4000/api/sessions): error trying to connect: tcp connect error: Connection refused (os error 111)\""), credential_value);
 
   let option_array = job_result.get_parameter::<Vec<String>>("array_of_string_parameter");
   assert!(option_array.is_ok());
@@ -204,9 +205,9 @@ fn test_job_result_from_json_without_value() {
   assert_eq!("default", &json_param.key);
 
   let optional_credential = job_result.get_parameter::<Credential>("credential_parameter");
-  assert!(optional_credential.is_ok());
-  let credential_value = optional_credential.unwrap();
-  assert_eq!("default_credential_key", credential_value.key);
+  assert!(optional_credential.is_err());
+  let credential_value = optional_credential.unwrap_err();
+  assert_eq!(ParameterValueError::new("\"error sending request for url (http://127.0.0.1:4000/api/sessions): error trying to connect: tcp connect error: Connection refused (os error 111)\""), credential_value);
 
   let option_array = job_result.get_parameter::<Vec<String>>("array_of_string_parameter");
   assert!(option_array.is_ok());

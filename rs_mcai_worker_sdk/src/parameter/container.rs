@@ -1,25 +1,27 @@
 use crate::parameter::{Parameter, ParameterValue, ParameterValueError};
+use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
 pub trait ParametersContainer {
   fn get_parameters(&self) -> &Vec<Parameter>;
 
-  fn get_parameter<T>(&self, key: &str) -> Result<T, ParameterValueError>
+  fn get_parameter<T: DeserializeOwned>(&self, key: &str) -> Result<T, ParameterValueError>
   where
     T: ParameterValue,
   {
     for parameter in self.get_parameters() {
       if parameter.id == key && T::get_type_as_string() == parameter.kind {
-        if let Some(value) = &parameter.value {
-          return T::parse_value(value);
-        } else if let Some(default) = &parameter.default {
-          return T::parse_value(default);
+        if let Some(value) = parameter.value.clone() {
+          return T::parse_value(value, &parameter.store);
+        } else if let Some(default) = parameter.default.clone() {
+          return T::parse_value(default, &parameter.store);
         }
       }
     }
     Err(ParameterValueError::new(&format!(
-      "Could not find any parameter for key '{}'",
-      key
+      "Could not find any parameter for key '{}' and type '{}'",
+      key,
+      T::get_type_as_string()
     )))
   }
 
