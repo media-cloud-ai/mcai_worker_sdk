@@ -36,7 +36,7 @@ impl std::fmt::Display for ParameterValueError {
 
 pub trait ParameterValue {
   fn parse_value(
-    content: serde_json::Value,
+    content: Value,
     store: &Option<String>,
   ) -> Result<Self, ParameterValueError>
   where
@@ -49,7 +49,7 @@ pub trait ParameterValue {
         store_code
       );
 
-      if let serde_json::Value::String(credential_key) = content {
+      if let Value::String(credential_key) = content {
         Self::from_store(&credential_key, &store_code)
       } else {
         Err(ParameterValueError::new(&format!(
