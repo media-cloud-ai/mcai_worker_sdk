@@ -35,10 +35,7 @@ impl std::fmt::Display for ParameterValueError {
 }
 
 pub trait ParameterValue {
-  fn parse_value(
-    content: Value,
-    store: &Option<String>,
-  ) -> Result<Self, ParameterValueError>
+  fn parse_value(content: Value, store: &Option<String>) -> Result<Self, ParameterValueError>
   where
     Self: Sized + DeserializeOwned,
   {
