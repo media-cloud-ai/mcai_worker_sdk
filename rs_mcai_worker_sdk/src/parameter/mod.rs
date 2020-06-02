@@ -2,6 +2,7 @@ use crate::parameter::media_segment::MediaSegment;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
+use serde_json::Value;
 use std::error::Error;
 
 pub mod container;
@@ -49,10 +50,7 @@ pub trait ParameterValue {
       );
 
       if let serde_json::Value::String(credential_key) = content {
-        let value = credential::request_value(&credential_key, &store_code)
-          .map_err(|e| ParameterValueError::new(&format!("{:?}", e)))?;
-        // TODO handle other types...
-        Ok(serde_json::Value::String(value))
+        Self::from_store(&credential_key, &store_code)
       } else {
         Err(ParameterValueError::new(&format!(
           "Cannot handle credential type for {:?}",
@@ -62,9 +60,23 @@ pub trait ParameterValue {
     } else {
       content
     };
+
+    Self::from_value(content)
+  }
+
+  fn from_store(key: &str, store_code: &str) -> Result<Value, ParameterValueError> {
+    credential::request_value(&key, &store_code)
+      .map_err(|e| ParameterValueError::new(&format!("{:?}", e)))
+  }
+
+  fn from_value(content: Value) -> Result<Self, ParameterValueError>
+  where
+    Self: Sized + DeserializeOwned,
+  {
     serde_json::value::from_value(content)
       .map_err(|e| ParameterValueError::new(&format!("{:?}", e)))
   }
+
   fn get_type_as_string() -> String;
 }
 
@@ -75,18 +87,73 @@ impl ParameterValue for String {
 }
 
 impl ParameterValue for i64 {
+  fn from_value(value: Value) -> Result<i64, ParameterValueError> {
+    match value {
+      Value::String(value) => value
+        .parse()
+        .map_err(|e| ParameterValueError::new(&format!("{:?}", e))),
+      Value::Number(value) => value.as_i64().ok_or_else(|| {
+        ParameterValueError::new(&format!(
+          "Cannot convert value type '{:?}' to type {}",
+          value,
+          std::any::type_name::<Self>()
+        ))
+      }),
+      _ => Err(ParameterValueError::new(&format!(
+        "Cannot convert value type '{:?}' to type {}",
+        value,
+        std::any::type_name::<Self>()
+      ))),
+    }
+  }
+
   fn get_type_as_string() -> String {
     "integer".to_string()
   }
 }
 
 impl ParameterValue for f64 {
+  fn from_value(value: Value) -> Result<f64, ParameterValueError> {
+    match value {
+      Value::String(value) => value
+        .parse()
+        .map_err(|e| ParameterValueError::new(&format!("{:?}", e))),
+      Value::Number(value) => value.as_f64().ok_or_else(|| {
+        ParameterValueError::new(&format!(
+          "Cannot convert value type '{:?}' to type {}",
+          value,
+          std::any::type_name::<Self>()
+        ))
+      }),
+      _ => Err(ParameterValueError::new(&format!(
+        "Cannot convert value type '{:?}' to type {}",
+        value,
+        std::any::type_name::<Self>()
+      ))),
+    }
+  }
+
   fn get_type_as_string() -> String {
     "float".to_string()
   }
 }
 
 impl ParameterValue for bool {
+  fn from_value(value: Value) -> Result<bool, ParameterValueError> {
+    match value {
+      Value::String(value) => value
+        .parse()
+        .map_err(|e| ParameterValueError::new(&format!("{:?}", e))),
+      Value::Number(value) => Ok(value.as_i64().map_or_else(|| false, |v| v > 0)),
+      Value::Bool(value) => Ok(value),
+      _ => Err(ParameterValueError::new(&format!(
+        "Cannot convert value type '{:?}' to type {}",
+        value,
+        std::any::type_name::<Self>()
+      ))),
+    }
+  }
+
   fn get_type_as_string() -> String {
     "boolean".to_string()
   }
@@ -100,6 +167,29 @@ impl ParameterValue for Vec<String> {
 
 #[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
 impl ParameterValue for credential::Credential {
+  fn parse_value(content: Value, store: &Option<String>) -> Result<Self, ParameterValueError>
+  where
+    Self: Sized + DeserializeOwned,
+  {
+    let store_code = store.clone().unwrap_or_else(|| "BACKEND".to_string());
+
+    debug!(
+      "Retrieve credential value {} from store {}",
+      content.to_string(),
+      store_code
+    );
+
+    if let Value::String(credential_key) = &content {
+      let value = Self::from_store(&credential_key, &store_code)?;
+      Self::from_value(value)
+    } else {
+      Err(ParameterValueError::new(&format!(
+        "Cannot handle credential type for {:?}",
+        content
+      )))
+    }
+  }
+
   fn get_type_as_string() -> String {
     "credential".to_string()
   }
@@ -128,8 +218,8 @@ pub struct Parameter {
   #[serde(rename = "type")]
   pub kind: String,
   pub store: Option<String>,
-  pub value: Option<serde_json::Value>,
-  pub default: Option<serde_json::Value>,
+  pub value: Option<Value>,
+  pub default: Option<Value>,
 }
 
 impl Parameter {
@@ -153,12 +243,12 @@ impl ToString for Parameter {
     };
 
     match current_value {
-      serde_json::Value::Null => format!("{:?}", current_value),
-      serde_json::Value::Object(_content) => serde_json::to_string(current_value).unwrap(),
-      serde_json::Value::Array(_content) => serde_json::to_string(current_value).unwrap(),
-      serde_json::Value::Bool(content) => format!("{}", content),
-      serde_json::Value::Number(content) => format!("{}", content),
-      serde_json::Value::String(content) => content.to_string(),
+      Value::Null => format!("{:?}", current_value),
+      Value::Object(_content) => serde_json::to_string(current_value).unwrap(),
+      Value::Array(_content) => serde_json::to_string(current_value).unwrap(),
+      Value::Bool(content) => format!("{}", content),
+      Value::Number(content) => format!("{}", content),
+      Value::String(content) => content.to_string(),
     }
   }
 }

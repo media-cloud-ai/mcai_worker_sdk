@@ -19,8 +19,9 @@ pub trait ParametersContainer {
       }
     }
     Err(ParameterValueError::new(&format!(
-      "Could not find any parameter for key '{}'",
-      key
+      "Could not find any parameter for key '{}' and type '{}'",
+      key,
+      T::get_type_as_string()
     )))
   }
 

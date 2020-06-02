@@ -9,6 +9,7 @@ use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
+use serde_json::Value;
 
 #[deprecated(
   since = "0.10.4",
@@ -66,7 +67,7 @@ impl<'de> Deserialize<'de> for Credential {
   }
 }
 
-pub fn request_value(credential_key: &str, store_code: &str) -> Result<String, String> {
+pub fn request_value(credential_key: &str, store_code: &str) -> Result<Value, String> {
   let backend_endpoint = get_store_hostname(store_code);
   let backend_username = get_store_username(store_code);
   let backend_password = get_store_password(store_code);
