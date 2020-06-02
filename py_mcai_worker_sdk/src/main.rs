@@ -225,42 +225,56 @@ impl PythonWorkerEvent {
 
       let id = parameter.get_id();
 
-      if parameter.kind == Vec::<String>::get_type_as_string() {
-        let v = Vec::<String>::parse_value(current_value, &parameter.store)
-          .map_err(|e| format!("{:?}", e))?;
-        list_of_parameters
-          .set_item(id.to_string(), PyList::new(py, v))
-          .map_err(|e| py_err_to_string(py, e))?
-      } else if parameter.kind == String::get_type_as_string() {
-        let v =
-          String::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
-        list_of_parameters
-          .set_item(id.to_string(), v)
-          .map_err(|e| py_err_to_string(py, e))?;
-      } else if parameter.kind == bool::get_type_as_string() {
-        let v =
-          bool::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
-        list_of_parameters
-          .set_item(id.to_string(), v)
-          .map_err(|e| py_err_to_string(py, e))?;
-      } else if parameter.kind == i64::get_type_as_string() {
-        let v =
-          i64::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
-        list_of_parameters
-          .set_item(id.to_string(), v)
-          .map_err(|e| py_err_to_string(py, e))?;
-      } else if parameter.kind == f64::get_type_as_string() {
-        let v =
-          f64::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
-        list_of_parameters
-          .set_item(id.to_string(), v)
-          .map_err(|e| py_err_to_string(py, e))?;
-      } else if parameter.kind == mcai_worker_sdk::Credential::get_type_as_string() {
-        let credential = mcai_worker_sdk::Credential::parse_value(current_value, &parameter.store)
-          .map_err(|e| format!("{:?}", e))?;
-        list_of_parameters
-          .set_item(id.to_string(), credential.value)
-          .map_err(|e| py_err_to_string(py, e))?;
+      match &parameter.kind {
+        array_of_strings if array_of_strings == &Vec::<String>::get_type_as_string() => {
+          let v = Vec::<String>::parse_value(current_value, &parameter.store)
+            .map_err(|e| format!("{:?}", e))?;
+          list_of_parameters
+            .set_item(id.to_string(), PyList::new(py, v))
+            .map_err(|e| py_err_to_string(py, e))?
+        }
+        string if string == &String::get_type_as_string() => {
+          let v =
+            String::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
+          list_of_parameters
+            .set_item(id.to_string(), v)
+            .map_err(|e| py_err_to_string(py, e))?;
+        }
+        boolean if boolean == &bool::get_type_as_string() => {
+          let v =
+            bool::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
+          list_of_parameters
+            .set_item(id.to_string(), v)
+            .map_err(|e| py_err_to_string(py, e))?;
+        }
+        integer if integer == &i64::get_type_as_string() => {
+          let v =
+            i64::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
+          list_of_parameters
+            .set_item(id.to_string(), v)
+            .map_err(|e| py_err_to_string(py, e))?;
+        }
+        float if float == &f64::get_type_as_string() => {
+          let v =
+            f64::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
+          list_of_parameters
+            .set_item(id.to_string(), v)
+            .map_err(|e| py_err_to_string(py, e))?;
+        }
+        credential if credential == &mcai_worker_sdk::Credential::get_type_as_string() => {
+          let credential =
+            mcai_worker_sdk::Credential::parse_value(current_value, &parameter.store)
+              .map_err(|e| format!("{:?}", e))?;
+          list_of_parameters
+            .set_item(id.to_string(), credential.value)
+            .map_err(|e| py_err_to_string(py, e))?;
+        }
+        other => {
+          return Err(format!(
+            "Parameter type not supported by Python SDK: {}",
+            other
+          ))
+        }
       }
     }
 
