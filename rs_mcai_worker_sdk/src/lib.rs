@@ -94,8 +94,9 @@ pub use semver::Version;
 
 pub use message::publish_job_progression;
 pub use parameter::container::ParametersContainer;
+#[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
 pub use parameter::credential::Credential;
-pub use parameter::{Parameter, Requirement};
+pub use parameter::{Parameter, ParameterValue, Requirement};
 
 use chrono::prelude::*;
 use config::*;

@@ -8,6 +8,8 @@ use mcai_worker_sdk::job::*;
 use mcai_worker_sdk::parameter::media_segment::MediaSegment;
 use mcai_worker_sdk::MessageError;
 
+use mcai_worker_sdk::parameter::ParameterValueError;
+use mcai_worker_sdk::Credential;
 use std::collections::HashMap;
 
 #[test]
@@ -79,35 +81,35 @@ fn test_new_job() {
   let job = result.unwrap();
   assert_eq!(job.job_id, 123);
 
-  let optional_string = job.get_string_parameter("string_parameter");
-  assert!(optional_string.is_some());
+  let optional_string = job.get_parameter::<String>("string_parameter");
+  assert!(optional_string.is_ok());
   let string_value = optional_string.unwrap();
   assert_eq!("real_value".to_string(), string_value);
 
-  let optional_boolean = job.get_boolean_parameter("boolean_parameter");
-  assert!(optional_boolean.is_some());
+  let optional_boolean = job.get_parameter::<bool>("boolean_parameter");
+  assert!(optional_boolean.is_ok());
   let boolean_value = optional_boolean.unwrap();
   assert_eq!(boolean_value, true);
 
-  let optional_integer = job.get_integer_parameter("integer_parameter");
-  assert!(optional_integer.is_some());
+  let optional_integer = job.get_parameter::<i64>("integer_parameter");
+  assert!(optional_integer.is_ok());
   let integer_value = optional_integer.unwrap();
   assert_eq!(integer_value, 654321);
 
-  let optional_credential = job.get_credential_parameter("credential_parameter");
-  assert!(optional_credential.is_some());
-  let credential_value = optional_credential.unwrap();
-  assert_eq!("credential_key", credential_value.key);
+  let optional_credential = job.get_parameter::<Credential>("credential_parameter");
+  assert!(optional_credential.is_err());
+  let credential_value = optional_credential.unwrap_err();
+  assert_eq!(ParameterValueError::new("\"error sending request for url (http://127.0.0.1:4000/api/sessions): error trying to connect: tcp connect error: Connection refused (os error 111)\""), credential_value);
 
-  let option_array = job.get_array_of_strings_parameter("array_of_string_parameter");
-  assert!(option_array.is_some());
+  let option_array = job.get_parameter::<Vec<String>>("array_of_string_parameter");
+  assert!(option_array.is_ok());
   let array_of_values = option_array.unwrap();
   assert_eq!(array_of_values.len(), 1);
   assert_eq!("real_value".to_string(), array_of_values[0]);
 
   let option_media_segments_array =
-    job.get_array_of_media_segments_parameter("array_of_media_segments_parameter");
-  assert!(option_media_segments_array.is_some());
+    job.get_parameter::<Vec<MediaSegment>>("array_of_media_segments_parameter");
+  assert!(option_media_segments_array.is_ok());
   let media_segments_array = option_media_segments_array.unwrap();
   assert_eq!(media_segments_array.len(), 1);
   assert_eq!(MediaSegment::new(123, 456), media_segments_array[0]);
@@ -127,7 +129,7 @@ fn test_new_job() {
   reference_map.insert("string_parameter".to_string(), "real_value".to_string());
   reference_map.insert(
     "array_of_media_segments_parameter".to_string(),
-    format!("{:?}", vec![MediaSegment::new(123, 456)]),
+    "[{\"end\":456,\"start\":123}]".to_string(),
   );
   assert_eq!(
     reference_map.get("credential_parameter"),

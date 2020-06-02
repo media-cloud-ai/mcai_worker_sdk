@@ -1,10 +1,6 @@
 language: rust
 
 rust:
-  - 1.40.0
-  - 1.41.0
-  - 1.41.1
-  - 1.42.0
   - 1.43.0
   - stable
   - beta
@@ -60,12 +56,11 @@ jobs:
     # Test coverage
     - rust: nightly
       install:
-        - travis_wait RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
+        - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
         - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
         - travis_wait cargo tarpaulin --verbose --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
       env:
-        - ALLOW_FAILURE=TRUE
         - COVERAGE_CHECK=TRUE
         - TRAVIS_RUST_VERSION=nightly-2020-01-21
         - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
@@ -92,8 +87,15 @@ script:
   - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
   - cargo test --package mcai_worker_sdk --package c_mcai_worker_sdk
 
+# Need to cache the whole `.cargo` directory to keep .crates.toml for
+# cargo-update to work
 cache:
-  cargo: true
+  directories:
+    - /home/travis/.cargo
+
+# But don't cache the cargo registry
+before_cache:
+  - rm -rf /home/travis/.cargo/registry
 
 addons:
   apt:

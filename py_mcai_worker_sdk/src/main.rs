@@ -1,12 +1,9 @@
 use crate::helpers::get_destination_paths;
 use mcai_worker_sdk::{
-  error,
   job::*,
   publish_job_progression, start_worker,
   worker::{Parameter, ParameterType},
-  Credential, McaiChannel, MessageError, MessageEvent,
-  Parameter::*,
-  Version,
+  McaiChannel, MessageError, MessageEvent, ParameterValue, Version,
 };
 use pyo3::{prelude::*, types::*};
 use std::{env, fs};
@@ -152,16 +149,9 @@ impl MessageEvent for PythonWorkerEvent {
 
     let list_of_parameters = PyDict::new(py);
     if let Err(error) = self.build_parameters(job, py, list_of_parameters) {
-      let locals = [("error", error)].into_py_dict(py);
-
-      let error_msg = py
-        .eval("repr(error)", None, Some(locals))
-        .expect("Unknown python error, unable to get the error message")
-        .to_string();
-
       let result = job_result
         .with_status(JobStatus::Error)
-        .with_message(&error_msg);
+        .with_message(&error);
       return Err(MessageError::ProcessingError(result));
     }
 
@@ -209,74 +199,81 @@ impl MessageEvent for PythonWorkerEvent {
   }
 }
 
+fn py_err_to_string(py: Python, error: PyErr) -> String {
+  let locals = [("error", error)].into_py_dict(py);
+
+  py.eval("repr(error)", None, Some(locals))
+    .expect("Unknown python error, unable to get the error message")
+    .to_string()
+}
+
 impl PythonWorkerEvent {
   fn build_parameters(
     &self,
     job: &Job,
     py: Python,
     list_of_parameters: &PyDict,
-  ) -> Result<(), PyErr> {
+  ) -> Result<(), String> {
     for parameter in &job.parameters {
-      match parameter {
-        ArrayOfStringsParam { id, default, value } => {
-          if let Some(v) = value {
-            list_of_parameters.set_item(id.to_string(), PyList::new(py, v))?;
-          } else if let Some(v) = default {
-            list_of_parameters.set_item(id.to_string(), PyList::new(py, v))?;
-          }
-        }
-        BooleanParam { id, default, value } => {
-          if let Some(v) = value {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          } else if let Some(v) = default {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          }
-        }
-        CredentialParam { id, default, value } => {
-          let credential_key = if let Some(v) = value {
-            Some(v)
-          } else if let Some(v) = default {
-            Some(v)
-          } else {
-            None
-          };
+      let current_value = if let Some(value) = parameter.value.clone() {
+        value
+      } else if let Some(default) = parameter.default.clone() {
+        default
+      } else {
+        continue;
+      };
 
-          if let Some(credential_key) = credential_key {
-            let credential = Credential {
-              key: credential_key.to_string(),
-            };
-            if let Ok(retrieved_value) = credential.request_value(&job) {
-              list_of_parameters.set_item(id.to_string(), retrieved_value)?;
-            } else {
-              error!("unable to retrieve the credential value");
-            }
-          } else {
-            error!("no value or default for the credential value");
-          }
+      let id = parameter.get_id();
+
+      match &parameter.kind {
+        array_of_strings if array_of_strings == &Vec::<String>::get_type_as_string() => {
+          let v = Vec::<String>::parse_value(current_value, &parameter.store)
+            .map_err(|e| format!("{:?}", e))?;
+          list_of_parameters
+            .set_item(id.to_string(), PyList::new(py, v))
+            .map_err(|e| py_err_to_string(py, e))?
         }
-        IntegerParam { id, default, value } => {
-          if let Some(v) = value {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          } else if let Some(v) = default {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          }
+        string if string == &String::get_type_as_string() => {
+          let v =
+            String::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
+          list_of_parameters
+            .set_item(id.to_string(), v)
+            .map_err(|e| py_err_to_string(py, e))?;
         }
-        ArrayOfMediaSegmentsParam { .. } | RequirementParam { .. } => {
-          // do nothing
+        boolean if boolean == &bool::get_type_as_string() => {
+          let v =
+            bool::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
+          list_of_parameters
+            .set_item(id.to_string(), v)
+            .map_err(|e| py_err_to_string(py, e))?;
         }
-        StringParam { id, default, value } => {
-          if let Some(v) = value {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          } else if let Some(v) = default {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          }
+        integer if integer == &i64::get_type_as_string() => {
+          let v =
+            i64::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
+          list_of_parameters
+            .set_item(id.to_string(), v)
+            .map_err(|e| py_err_to_string(py, e))?;
         }
-        JsonParam { id, default, value } => {
-          if let Some(v) = value {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          } else if let Some(v) = default {
-            list_of_parameters.set_item(id.to_string(), v)?;
-          }
+        float if float == &f64::get_type_as_string() => {
+          let v =
+            f64::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
+          list_of_parameters
+            .set_item(id.to_string(), v)
+            .map_err(|e| py_err_to_string(py, e))?;
+        }
+        credential if credential == &mcai_worker_sdk::Credential::get_type_as_string() => {
+          let credential =
+            mcai_worker_sdk::Credential::parse_value(current_value, &parameter.store)
+              .map_err(|e| format!("{:?}", e))?;
+          list_of_parameters
+            .set_item(id.to_string(), credential.value)
+            .map_err(|e| py_err_to_string(py, e))?;
+        }
+        other => {
+          return Err(format!(
+            "Parameter type not supported by Python SDK: {}",
+            other
+          ))
         }
       }
     }

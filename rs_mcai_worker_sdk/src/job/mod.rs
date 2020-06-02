@@ -1,6 +1,7 @@
 //! Module to manage Job
 
 use crate::{parameter::container::ParametersContainer, MessageError, Parameter, Requirement};
+use serde_json::Value;
 use std::path::Path;
 
 mod job_progression;
@@ -37,7 +38,7 @@ pub struct SessionResponseBody {
 pub struct DataResponseBody {
   id: u32,
   key: String,
-  pub value: String,
+  pub value: Value,
   inserted_at: String,
 }
 
@@ -54,19 +55,15 @@ impl Job {
   }
 
   pub fn check_requirements(&self) -> Result<(), MessageError> {
-    for param in self.parameters.iter() {
-      if let Parameter::RequirementParam { id, value, .. } = param {
-        if id == "requirements" {
-          if let Some(Requirement { paths: Some(paths) }) = value {
-            for path in paths.iter() {
-              let p = Path::new(path);
-              if !p.exists() {
-                return Err(MessageError::RequirementsError(format!(
-                  "Warning: Required file does not exists: {:?}",
-                  p
-                )));
-              }
-            }
+    if let Ok(requirements) = self.get_parameter::<Requirement>("requirements") {
+      if let Some(paths) = requirements.paths {
+        for path in paths.iter() {
+          let p = Path::new(path);
+          if !p.exists() {
+            return Err(MessageError::RequirementsError(format!(
+              "Warning: Required file does not exists: {:?}",
+              p
+            )));
           }
         }
       }

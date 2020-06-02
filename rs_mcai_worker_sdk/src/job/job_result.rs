@@ -2,6 +2,7 @@ use super::job_status::JobStatus;
 use crate::job::Job;
 use crate::parameter::container::ParametersContainer;
 use crate::parameter::Parameter;
+use crate::parameter::ParameterValue;
 use reqwest::Error;
 use serde::Serialize;
 use std::time::Instant;
@@ -41,19 +42,23 @@ impl JobResult {
 
   pub fn with_error(mut self, error: Error) -> Self {
     self.update_execution_duration();
-    self.parameters.push(Parameter::StringParam {
+    self.parameters.push(Parameter {
       id: "message".to_string(),
+      kind: String::get_type_as_string(),
+      store: None,
       default: None,
-      value: Some(error.to_string()),
+      value: serde_json::to_value(error.to_string()).ok(),
     });
     self
   }
 
   pub fn with_message(mut self, message: &str) -> Self {
-    self.parameters.push(Parameter::StringParam {
+    self.parameters.push(Parameter {
       id: "message".to_string(),
+      kind: String::get_type_as_string(),
+      store: None,
       default: None,
-      value: Some(message.to_string()),
+      value: serde_json::to_value(message.to_string()).ok(),
     });
     self
   }
@@ -74,10 +79,12 @@ impl JobResult {
   {
     let json_string = serde_json::to_string(serializable)
       .map_err(|error| format!("Unable to serialize object: {:?}", error))?;
-    self.parameters.push(Parameter::JsonParam {
+    self.parameters.push(Parameter {
       id: id.to_string(),
+      kind: String::get_type_as_string(),
+      store: None,
       default: None,
-      value: Some(json_string),
+      value: serde_json::to_value(json_string).ok(),
     });
     Ok(self)
   }

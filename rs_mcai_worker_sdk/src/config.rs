@@ -46,16 +46,19 @@ pub fn get_amqp_queue() -> String {
   get_env_value!("AMQP_QUEUE", "job_undefined")
 }
 
-pub fn get_backend_hostname() -> String {
-  get_env_value!("BACKEND_HOSTNAME", "http://127.0.0.1:4000/api")
+pub fn get_store_hostname(store_code: &str) -> String {
+  get_env_value!(
+    &format!("{}_HOSTNAME", store_code),
+    "http://127.0.0.1:4000/api"
+  )
 }
 
-pub fn get_backend_username() -> String {
-  get_env_value!("BACKEND_USERNAME", "")
+pub fn get_store_username(store_code: &str) -> String {
+  get_env_value!(&format!("{}_USERNAME", store_code), "")
 }
 
-pub fn get_backend_password() -> String {
-  get_env_value!("BACKEND_PASSWORD", "")
+pub fn get_store_password(store_code: &str) -> String {
+  get_env_value!(&format!("{}_PASSWORD", store_code), "")
 }
 
 pub fn get_amqp_uri() -> AMQPUri {
@@ -118,9 +121,9 @@ fn configuration() {
   assert!(get_amqp_password() == "guest".to_string());
   assert!(get_amqp_vhost() == "/".to_string());
   assert!(get_amqp_queue() == "job_undefined".to_string());
-  assert!(get_backend_hostname() == "http://127.0.0.1:4000/api".to_string());
-  assert!(get_backend_username() == "".to_string());
-  assert!(get_backend_password() == "".to_string());
+  assert!(get_store_hostname("BACKEND") == "http://127.0.0.1:4000/api".to_string());
+  assert!(get_store_username("BACKEND") == "".to_string());
+  assert!(get_store_password("BACKEND") == "".to_string());
 
   env::set_var("AMQP_TLS", "False");
   assert!(get_amqp_tls() == false);

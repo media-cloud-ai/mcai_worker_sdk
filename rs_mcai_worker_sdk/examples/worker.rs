@@ -59,7 +59,7 @@ pub fn process_message(
   publish_job_progression(channel.clone(), &job, 50)?;
 
   match job
-    .get_string_parameter("action")
+    .get_parameter::<String>("action")
     .unwrap_or("error".to_string())
     .as_str()
   {
