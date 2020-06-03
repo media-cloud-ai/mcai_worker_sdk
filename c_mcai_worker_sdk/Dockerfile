@@ -1,4 +1,4 @@
-FROM rust:1.42-stretch as builder
+FROM rust:1.43-stretch as builder
 
 ADD . /src
 WORKDIR /src/c_mcai_worker_sdk
