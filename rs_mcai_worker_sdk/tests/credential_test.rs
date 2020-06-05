@@ -270,9 +270,19 @@ fn test_credential_request_value_with_invalid_store() {
 
   let job = Job::new(message).unwrap();
 
+  #[cfg(target_os = "linux")]
+  let code = 111;
+
+  #[cfg(target_os = "macos")]
+  let code = 61;
+
+  let part_1 = "error sending request for url (http://127.0.0.1:4000/api/sessions): ";
+  let part_2 = "error trying to connect: tcp connect error: Connection refused (os error";
+  let error_message = format!(r#""{}{} {})""#, part_1, part_2, code);
+
   assert_eq!(
     job.get_parameter::<Credential>("test_credential"),
-    Err(ParameterValueError::new("\"error sending request for url (http://127.0.0.1:4000/api/sessions): error trying to connect: tcp connect error: Connection refused (os error 61)\""))
+    Err(ParameterValueError::new(&error_message))
   );
 }
 
@@ -812,8 +822,18 @@ fn test_string_credential_request_value_with_invalid_store() {
 
   let job = Job::new(message).unwrap();
 
+  #[cfg(target_os = "linux")]
+  let code = 111;
+
+  #[cfg(target_os = "macos")]
+  let code = 61;
+
+  let part_1 = "error sending request for url (http://127.0.0.1:4000/api/sessions): ";
+  let part_2 = "error trying to connect: tcp connect error: Connection refused (os error";
+  let error_message = format!(r#""{}{} {})""#, part_1, part_2, code);
+
   assert_eq!(
     job.get_parameter::<String>("test_credential"),
-    Err(ParameterValueError::new("\"error sending request for url (http://127.0.0.1:4000/api/sessions): error trying to connect: tcp connect error: Connection refused (os error 61)\""))
+    Err(ParameterValueError::new(&error_message))
   );
 }

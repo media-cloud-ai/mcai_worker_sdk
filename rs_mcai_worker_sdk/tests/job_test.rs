@@ -99,7 +99,17 @@ fn test_new_job() {
   let optional_credential = job.get_parameter::<Credential>("credential_parameter");
   assert!(optional_credential.is_err());
   let credential_value = optional_credential.unwrap_err();
-  assert_eq!(ParameterValueError::new("\"error sending request for url (http://127.0.0.1:4000/api/sessions): error trying to connect: tcp connect error: Connection refused (os error 61)\""), credential_value);
+
+  #[cfg(target_os = "linux")]
+  let code = 111;
+
+  #[cfg(target_os = "macos")]
+  let code = 61;
+
+  let part_1 = "error sending request for url (http://127.0.0.1:4000/api/sessions): ";
+  let part_2 = "error trying to connect: tcp connect error: Connection refused (os error";
+  let error_message = format!(r#""{}{} {})""#, part_1, part_2, code);
+  assert_eq!(ParameterValueError::new(&error_message), credential_value);
 
   let option_array = job.get_parameter::<Vec<String>>("array_of_string_parameter");
   assert!(option_array.is_ok());
