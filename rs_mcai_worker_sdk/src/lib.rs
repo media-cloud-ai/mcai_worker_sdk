@@ -1,14 +1,14 @@
 //! # MCAI Worker SDK
 //!
-//! This library is an SDK to communicate via message broker with [StepFlow](https://hexdocs.pm/step_flow/readme.html).  
-//! It's used for every worker as an abstraction.  
-//! It manage itself requirements, message parsing, direct messaging.  
+//! This library is an SDK to communicate via message broker with [StepFlow](https://hexdocs.pm/step_flow/readme.html).
+//! It's used for every worker as an abstraction.
+//! It manage itself requirements, message parsing, direct messaging.
 //!
 //! ## Worker implementation
 //!
 //! 1. Create a Rust project
 //! 2. Add MCAI Worker SDK as a dependency in Cargo.toml: `mcai_worker_sdk = "^1.0"`
-//! 1. Update the main file with the example provided here to implement [MessageEvent](trait.MessageEvent.html) trait,  
+//! 1. Update the main file with the example provided here to implement [MessageEvent](trait.MessageEvent.html) trait,
 //! and call the [`start_worker`](fn.start_worker.html) to start the worker itself.
 //!
 //! ```rust
@@ -60,14 +60,14 @@
 //!
 //! ## Start worker locally
 //!
-//! MCAI Worker SDK can be launched locally - without RabbitMQ.  
-//! It can process some message for different purpose (functional tests, message order examples, etc.).  
-//!   
-//! To start worker in this mode, setup the environment variable `SOURCE_ORDERS` with path(s) to json orders.  
-//! It can take multiple orders, joined with `:` on unix platform, `;` on windows os.  
-//!   
+//! MCAI Worker SDK can be launched locally - without RabbitMQ.
+//! It can process some message for different purpose (functional tests, message order examples, etc.).
+//!
+//! To start worker in this mode, setup the environment variable `SOURCE_ORDERS` with path(s) to json orders.
+//! It can take multiple orders, joined with `:` on unix platform, `;` on windows os.
+//!
 //! ### Examples:
-//!   
+//!
 //! ```bash
 //! RUST_LOG=info SOURCE_ORDERS=./examples/success_order.json:./examples/error_order.json cargo run --example worker
 //! ```
@@ -104,11 +104,11 @@ use env_logger::Builder;
 use futures_executor::LocalPool;
 use futures_util::{future::FutureExt, stream::StreamExt, task::LocalSpawnExt};
 use job::{Job, JobResult, JobStatus};
-use lapin::{options::*, types::FieldTable, CloseOnDrop, Connection, ConnectionProperties};
+use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use std::{fs, io::Write, sync::Arc, thread, time};
 
 /// Exposed Channel type
-pub type McaiChannel = Arc<CloseOnDrop<Channel>>;
+pub type McaiChannel = Arc<Channel>;
 
 /// Trait to describe a worker
 ///
@@ -265,7 +265,7 @@ where
       let _consumer = spawner.spawn_local(async move {
         status_consumer
           .for_each(move |delivery| {
-            let delivery = delivery.expect("error caught in in consumer");
+            let (_channel, delivery) = delivery.expect("error caught in in consumer");
 
             worker::system_information::send_real_time_information(
               delivery,
@@ -283,7 +283,7 @@ where
 
       consumer
         .for_each(move |delivery| {
-          let delivery = delivery.expect("error caught in in consumer");
+          let (_channel, delivery) = delivery.expect("error caught in in consumer");
 
           message::process_message(message_event, delivery, clone_channel.clone()).map(|_| ())
         })

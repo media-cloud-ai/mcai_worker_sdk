@@ -7,7 +7,7 @@ use bind_description::BindDescription;
 use exchange_description::ExchangeDescription;
 use lapin::{
   options::{BasicPublishOptions, BasicQosOptions, ExchangeDeclareOptions},
-  BasicProperties, Channel, CloseOnDrop, Connection, ExchangeKind,
+  BasicProperties, Channel, Connection, ExchangeKind,
 };
 use queue_description::QueueDescription;
 use std::collections::HashMap;
@@ -23,7 +23,7 @@ static QUEUE_NAME_WORKER_DISCOVERY: &str = "worker_discovery";
 pub fn declare_consumer_channel(
   conn: &Connection,
   worker_configuration: &WorkerConfiguration,
-) -> CloseOnDrop<Channel> {
+) -> Channel {
   let channel = conn.create_channel().wait().unwrap();
   let prefetch_count = 1;
 

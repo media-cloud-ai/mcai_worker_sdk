@@ -272,7 +272,7 @@ fn test_credential_request_value_with_invalid_store() {
 
   assert_eq!(
     job.get_parameter::<Credential>("test_credential"),
-    Err(ParameterValueError::new("\"error sending request for url (http://127.0.0.1:4000/api/sessions): error trying to connect: tcp connect error: Connection refused (os error 111)\""))
+    Err(ParameterValueError::new("\"error sending request for url (http://127.0.0.1:4000/api/sessions): error trying to connect: tcp connect error: Connection refused (os error 61)\""))
   );
 }
 
@@ -814,6 +814,6 @@ fn test_string_credential_request_value_with_invalid_store() {
 
   assert_eq!(
     job.get_parameter::<String>("test_credential"),
-    Err(ParameterValueError::new("\"error sending request for url (http://127.0.0.1:4000/api/sessions): error trying to connect: tcp connect error: Connection refused (os error 111)\""))
+    Err(ParameterValueError::new("\"error sending request for url (http://127.0.0.1:4000/api/sessions): error trying to connect: tcp connect error: Connection refused (os error 61)\""))
   );
 }
