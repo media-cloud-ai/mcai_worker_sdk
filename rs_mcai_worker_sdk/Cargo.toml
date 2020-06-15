@@ -15,16 +15,16 @@ readme = "README.md"
 edition = "2018"
 
 [dependencies]
-amq-protocol = "=6.0.0-rc10"
-amq-protocol-types = "=6.0.0-rc10"
-amq-protocol-uri = "=6.0.0-rc10"
+amq-protocol = "=6.0.0-rc11"
+amq-protocol-types = "=6.0.0-rc11"
+amq-protocol-uri = "=6.0.0-rc11"
 chrono = {version = "0.4", features = ["serde"]}
 env_logger = "^0.7"
 failure = "^0.1"
 futures-util = "^0.3"
 futures-executor = "^0.3"
 futures-core = "^0.3"
-lapin = "1.0.2"
+lapin = "1.1.0"
 log = "0.4.5"
 reqwest = { version = "0.10", features = ["blocking", "json"] }
 semver = { version = "0.10", features = ["serde"] }
