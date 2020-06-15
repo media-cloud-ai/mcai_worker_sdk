@@ -39,7 +39,7 @@ fn get_amqp_password() -> String {
 }
 
 fn get_amqp_vhost() -> String {
-  get_env_value!("AMQP_VHOST", "/")
+  get_env_value!("AMQP_VHOST", get_env_value!("AMQP_VIRTUAL_HOST", "/"))
 }
 
 pub fn get_amqp_queue() -> String {
