@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "c_mcai_worker_sdk",
+  "media-stream",
   "py_mcai_worker_sdk",
   "rs_mcai_worker_sdk",
 ]

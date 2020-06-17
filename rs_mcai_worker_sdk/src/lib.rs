@@ -121,6 +121,22 @@ pub trait MessageEvent {
 
   fn get_parameters(&self) -> Vec<worker::Parameter>;
 
+  #[cfg(feature = "media")]
+  fn init_process(&self) -> Result<(), MessageError> {
+    Ok(())
+  }
+
+  #[cfg(feature = "media")]
+  fn process_frame(&self) -> Result<(), MessageError> {
+    Err(MessageError::NotImplemented())
+  }
+
+  #[cfg(feature = "media")]
+  fn ending_process(&self) -> Result<(), MessageError> {
+    Ok(())
+  }
+
+  #[cfg(not(feature = "media"))]
   fn process(
     &self,
     _channel: Option<McaiChannel>,

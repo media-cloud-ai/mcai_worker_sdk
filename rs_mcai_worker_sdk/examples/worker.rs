@@ -35,6 +35,7 @@ Do no use in production, just for developments."#
     }]
   }
 
+  #[cfg(not(feature = "media"))]
   fn process(
     &self,
     channel: Option<McaiChannel>,

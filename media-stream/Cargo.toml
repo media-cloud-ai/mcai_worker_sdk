@@ -1,0 +1,15 @@
+[package]
+name = "media-stream"
+version = "0.0.1"
+authors = [
+  "Marc-Antoine Arnaud <maarnaud@media-io.com>"
+]
+license = "MIT"
+readme = "README.md"
+edition = "2018"
+
+[dependencies]
+log = "0.4"
+ringbuf = "0.2.1"
+stainless_ffmpeg = { git = "https://github.com/nomalab/stainless-ffmpeg", branch = "master" }
+stainless-ffmpeg-sys = {version = "4.2.2-update.1" }

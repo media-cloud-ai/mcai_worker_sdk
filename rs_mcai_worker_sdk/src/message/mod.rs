@@ -66,6 +66,11 @@ pub fn parse_and_process_message<
   publish_job_progression(channel.clone(), &job, 0)?;
 
   let job_result = JobResult::new(job.job_id);
+
+  #[cfg(feature = "media")]
+  return Ok(job_result);
+
+  #[cfg(not(feature = "media"))]
   MessageEvent::process(message_event, channel, &job, job_result)
 }
 
