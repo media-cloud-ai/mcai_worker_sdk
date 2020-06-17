@@ -11,10 +11,10 @@ use serde::Serialize;
 use serde::Serializer;
 use serde_json::Value;
 
-#[deprecated(
-  since = "0.10.4",
-  note = "Please use the `store` field in Parameter instead"
-)]
+// #[deprecated(
+//   since = "0.10.4",
+//   note = "Please use the `store` field in Parameter instead"
+// )]
 #[derive(Debug, PartialEq)]
 pub struct Credential {
   pub value: String,

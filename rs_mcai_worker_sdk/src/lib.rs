@@ -81,6 +81,7 @@ extern crate serde_json;
 
 mod channels;
 mod config;
+mod error;
 pub mod job;
 mod message;
 pub mod parameter;
@@ -92,6 +93,7 @@ pub use log::{debug, error, info, trace, warn};
 /// Re-export from semver:
 pub use semver::Version;
 
+pub use error::MessageError;
 pub use message::publish_job_progression;
 pub use parameter::container::ParametersContainer;
 #[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
@@ -147,25 +149,6 @@ pub trait MessageEvent {
     Self: std::marker::Sized,
   {
     Err(MessageError::NotImplemented())
-  }
-}
-
-/// Internal error status to manage process errors
-#[derive(Debug, PartialEq)]
-pub enum MessageError {
-  RuntimeError(String),
-  ProcessingError(JobResult),
-  RequirementsError(String),
-  NotImplemented(),
-}
-
-impl MessageError {
-  pub fn from(error: std::io::Error, job_result: JobResult) -> Self {
-    let result = job_result
-      .with_status(JobStatus::Error)
-      .with_message(&format!("IO Error: {}", error.to_string()));
-
-    MessageError::ProcessingError(result)
   }
 }
 

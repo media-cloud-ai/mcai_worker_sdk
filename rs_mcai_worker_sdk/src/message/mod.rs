@@ -1,4 +1,6 @@
 mod helpers;
+#[cfg(feature = "media")]
+mod media;
 
 use crate::{
   job::{Job, JobProgression, JobResult, JobStatus},
@@ -68,7 +70,7 @@ pub fn parse_and_process_message<
   let job_result = JobResult::new(job.job_id);
 
   #[cfg(feature = "media")]
-  return Ok(job_result);
+  return media::process(message_event, channel, &job, job_result);
 
   #[cfg(not(feature = "media"))]
   MessageEvent::process(message_event, channel, &job, job_result)
