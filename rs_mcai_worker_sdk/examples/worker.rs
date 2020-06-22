@@ -2,6 +2,8 @@ use mcai_worker_sdk::job::{Job, JobResult, JobStatus};
 use mcai_worker_sdk::worker::{Parameter, ParameterType};
 use mcai_worker_sdk::{publish_job_progression, McaiChannel};
 use mcai_worker_sdk::{MessageError, MessageEvent, ParametersContainer};
+#[cfg(feature = "media")]
+use mcai_worker_sdk::{FormatContext, Frame, info};
 use semver::Version;
 
 #[derive(Debug)]
@@ -43,6 +45,39 @@ Do no use in production, just for developments."#
     job_result: JobResult,
   ) -> Result<JobResult, MessageError> {
     process_message(channel, job, job_result)
+  }
+
+  #[cfg(feature = "media")]
+  fn init_process(&self, format_context: &FormatContext) -> Result<Vec<usize>, MessageError> {
+    Ok(vec![1])
+  }
+
+  #[cfg(feature = "media")]
+  fn process_frame(
+    &self,
+    job_id: &str,
+    stream_index: usize,
+    frame: Frame,
+  ) -> Result<(), MessageError> {
+    unsafe {
+      let width = (*frame.frame).width;
+      let height = (*frame.frame).height;
+      let sample_rate = (*frame.frame).sample_rate;
+      let channels = (*frame.frame).channels;
+      let nb_samples = (*frame.frame).nb_samples;
+
+      if width != 0 && height != 0 {
+        info!(target: job_id, "PTS: {}, image size: {}x{}", frame.get_pts(), width, height);
+      } else {
+        info!(target: job_id, "PTS: {}, sample_rate: {}Hz, channels: {}, nb_samples: {}",
+          frame.get_pts(),
+          sample_rate,
+          channels,
+          nb_samples,
+        );
+      }
+    }
+    Ok(())
   }
 }
 

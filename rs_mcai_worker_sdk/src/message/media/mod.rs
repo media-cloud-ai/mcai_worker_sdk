@@ -5,8 +5,11 @@ use crate::{
   parameter::container::ParametersContainer,
   McaiChannel, MessageError, MessageEvent,
 };
-
-use stainless_ffmpeg::{format_context::FormatContext, video_decoder::VideoDecoder};
+use stainless_ffmpeg::{
+  format_context::FormatContext,
+  video_decoder::VideoDecoder
+};
+use std::collections::HashMap;
 
 pub fn process<ME: MessageEvent>(
   message_event: &'static ME,
@@ -14,21 +17,33 @@ pub fn process<ME: MessageEvent>(
   job: &Job,
   job_result: JobResult,
 ) -> Result<JobResult, MessageError> {
+  let str_job_id = job.job_id.to_string();
+
   let filename: String = job.get_parameter("source_path").unwrap();
 
-  let mut context = FormatContext::new(&filename).unwrap();
-  context.open_input().unwrap();
+  let mut format_context = FormatContext::new(&filename).unwrap();
+  format_context.open_input().unwrap();
 
-  let video_decoder = VideoDecoder::new("h264".to_string(), &context, 0).unwrap();
+  let selected_streams = message_event.init_process(&format_context)?;
 
-  info!("Start to process media");
+  info!(target: &str_job_id, "Selected stream IDs: {:?}", selected_streams);
 
-  let total_duration = context.get_duration().map(|duration| duration * 25.0);
+  let mut decoders : HashMap<usize, VideoDecoder> = HashMap::new();
+
+  for selected_stream in &selected_streams {
+    // VideoDecoder can decode any codec, not only video
+    let decoder = VideoDecoder::new(format!("decoder_{}", selected_stream), &format_context, *selected_stream as isize).unwrap();
+    decoders.insert(*selected_stream, decoder);
+  }
+
+  info!(target: &str_job_id, "Start to process media");
+
+  let total_duration = format_context.get_duration().map(|duration| duration * 25.0);
   let mut count = 0;
   let mut previous_progress = 0;
 
   loop {
-    match context.next_packet() {
+    match format_context.next_packet() {
       Err(message) => {
         if message == "End of data stream" || message == "Unable to read next packet" {
           return Ok(job_result);
@@ -37,7 +52,8 @@ pub fn process<ME: MessageEvent>(
         return Err(RuntimeError(message));
       }
       Ok(packet) => {
-        if packet.get_stream_index() == 0 && total_duration.is_some() {
+        let stream_index = packet.get_stream_index() as usize;
+        if stream_index == 0 && total_duration.is_some() {
           count += 1;
 
           if let Some(duration) = total_duration {
@@ -49,9 +65,20 @@ pub fn process<ME: MessageEvent>(
           }
         }
 
-        // let frame = video_decoder.decode(&packet).unwrap();
-
-        message_event.process_frame().unwrap();
+        if let Some(decoder) = decoders.get(&stream_index) {
+          match decoder.decode(&packet) {
+            Ok(frame) => {
+              trace!(target: &job_result.get_str_job_id(), "Process frame {}", count);
+              message_event.process_frame(&str_job_id, stream_index, frame)?;
+            }
+            Err(message) => {
+              if message == "Resource temporarily unavailable" {
+                continue;
+              }
+              return Err(RuntimeError(message));
+            }
+          }
+        }
       }
     }
   }

@@ -4,7 +4,8 @@
 		{
 			"id": "source_path",
 			"type": "string",
-			"value": "/Users/marco/Movies/kids-united-loiseau-et-lenfant-clip-officiel.mp4"
+			"store": "environment",
+			"value": "SOURCE_PATH"
 		}
 	]
 }

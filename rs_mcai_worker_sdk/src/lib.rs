@@ -99,6 +99,8 @@ pub use parameter::container::ParametersContainer;
 #[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
 pub use parameter::credential::Credential;
 pub use parameter::{Parameter, ParameterValue, Requirement};
+pub use stainless_ffmpeg::format_context::FormatContext;
+pub use stainless_ffmpeg::frame::Frame;
 
 use chrono::prelude::*;
 use config::*;
@@ -124,12 +126,12 @@ pub trait MessageEvent {
   fn get_parameters(&self) -> Vec<worker::Parameter>;
 
   #[cfg(feature = "media")]
-  fn init_process(&self) -> Result<(), MessageError> {
-    Ok(())
+  fn init_process(&self, format_context: &FormatContext) -> Result<Vec<usize>, MessageError> {
+    Ok(vec![])
   }
 
   #[cfg(feature = "media")]
-  fn process_frame(&self) -> Result<(), MessageError> {
+  fn process_frame(&self, str_job_id: &str, stream_index: usize, frame: Frame) -> Result<(), MessageError> {
     Err(MessageError::NotImplemented())
   }
 
