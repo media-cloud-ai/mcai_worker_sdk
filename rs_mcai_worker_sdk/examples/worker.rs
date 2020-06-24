@@ -7,9 +7,9 @@ use mcai_worker_sdk::{FormatContext, Frame, info};
 use semver::Version;
 
 #[derive(Debug)]
-struct WorkerEvent {}
+struct WorkerContext {}
 
-impl MessageEvent for WorkerEvent {
+impl MessageEvent for WorkerContext {
   fn get_name(&self) -> String {
     "Example".to_string()
   }
@@ -81,10 +81,9 @@ Do no use in production, just for developments."#
   }
 }
 
-static WORKER_EVENT: WorkerEvent = WorkerEvent {};
-
 fn main() {
-  mcai_worker_sdk::start_worker(&WORKER_EVENT);
+  let worker_context = WorkerContext {};
+  mcai_worker_sdk::start_worker(worker_context);
 }
 
 pub fn process_message(

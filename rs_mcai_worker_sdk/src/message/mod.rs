@@ -8,13 +8,16 @@ use crate::{
 };
 use lapin::{message::Delivery, options::*, BasicProperties, Promise};
 
+use std::rc::Rc;
+use std::cell::RefCell;
+
 static RESPONSE_EXCHANGE: &str = "job_response";
 static QUEUE_JOB_COMPLETED: &str = "job_completed";
 static QUEUE_JOB_ERROR: &str = "job_error";
 static QUEUE_JOB_PROGRESSION: &str = "job_progression";
 
 pub fn process_message<ME: MessageEvent>(
-  message_event: &'static ME,
+  message_event: Rc<RefCell<ME>>,
   message: Delivery,
   channel: McaiChannel,
 ) -> Promise<()> {
@@ -51,7 +54,7 @@ pub fn parse_and_process_message<
   ME: MessageEvent,
   F: Fn(Option<McaiChannel>, &Job, u8) -> Result<(), MessageError> + 'static,
 >(
-  message_event: &'static ME,
+  message_event: Rc<RefCell<ME>>,
   message_data: &str,
   count: Option<i64>,
   channel: Option<McaiChannel>,
@@ -73,7 +76,8 @@ pub fn parse_and_process_message<
   return media::process(message_event, channel, &job, job_result);
 
   #[cfg(not(feature = "media"))]
-  MessageEvent::process(message_event, channel, &job, job_result)
+  // MessageEvent::process(message_event, channel, &job, job_result)
+  message_event.borrow_mut().process(channel, &job, job_result)
 }
 
 fn publish_job_completed(

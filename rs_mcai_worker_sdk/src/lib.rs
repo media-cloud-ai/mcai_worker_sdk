@@ -99,20 +99,38 @@ pub use parameter::container::ParametersContainer;
 #[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
 pub use parameter::credential::Credential;
 pub use parameter::{Parameter, ParameterValue, Requirement};
-pub use stainless_ffmpeg::format_context::FormatContext;
-pub use stainless_ffmpeg::frame::Frame;
+#[cfg(feature = "media")]
+pub use stainless_ffmpeg::{
+  format_context::FormatContext,
+  frame::Frame,
+};
 
 use chrono::prelude::*;
 use config::*;
 use env_logger::Builder;
 use futures_executor::LocalPool;
 use futures_util::{future::FutureExt, stream::StreamExt, task::LocalSpawnExt};
-use job::{Job, JobResult, JobStatus};
+use job::{Job, JobResult};
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
-use std::{fs, io::Write, sync::Arc, thread, time};
+use serde::Serialize;
+use std::{cell::RefCell, fs, io::Write, rc::Rc, sync::Arc, thread, time};
 
 /// Exposed Channel type
 pub type McaiChannel = Arc<Channel>;
+
+#[cfg(feature = "media")]
+#[derive(Debug)]
+pub struct ProcessResult {
+  content: Option<String>,
+}
+
+impl ProcessResult {
+  pub fn new_json<S: Serialize>(content: &Box<S>) -> Self {
+    ProcessResult {
+      content: Some(serde_json::to_string(content).unwrap()),
+    }
+  }
+}
 
 /// Trait to describe a worker
 ///
@@ -126,12 +144,12 @@ pub trait MessageEvent {
   fn get_parameters(&self) -> Vec<worker::Parameter>;
 
   #[cfg(feature = "media")]
-  fn init_process(&self, format_context: &FormatContext) -> Result<Vec<usize>, MessageError> {
+  fn init_process(&mut self, job: &Job, format_context: &FormatContext) -> Result<Vec<usize>, MessageError> {
     Ok(vec![])
   }
 
   #[cfg(feature = "media")]
-  fn process_frame(&self, str_job_id: &str, stream_index: usize, frame: Frame) -> Result<(), MessageError> {
+  fn process_frame(&mut self, str_job_id: &str, stream_index: usize, frame: Frame) -> Result<ProcessResult, MessageError> {
     Err(MessageError::NotImplemented())
   }
 
@@ -155,13 +173,13 @@ pub trait MessageEvent {
 }
 
 /// Function to start a worker
-pub fn start_worker<ME: MessageEvent>(message_event: &'static ME)
+pub fn start_worker<ME: MessageEvent>(message_event: ME)
 where
   ME: std::marker::Sync,
 {
   let mut builder = Builder::from_default_env();
   let amqp_queue = get_amqp_queue();
-  let worker_configuration = worker::WorkerConfiguration::new(&amqp_queue, message_event);
+  let worker_configuration = worker::WorkerConfiguration::new(&amqp_queue, &message_event);
 
   let container_id = worker_configuration.get_instance_id();
 
@@ -189,6 +207,9 @@ where
     worker_configuration.get_sdk_version(),
   );
 
+  let rc = Rc::new(RefCell::new(message_event));
+
+
   if let Some(source_orders) = get_source_orders() {
     warn!("Worker will process source orders");
     for source_order in &source_orders {
@@ -199,7 +220,7 @@ where
       let message_data = fs::read_to_string(source_order).unwrap();
 
       let result = message::parse_and_process_message(
-        message_event,
+        rc.clone(),
         &message_data,
         count,
         channel,
@@ -281,12 +302,13 @@ where
       info!("Start to consume on queue {:?}", amqp_queue);
 
       let clone_channel = channel.clone();
+      let rc = rc.clone();
 
       consumer
         .for_each(move |delivery| {
           let (_channel, delivery) = delivery.expect("error caught in in consumer");
 
-          message::process_message(message_event, delivery, clone_channel.clone()).map(|_| ())
+          message::process_message(rc.clone(), delivery, clone_channel.clone()).map(|_| ())
         })
         .await
     });

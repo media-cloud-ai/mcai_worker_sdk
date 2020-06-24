@@ -47,7 +47,7 @@ pub struct WorkerConfiguration {
 }
 
 impl WorkerConfiguration {
-  pub fn new<ME: MessageEvent>(queue_name: &str, message_event: &'static ME) -> Self {
+  pub fn new<ME: MessageEvent>(queue_name: &str, message_event: &ME) -> Self {
     let sdk_version =
       Version::parse(built_info::PKG_VERSION).unwrap_or_else(|_| Version::new(0, 0, 0));
 
