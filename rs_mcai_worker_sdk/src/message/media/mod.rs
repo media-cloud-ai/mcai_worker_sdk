@@ -74,15 +74,17 @@ impl Output {
 
     if let Some(srt_stream) = &self.srt_stream {
       self.runtime.block_on(async {
-        srt_stream
-          .clone()
-          .borrow_mut()
-          .send((Instant::now(), Bytes::from(content.content.unwrap())))
-          .await
-          .unwrap();
-        });
-    }
 
+        if let Err(reason) =
+          srt_stream
+            .clone()
+            .borrow_mut()
+            .send((Instant::now(), Bytes::from(content.content.unwrap_or_else(|| "{}".to_string()))))
+            .await {
+              error!("unable to send message, reason: {}", reason);
+            }
+      });
+    }
   }
 }
 
