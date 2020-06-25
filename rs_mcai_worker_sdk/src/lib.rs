@@ -125,9 +125,11 @@ pub struct ProcessResult {
 }
 
 impl ProcessResult {
-  pub fn new_json<S: Serialize>(content: &Box<S>) -> Self {
+  pub fn new_json<S: Serialize>(content: S) -> Self {
+    let content = serde_json::to_string(&content).unwrap();
+
     ProcessResult {
-      content: Some(serde_json::to_string(content).unwrap()),
+      content: Some(content),
     }
   }
 }
