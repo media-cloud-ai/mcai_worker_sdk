@@ -42,6 +42,9 @@ pub fn process_message<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
         publish_missing_requirements(channel, message, &details)
       }
       MessageError::NotImplemented() => publish_not_implemented(channel, message),
+      MessageError::ParameterValueError(error_message) => {
+        publish_parameter_error(channel, message, &error_message)
+      }
       MessageError::ProcessingError(job_result) => {
         publish_processing_error(channel, message, job_result)
       }
@@ -164,6 +167,11 @@ fn publish_not_implemented(channel: McaiChannel, message: Delivery) -> Promise<(
     message.delivery_tag,
     BasicRejectOptions { requeue: true }, /*requeue*/
   )
+}
+
+fn publish_parameter_error(channel: McaiChannel, message: Delivery, details: &str) -> Promise<()> {
+  debug!("Parameter value error: {}", details);
+  channel.basic_reject(message.delivery_tag, BasicRejectOptions::default())
 }
 
 fn publish_processing_error(

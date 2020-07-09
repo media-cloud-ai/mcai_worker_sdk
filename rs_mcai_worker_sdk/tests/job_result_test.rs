@@ -6,8 +6,7 @@ use crate::mcai_worker_sdk::ParametersContainer;
 use mcai_worker_sdk::job::*;
 
 use mcai_worker_sdk::parameter::media_segment::MediaSegment;
-use mcai_worker_sdk::parameter::ParameterValueError;
-use mcai_worker_sdk::Credential;
+use mcai_worker_sdk::{Credential, MessageError};
 use std::collections::HashMap;
 
 #[derive(Deserialize, Serialize)]
@@ -91,7 +90,10 @@ fn test_job_result_from_json() {
   let part_1 = "error sending request for url (http://127.0.0.1:4000/api/sessions): ";
   let part_2 = "error trying to connect: tcp connect error: Connection refused (os error";
   let error_message = format!(r#""{}{} {})""#, part_1, part_2, code);
-  assert_eq!(ParameterValueError::new(&error_message), credential_value);
+  assert_eq!(
+    MessageError::ParameterValueError(error_message),
+    credential_value
+  );
 
   let option_array = job_result.get_parameter::<Vec<String>>("array_of_string_parameter");
   assert!(option_array.is_ok());
@@ -226,7 +228,10 @@ fn test_job_result_from_json_without_value() {
   let part_1 = "error sending request for url (http://127.0.0.1:4000/api/sessions): ";
   let part_2 = "error trying to connect: tcp connect error: Connection refused (os error";
   let error_message = format!(r#""{}{} {})""#, part_1, part_2, code);
-  assert_eq!(ParameterValueError::new(&error_message), credential_value);
+  assert_eq!(
+    MessageError::ParameterValueError(error_message),
+    credential_value
+  );
 
   let option_array = job_result.get_parameter::<Vec<String>>("array_of_string_parameter");
   assert!(option_array.is_ok());

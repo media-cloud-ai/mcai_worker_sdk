@@ -1,11 +1,12 @@
-use crate::parameter::{Parameter, ParameterValue, ParameterValueError};
+use crate::parameter::{Parameter, ParameterValue};
+use crate::MessageError;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
 pub trait ParametersContainer {
   fn get_parameters(&self) -> &Vec<Parameter>;
 
-  fn get_parameter<T: DeserializeOwned>(&self, key: &str) -> Result<T, ParameterValueError>
+  fn get_parameter<T: DeserializeOwned>(&self, key: &str) -> Result<T, MessageError>
   where
     T: ParameterValue,
   {
@@ -18,7 +19,7 @@ pub trait ParametersContainer {
         }
       }
     }
-    Err(ParameterValueError::new(&format!(
+    Err(MessageError::ParameterValueError(format!(
       "Could not find any parameter for key '{}' and type '{}'",
       key,
       T::get_type_as_string()

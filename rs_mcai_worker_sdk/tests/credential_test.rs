@@ -3,8 +3,7 @@ extern crate mcai_worker_sdk;
 use crate::mcai_worker_sdk::ParametersContainer;
 use mcai_worker_sdk::job::*;
 use mcai_worker_sdk::parameter::media_segment::MediaSegment;
-use mcai_worker_sdk::parameter::ParameterValueError;
-use mcai_worker_sdk::Credential;
+use mcai_worker_sdk::{Credential, MessageError};
 
 #[test]
 fn test_credential_serialize_deserialize() {
@@ -83,8 +82,8 @@ fn test_credential_request_value_no_session() {
 
   assert_eq!(
     job.get_parameter::<Credential>("test_credential"),
-    Err(ParameterValueError::new(
-      "\"error decoding response body: EOF while parsing a value at line 1 column 0\""
+    Err(MessageError::ParameterValueError(
+      "\"error decoding response body: EOF while parsing a value at line 1 column 0\"".to_string()
     ))
   );
 }
@@ -113,8 +112,9 @@ fn test_credential_request_value_invalid_session() {
 
   assert_eq!(
     job.get_parameter::<Credential>("test_credential"),
-    Err(ParameterValueError::new(
+    Err(MessageError::ParameterValueError(
       "\"error decoding response body: missing field `access_token` at line 1 column 26\""
+        .to_string()
     ))
   );
 }
@@ -147,8 +147,8 @@ fn test_credential_request_value_no_credential() {
 
   assert_eq!(
     job.get_parameter::<Credential>("test_credential"),
-    Err(ParameterValueError::new(
-      "\"error decoding response body: EOF while parsing a value at line 1 column 0\""
+    Err(MessageError::ParameterValueError(
+      "\"error decoding response body: EOF while parsing a value at line 1 column 0\"".to_string()
     ))
   );
 }
@@ -182,8 +182,8 @@ fn test_credential_request_value_invalid_credential() {
 
   assert_eq!(
     job.get_parameter::<Credential>("test_credential"),
-    Err(ParameterValueError::new(
-      "\"error decoding response body: missing field `id` at line 1 column 11\""
+    Err(MessageError::ParameterValueError(
+      "\"error decoding response body: missing field `id` at line 1 column 11\"".to_string()
     ))
   );
 }
@@ -282,7 +282,7 @@ fn test_credential_request_value_with_invalid_store() {
 
   assert_eq!(
     job.get_parameter::<Credential>("test_credential"),
-    Err(ParameterValueError::new(&error_message))
+    Err(MessageError::ParameterValueError(error_message))
   );
 }
 
@@ -598,8 +598,8 @@ fn test_string_credential_request_value_no_session() {
 
   assert_eq!(
     job.get_parameter::<String>("test_credential"),
-    Err(ParameterValueError::new(
-      "\"error decoding response body: EOF while parsing a value at line 1 column 0\""
+    Err(MessageError::ParameterValueError(
+      "\"error decoding response body: EOF while parsing a value at line 1 column 0\"".to_string()
     ))
   );
 }
@@ -629,8 +629,9 @@ fn test_string_credential_request_value_invalid_session() {
 
   assert_eq!(
     job.get_parameter::<String>("test_credential"),
-    Err(ParameterValueError::new(
+    Err(MessageError::ParameterValueError(
       "\"error decoding response body: missing field `access_token` at line 1 column 26\""
+        .to_string()
     ))
   );
 }
@@ -664,8 +665,8 @@ fn test_string_credential_request_value_no_credential() {
 
   assert_eq!(
     job.get_parameter::<String>("test_credential"),
-    Err(ParameterValueError::new(
-      "\"error decoding response body: EOF while parsing a value at line 1 column 0\""
+    Err(MessageError::ParameterValueError(
+      "\"error decoding response body: EOF while parsing a value at line 1 column 0\"".to_string()
     ))
   );
 }
@@ -700,8 +701,8 @@ fn test_string_credential_request_value_invalid_credential() {
 
   assert_eq!(
     job.get_parameter::<String>("test_credential"),
-    Err(ParameterValueError::new(
-      "\"error decoding response body: missing field `id` at line 1 column 11\""
+    Err(MessageError::ParameterValueError(
+      "\"error decoding response body: missing field `id` at line 1 column 11\"".to_string()
     ))
   );
 }
@@ -834,6 +835,6 @@ fn test_string_credential_request_value_with_invalid_store() {
 
   assert_eq!(
     job.get_parameter::<String>("test_credential"),
-    Err(ParameterValueError::new(&error_message))
+    Err(MessageError::ParameterValueError(error_message))
   );
 }
