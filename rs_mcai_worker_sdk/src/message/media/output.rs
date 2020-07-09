@@ -1,77 +1,39 @@
 use crate::{MessageError, ProcessResult};
 use bytes::Bytes;
-use futures_util::sink::SinkExt;
-use srt::tokio::SrtSocket;
-use srt::SrtSocketBuilder;
-use std::time::Instant;
-use std::{cell::RefCell, rc::Rc};
-use tokio::runtime::Runtime;
+use crate::message::media::srt::SrtStream;
 
 pub struct Output {
-  srt_stream: Option<Rc<RefCell<SrtSocket>>>,
+  srt_stream: Option<SrtStream>,
   results: Vec<ProcessResult>,
-  runtime: Runtime,
   url: String,
 }
 
 impl Output {
-  pub fn new(output: &str) -> Self {
-    let mut runtime = Runtime::new().unwrap();
+  pub fn new(output: &str) -> Result<Self, MessageError> {
+    if SrtStream::is_srt_stream(output) {
+      let srt_stream = Some(SrtStream::open_connection(output)?);
 
-    if output.starts_with("srt://") {
-      let srt_socket = runtime.block_on(async {
-        if output.starts_with("srt://:") {
-          let port = output.replace("srt://:", "").parse::<u16>().unwrap();
-          SrtSocketBuilder::new_listen()
-            .local_port(port)
-            .connect()
-            .await
-            .unwrap()
-        } else {
-          let url = output.replace("srt://", "");
-
-          SrtSocketBuilder::new_connect(url).connect().await.unwrap()
-        }
-      });
-
-      info!("SRT connected");
-
-      Output {
-        srt_stream: Some(Rc::new(RefCell::new(srt_socket))),
+      Ok(Output {
+        srt_stream,
         results: vec![],
-        runtime,
         url: output.to_string(),
-      }
+      })
     } else {
-      Output {
+      Ok(Output {
         srt_stream: None,
         results: vec![],
-        runtime,
         url: output.to_string(),
-      }
+      })
     }
   }
 
   pub fn push(&mut self, content: ProcessResult) {
-    if self.srt_stream.is_none() {
+    if let Some(srt_stream) = &mut self.srt_stream {
+      let data = Bytes::from(content.content.unwrap_or_else(|| "{}".to_string()));
+      srt_stream.send(data);
+    } else {
       self.results.push(content);
       return;
-    }
-
-    if let Some(srt_stream) = &self.srt_stream {
-      self.runtime.block_on(async {
-        if let Err(reason) = srt_stream
-          .clone()
-          .borrow_mut()
-          .send((
-            Instant::now(),
-            Bytes::from(content.content.unwrap_or_else(|| "{}".to_string())),
-          ))
-          .await
-        {
-          error!("unable to send message, reason: {}", reason);
-        }
-      });
     }
   }
 
