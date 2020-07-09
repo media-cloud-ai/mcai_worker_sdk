@@ -8,6 +8,8 @@ use crate::{
 };
 use lapin::{message::Delivery, options::*, BasicProperties, Promise};
 
+use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -16,7 +18,7 @@ static QUEUE_JOB_COMPLETED: &str = "job_completed";
 static QUEUE_JOB_ERROR: &str = "job_error";
 static QUEUE_JOB_PROGRESSION: &str = "job_progression";
 
-pub fn process_message<ME: MessageEvent>(
+pub fn process_message<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   message_event: Rc<RefCell<ME>>,
   message: Delivery,
   channel: McaiChannel,
@@ -51,7 +53,8 @@ pub fn process_message<ME: MessageEvent>(
 }
 
 pub fn parse_and_process_message<
-  ME: MessageEvent,
+  P: DeserializeOwned + JsonSchema,
+  ME: MessageEvent<P>,
   F: Fn(Option<McaiChannel>, &Job, u8) -> Result<(), MessageError> + 'static,
 >(
   message_event: Rc<RefCell<ME>>,
@@ -67,6 +70,7 @@ pub fn parse_and_process_message<
     count.unwrap_or(0));
 
   job.check_requirements()?;
+  let parameters: P = job.get_parameters()?;
 
   publish_job_progression(channel.clone(), &job, 0)?;
 
@@ -78,7 +82,7 @@ pub fn parse_and_process_message<
   #[cfg(not(feature = "media"))]
   message_event
     .borrow_mut()
-    .process(channel, &job, job_result)
+    .process(channel, &job, parameters, job_result)
 }
 
 fn publish_job_completed(

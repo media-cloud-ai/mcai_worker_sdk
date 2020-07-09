@@ -1,9 +1,16 @@
 //! Module to manage the worker
 
+use schemars::schema::RootSchema;
+use schemars::schema_for;
+use schemars::JsonSchema;
+use semver::Version;
+use serde::Deserialize;
+
+use crate::MessageEvent;
+use serde::de::DeserializeOwned;
+
 pub mod docker;
 pub mod system_information;
-use crate::MessageEvent;
-use semver::Version;
 
 pub mod built_info {
   include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -43,13 +50,18 @@ pub struct WorkerConfiguration {
   description: String,
   version: Version,
   sdk_version: Version,
-  parameters: Vec<Parameter>,
+  parameters: RootSchema,
 }
 
 impl WorkerConfiguration {
-  pub fn new<ME: MessageEvent>(queue_name: &str, message_event: &ME) -> Self {
+  pub fn new<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
+    queue_name: &str,
+    message_event: &ME,
+  ) -> Self {
     let sdk_version =
       Version::parse(built_info::PKG_VERSION).unwrap_or_else(|_| Version::new(0, 0, 0));
+
+    let parameters = schema_for!(P);
 
     WorkerConfiguration {
       instance_id: docker::get_instance_id("/proc/self/cgroup"),
@@ -59,12 +71,8 @@ impl WorkerConfiguration {
       version: message_event.get_version(),
       short_description: message_event.get_short_description(),
       description: message_event.get_description(),
-      parameters: message_event.get_parameters(),
+      parameters,
     }
-  }
-
-  pub fn add_parameter(&mut self, parameter: Parameter) {
-    self.parameters.push(parameter);
   }
 
   pub fn get_instance_id(&self) -> String {

@@ -1,7 +1,7 @@
 //! Module to manage Job
 
 use crate::{parameter::container::ParametersContainer, MessageError, Parameter, Requirement};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::path::Path;
 
 mod job_progression;
@@ -11,6 +11,8 @@ mod job_status;
 pub use job_progression::JobProgression;
 pub use job_result::JobResult;
 pub use job_status::JobStatus;
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Job {
@@ -52,6 +54,23 @@ impl Job {
     let parsed: Result<Job, _> = serde_json::from_str(message);
     parsed
       .map_err(|e| MessageError::RuntimeError(format!("unable to parse input message: {:?}", e)))
+  }
+
+  pub fn get_parameters<P: Sized + DeserializeOwned>(&self) -> Result<P, MessageError> {
+    let mut parameters = Map::<String, Value>::new();
+    for parameter in &self.parameters {
+      if let Some(value) = parameter
+        .value
+        .clone()
+        .or_else(|| parameter.default.clone())
+      {
+        parameters.insert(parameter.id.clone(), value);
+      }
+      // TODO handle default & store
+    }
+    let parameters = serde_json::Value::Object(parameters);
+
+    Ok(serde_json::from_value(parameters).unwrap())
   }
 
   pub fn check_requirements(&self) -> Result<(), MessageError> {

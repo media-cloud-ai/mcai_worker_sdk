@@ -17,16 +17,20 @@
 //!   Version,
 //!   worker::Parameter,
 //! };
+//! use serde_derive::Deserialize;
+//! use schemars::JsonSchema;
 //!
 //! #[derive(Debug)]
 //! struct WorkerNameEvent {}
 //!
-//! impl MessageEvent for WorkerNameEvent {
+//! #[derive(Debug, Deserialize, JsonSchema)]
+//! struct WorkerParameters {}
+//!
+//! impl MessageEvent<WorkerParameters> for WorkerNameEvent {
 //!   fn get_name(&self) -> String {"sample_worker".to_string()}
 //!   fn get_short_description(&self) -> String {"Short description".to_string()}
 //!   fn get_description(&self) -> String {"Long description".to_string()}
 //!   fn get_version(&self) -> Version { Version::new(0, 0, 1) }
-//!   fn get_parameters(&self) -> Vec<Parameter> { vec![] }
 //! }
 //! static WORKER_NAME_EVENT: WorkerNameEvent = WorkerNameEvent {};
 //!
@@ -111,6 +115,8 @@ use job::Job;
 #[cfg(not(feature = "media"))]
 use job::JobResult;
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
+use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
 #[cfg(feature = "media")]
 use serde::Serialize;
 use std::{cell::RefCell, fs, io::Write, rc::Rc, sync::Arc, thread, time};
@@ -138,13 +144,11 @@ impl ProcessResult {
 /// Trait to describe a worker
 ///
 /// Implement this trait to implement a worker
-pub trait MessageEvent {
+pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
   fn get_name(&self) -> String;
   fn get_short_description(&self) -> String;
   fn get_description(&self) -> String;
   fn get_version(&self) -> semver::Version;
-
-  fn get_parameters(&self) -> Vec<worker::Parameter>;
 
   fn init(&mut self) -> Result<(), MessageError> {
     Ok(())
@@ -179,6 +183,7 @@ pub trait MessageEvent {
     &self,
     _channel: Option<McaiChannel>,
     _job: &Job,
+    _parameters: P,
     _job_result: JobResult,
   ) -> Result<JobResult, MessageError>
   where
@@ -189,7 +194,7 @@ pub trait MessageEvent {
 }
 
 /// Function to start a worker
-pub fn start_worker<ME: MessageEvent>(mut message_event: ME)
+pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(mut message_event: ME)
 where
   ME: std::marker::Sync,
 {
@@ -347,7 +352,10 @@ fn empty_message_event_impl() {
   #[derive(Debug)]
   struct CustomEvent {}
 
-  impl MessageEvent for CustomEvent {
+  #[derive(JsonSchema, Deserialize)]
+  struct CustomParameters {}
+
+  impl MessageEvent<CustomParameters> for CustomEvent {
     fn get_name(&self) -> String {
       "custom".to_string()
     }
@@ -360,13 +368,10 @@ fn empty_message_event_impl() {
     fn get_version(&self) -> semver::Version {
       semver::Version::new(1, 2, 3)
     }
-
-    fn get_parameters(&self) -> Vec<worker::Parameter> {
-      vec![]
-    }
   }
 
   let custom_event = CustomEvent {};
+  let parameters = CustomParameters {};
 
   let job = job::Job {
     job_id: 1234,
@@ -375,6 +380,6 @@ fn empty_message_event_impl() {
 
   let job_result = job::JobResult::new(1234);
 
-  let result = custom_event.process(None, &job, job_result);
+  let result = custom_event.process(None, &job, parameters, job_result);
   assert!(result == Err(MessageError::NotImplemented()));
 }
