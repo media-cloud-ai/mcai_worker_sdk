@@ -1,9 +1,9 @@
 use mcai_worker_sdk::job::{Job, JobResult, JobStatus};
 use mcai_worker_sdk::worker::{Parameter, ParameterType};
+#[cfg(feature = "media")]
+use mcai_worker_sdk::{info, FormatContext, Frame};
 use mcai_worker_sdk::{publish_job_progression, McaiChannel};
 use mcai_worker_sdk::{MessageError, MessageEvent, ParametersContainer};
-#[cfg(feature = "media")]
-use mcai_worker_sdk::{FormatContext, Frame, info};
 use semver::Version;
 
 #[derive(Debug)]
@@ -67,9 +67,17 @@ Do no use in production, just for developments."#
       let nb_samples = (*frame.frame).nb_samples;
 
       if width != 0 && height != 0 {
-        info!(target: job_id, "PTS: {}, image size: {}x{}", frame.get_pts(), width, height);
+        info!(
+          target: job_id,
+          "PTS: {}, image size: {}x{}",
+          frame.get_pts(),
+          width,
+          height
+        );
       } else {
-        info!(target: job_id, "PTS: {}, sample_rate: {}Hz, channels: {}, nb_samples: {}",
+        info!(
+          target: job_id,
+          "PTS: {}, sample_rate: {}Hz, channels: {}, nb_samples: {}",
           frame.get_pts(),
           sample_rate,
           channels,

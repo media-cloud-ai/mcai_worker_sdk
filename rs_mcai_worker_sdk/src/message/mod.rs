@@ -8,8 +8,8 @@ use crate::{
 };
 use lapin::{message::Delivery, options::*, BasicProperties, Promise};
 
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 static RESPONSE_EXCHANGE: &str = "job_response";
 static QUEUE_JOB_COMPLETED: &str = "job_completed";
@@ -76,7 +76,9 @@ pub fn parse_and_process_message<
   return media::process(message_event, channel, &job, job_result);
 
   #[cfg(not(feature = "media"))]
-  message_event.borrow_mut().process(channel, &job, job_result)
+  message_event
+    .borrow_mut()
+    .process(channel, &job, job_result)
 }
 
 fn publish_job_completed(

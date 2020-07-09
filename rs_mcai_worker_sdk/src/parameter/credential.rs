@@ -69,9 +69,10 @@ impl<'de> Deserialize<'de> for Credential {
 }
 
 pub fn request_value(credential_key: &str, store_code: &str) -> Result<Value, String> {
-
   if vec!["env", "ENV", "environment"].contains(&store_code) {
-    return var(credential_key).map(|value| Value::String(value)).map_err(|error| error.to_string());
+    return var(credential_key)
+      .map(Value::String)
+      .map_err(|error| error.to_string());
   }
 
   let backend_endpoint = get_store_hostname(store_code);

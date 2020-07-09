@@ -100,10 +100,7 @@ pub use parameter::container::ParametersContainer;
 pub use parameter::credential::Credential;
 pub use parameter::{Parameter, ParameterValue, Requirement};
 #[cfg(feature = "media")]
-pub use stainless_ffmpeg::{
-  format_context::FormatContext,
-  frame::Frame,
-};
+pub use stainless_ffmpeg::{format_context::FormatContext, frame::Frame};
 
 use chrono::prelude::*;
 use config::*;
@@ -114,6 +111,7 @@ use job::Job;
 #[cfg(not(feature = "media"))]
 use job::JobResult;
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
+#[cfg(feature = "media")]
 use serde::Serialize;
 use std::{cell::RefCell, fs, io::Write, rc::Rc, sync::Arc, thread, time};
 
@@ -126,6 +124,7 @@ pub struct ProcessResult {
   content: Option<String>,
 }
 
+#[cfg(feature = "media")]
 impl ProcessResult {
   pub fn new_json<S: Serialize>(content: S) -> Self {
     let content = serde_json::to_string(&content).unwrap();
@@ -152,12 +151,21 @@ pub trait MessageEvent {
   }
 
   #[cfg(feature = "media")]
-  fn init_process(&mut self, _job: &Job, _format_context: &FormatContext) -> Result<Vec<usize>, MessageError> {
+  fn init_process(
+    &mut self,
+    _job: &Job,
+    _format_context: &FormatContext,
+  ) -> Result<Vec<usize>, MessageError> {
     Ok(vec![])
   }
 
   #[cfg(feature = "media")]
-  fn process_frame(&mut self, _str_job_id: &str, _stream_index: usize, _frame: Frame) -> Result<ProcessResult, MessageError> {
+  fn process_frame(
+    &mut self,
+    _str_job_id: &str,
+    _stream_index: usize,
+    _frame: Frame,
+  ) -> Result<ProcessResult, MessageError> {
     Err(MessageError::NotImplemented())
   }
 
@@ -322,7 +330,8 @@ where
         .for_each(move |delivery| {
           let (_channel, delivery) = delivery.expect("error caught in in consumer");
 
-          message::process_message(message_event.clone(), delivery, clone_channel.clone()).map(|_| ())
+          message::process_message(message_event.clone(), delivery, clone_channel.clone())
+            .map(|_| ())
         })
         .await
     });
