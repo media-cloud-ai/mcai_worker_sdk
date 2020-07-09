@@ -8,6 +8,7 @@ mod job_progression;
 mod job_result;
 mod job_status;
 
+use crate::parameter::credential::request_value;
 pub use job_progression::JobProgression;
 pub use job_result::JobResult;
 pub use job_status::JobStatus;
@@ -64,9 +65,27 @@ impl Job {
         .clone()
         .or_else(|| parameter.default.clone())
       {
+        let value = if let Some(store_code) = &parameter.store {
+          debug!(
+            "Retrieve credential value {} from store {}",
+            value.to_string(),
+            store_code
+          );
+
+          if let Value::String(credential_key) = value {
+            request_value(&credential_key, &store_code)
+              .map_err(|e| MessageError::ParameterValueError(format!("{:?}", e)))
+          } else {
+            Err(MessageError::ParameterValueError(format!(
+              "Cannot handle credential type for {:?}",
+              value
+            )))
+          }?
+        } else {
+          value
+        };
         parameters.insert(parameter.id.clone(), value);
       }
-      // TODO handle default & store
     }
     let parameters = serde_json::Value::Object(parameters);
 
