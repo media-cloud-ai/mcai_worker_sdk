@@ -220,7 +220,7 @@ where
     return;
   }
 
-  let rc = Rc::new(RefCell::new(message_event));
+  let message_event = Rc::new(RefCell::new(message_event));
 
   info!("Worker initialized, ready to receive jobs");
 
@@ -234,7 +234,7 @@ where
       let message_data = fs::read_to_string(source_order).unwrap();
 
       let result = message::parse_and_process_message(
-        rc.clone(),
+        message_event.clone(),
         &message_data,
         count,
         channel,
@@ -246,7 +246,7 @@ where
           info!(target: &job_result.get_job_id().to_string(), "Process succeeded: {:?}", job_result)
         }
         Err(message) => {
-          error!("Error {:?}", message);
+          error!("{:?}", message);
         }
       }
     }
@@ -316,13 +316,13 @@ where
       info!("Start to consume on queue {:?}", amqp_queue);
 
       let clone_channel = channel.clone();
-      let rc = rc.clone();
+      let message_event = message_event.clone();
 
       consumer
         .for_each(move |delivery| {
           let (_channel, delivery) = delivery.expect("error caught in in consumer");
 
-          message::process_message(rc.clone(), delivery, clone_channel.clone()).map(|_| ())
+          message::process_message(message_event.clone(), delivery, clone_channel.clone()).map(|_| ())
         })
         .await
     });

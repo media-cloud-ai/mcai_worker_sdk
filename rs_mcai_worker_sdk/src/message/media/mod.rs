@@ -104,7 +104,7 @@ impl Output {
       "frames": results,
     });
 
-    std::fs::write("test.json", serde_json::to_string(&content).unwrap()).unwrap();
+    std::fs::write(self.url.clone(), serde_json::to_string(&content).unwrap()).unwrap();
 
     Ok(())
   }
