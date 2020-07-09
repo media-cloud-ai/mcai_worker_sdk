@@ -24,6 +24,7 @@ struct Output {
   srt_stream: Option<Rc<RefCell<SrtSocket>>>,
   results: Vec<ProcessResult>,
   runtime: Runtime,
+  url: String,
 }
 
 impl Output {
@@ -56,12 +57,14 @@ impl Output {
         srt_stream: Some(Rc::new(RefCell::new(srt_socket))),
         results: vec![],
         runtime,
+        url: output.to_string()
       }
     } else {
       Output {
         srt_stream: None,
         results: vec![],
         runtime,
+        url: output.to_string()
       }
     }
   }
@@ -85,6 +88,25 @@ impl Output {
             }
       });
     }
+  }
+
+  fn to_destination_path(&self) -> Result<(), MessageError> {
+    let results: Vec<serde_json::Value> =
+      self.results
+        .iter()
+        .filter(|result| result.content.is_some())
+        .map(|result|
+          serde_json::from_str(&result.content.as_ref().unwrap()).unwrap()
+        )
+        .collect();
+
+    let content = json!({
+      "frames": results,
+    });
+
+    std::fs::write("test.json", serde_json::to_string(&content).unwrap()).unwrap();
+
+    Ok(())
   }
 }
 
@@ -126,7 +148,7 @@ pub fn process<ME: MessageEvent>(
     match format_context.next_packet() {
       Err(message) => {
         if message == "End of data stream" || message == "Unable to read next packet" {
-          // output.to_destination_path()
+          output.to_destination_path()?;
           return Ok(job_result);
         }
 

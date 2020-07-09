@@ -110,7 +110,9 @@ use config::*;
 use env_logger::Builder;
 use futures_executor::LocalPool;
 use futures_util::{future::FutureExt, stream::StreamExt, task::LocalSpawnExt};
-use job::{Job, JobResult};
+use job::Job;
+#[cfg(not(feature = "media"))]
+use job::JobResult;
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use serde::Serialize;
 use std::{cell::RefCell, fs, io::Write, rc::Rc, sync::Arc, thread, time};
@@ -145,13 +147,17 @@ pub trait MessageEvent {
 
   fn get_parameters(&self) -> Vec<worker::Parameter>;
 
+  fn init(&mut self) -> Result<(), MessageError> {
+    Ok(())
+  }
+
   #[cfg(feature = "media")]
-  fn init_process(&mut self, job: &Job, format_context: &FormatContext) -> Result<Vec<usize>, MessageError> {
+  fn init_process(&mut self, _job: &Job, _format_context: &FormatContext) -> Result<Vec<usize>, MessageError> {
     Ok(vec![])
   }
 
   #[cfg(feature = "media")]
-  fn process_frame(&mut self, str_job_id: &str, stream_index: usize, frame: Frame) -> Result<ProcessResult, MessageError> {
+  fn process_frame(&mut self, _str_job_id: &str, _stream_index: usize, _frame: Frame) -> Result<ProcessResult, MessageError> {
     Err(MessageError::NotImplemented())
   }
 
@@ -175,7 +181,7 @@ pub trait MessageEvent {
 }
 
 /// Function to start a worker
-pub fn start_worker<ME: MessageEvent>(message_event: ME)
+pub fn start_worker<ME: MessageEvent>(mut message_event: ME)
 where
   ME: std::marker::Sync,
 {
@@ -209,8 +215,14 @@ where
     worker_configuration.get_sdk_version(),
   );
 
+  if let Err(message) = message_event.init() {
+    error!("{:?}", message);
+    return;
+  }
+
   let rc = Rc::new(RefCell::new(message_event));
 
+  info!("Worker initialized, ready to receive jobs");
 
   if let Some(source_orders) = get_source_orders() {
     warn!("Worker will process source orders");

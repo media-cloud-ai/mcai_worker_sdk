@@ -76,7 +76,6 @@ pub fn parse_and_process_message<
   return media::process(message_event, channel, &job, job_result);
 
   #[cfg(not(feature = "media"))]
-  // MessageEvent::process(message_event, channel, &job, job_result)
   message_event.borrow_mut().process(channel, &job, job_result)
 }
 
