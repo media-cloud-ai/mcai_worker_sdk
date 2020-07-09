@@ -3,18 +3,12 @@ use crate::{
   job::{Job, JobResult},
   message::publish_job_progression,
   parameter::container::ParametersContainer,
-  McaiChannel, MessageError, MessageEvent, ProcessResult,
+  McaiChannel, MessageError, MessageEvent,
 };
-use bytes::Bytes;
-use futures_util::sink::SinkExt;
-use srt::tokio::SrtSocket;
-use srt::SrtSocketBuilder;
 use stainless_ffmpeg::{format_context::FormatContext, video_decoder::VideoDecoder};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::time::Instant;
-use tokio::runtime::Runtime;
 
 mod output;
 
@@ -81,7 +75,7 @@ pub fn process<ME: MessageEvent>(
 
           if let Some(duration) = total_duration {
             let progress = (count as f64 / duration * 100.0) as u8;
-            if progress > previous_progress {
+            if progress > previous_progress && progress <= 100 {
               publish_job_progression(channel.clone(), &job, progress)?;
               previous_progress = progress;
             }

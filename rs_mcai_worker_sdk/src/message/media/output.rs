@@ -1,6 +1,13 @@
+use crate::{MessageError, ProcessResult};
+use bytes::Bytes;
+use futures_util::sink::SinkExt;
+use srt::tokio::SrtSocket;
+use srt::SrtSocketBuilder;
+use std::time::Instant;
 use std::{cell::RefCell, rc::Rc};
+use tokio::runtime::Runtime;
 
-struct Output {
+pub struct Output {
   srt_stream: Option<Rc<RefCell<SrtSocket>>>,
   results: Vec<ProcessResult>,
   runtime: Runtime,
@@ -8,7 +15,7 @@ struct Output {
 }
 
 impl Output {
-  fn new(output: &str) -> Self {
+  pub fn new(output: &str) -> Self {
     let mut runtime = Runtime::new().unwrap();
 
     if output.starts_with("srt://") {
@@ -45,7 +52,7 @@ impl Output {
     }
   }
 
-  fn push(&mut self, content: ProcessResult) {
+  pub fn push(&mut self, content: ProcessResult) {
     if self.srt_stream.is_none() {
       self.results.push(content);
       return;
@@ -68,7 +75,7 @@ impl Output {
     }
   }
 
-  fn to_destination_path(&self) -> Result<(), MessageError> {
+  pub fn to_destination_path(&self) -> Result<(), MessageError> {
     let results: Vec<serde_json::Value> = self
       .results
       .iter()
