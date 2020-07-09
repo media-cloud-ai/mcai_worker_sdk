@@ -1,15 +1,24 @@
-use mcai_worker_sdk::job::{Job, JobResult, JobStatus};
-use mcai_worker_sdk::worker::{Parameter, ParameterType};
+#[macro_use]
+extern crate serde_derive;
+
 #[cfg(feature = "media")]
-use mcai_worker_sdk::{info, FormatContext, Frame};
-use mcai_worker_sdk::{publish_job_progression, McaiChannel, ProcessResult};
-use mcai_worker_sdk::{MessageError, MessageEvent, ParametersContainer};
+use mcai_worker_sdk::{info, FormatContext, Frame, ProcessResult};
+use mcai_worker_sdk::{
+  job::{Job, JobResult, JobStatus},
+  publish_job_progression, McaiChannel, MessageError, MessageEvent,
+};
+use schemars::JsonSchema;
 use semver::Version;
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct WorkerParameters {
+  action: Option<String>,
+}
 
 #[derive(Debug)]
 struct WorkerContext {}
 
-impl MessageEvent for WorkerContext {
+impl MessageEvent<WorkerParameters> for WorkerContext {
   fn get_name(&self) -> String {
     "Example".to_string()
   }
@@ -28,17 +37,12 @@ Do no use in production, just for developments."#
     Version::new(1, 2, 3)
   }
 
-  fn get_parameters(&self) -> Vec<Parameter> {
-    vec![Parameter {
-      identifier: "action".to_string(),
-      label: "Action".to_string(),
-      kind: vec![ParameterType::String],
-      required: false,
-    }]
-  }
-
   #[cfg(feature = "media")]
-  fn init_process(&mut self, _job: &Job, _format_context: &FormatContext) -> Result<Vec<usize>, MessageError> {
+  fn init_process(
+    &mut self,
+    _job: &Job,
+    _format_context: &FormatContext,
+  ) -> Result<Vec<usize>, MessageError> {
     Ok(vec![1])
   }
 
@@ -83,36 +87,31 @@ Do no use in production, just for developments."#
     &self,
     channel: Option<McaiChannel>,
     job: &Job,
+    parameters: WorkerParameters,
     job_result: JobResult,
   ) -> Result<JobResult, MessageError> {
-    process_message(channel, job, job_result)
+    publish_job_progression(channel.clone(), job, 50)?;
+
+    match parameters.action {
+      Some(action_label) => match action_label.as_str() {
+        "completed" => {
+          publish_job_progression(channel, job, 100)?;
+          Ok(job_result.with_status(JobStatus::Completed))
+        }
+        action_label => {
+          let result = job_result.with_message(&format!("Unknown action named {}", action_label));
+          Err(MessageError::ProcessingError(result))
+        }
+      },
+      None => {
+        let result = job_result.with_message(&format!("Unspecified action parameter"));
+        Err(MessageError::ProcessingError(result))
+      }
+    }
   }
 }
 
 fn main() {
   let worker_context = WorkerContext {};
   mcai_worker_sdk::start_worker(worker_context);
-}
-
-pub fn process_message(
-  channel: Option<McaiChannel>,
-  job: &Job,
-  job_result: JobResult,
-) -> Result<JobResult, MessageError> {
-  publish_job_progression(channel.clone(), &job, 50)?;
-
-  match job
-    .get_parameter::<String>("action")
-    .unwrap_or("error".to_string())
-    .as_str()
-  {
-    "completed" => {
-      publish_job_progression(channel, &job, 100)?;
-      Ok(job_result.with_status(JobStatus::Completed))
-    }
-    action_label => {
-      let result = job_result.with_message(&format!("Unknown action named {}", action_label));
-      Err(MessageError::ProcessingError(result))
-    }
-  }
 }

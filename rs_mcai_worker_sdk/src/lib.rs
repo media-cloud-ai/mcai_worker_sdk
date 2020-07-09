@@ -233,7 +233,7 @@ where
     return;
   }
 
-  let message_event = Rc::new(RefCell::new(message_event));
+  let message_event_ref = Rc::new(RefCell::new(message_event));
 
   info!("Worker initialized, ready to receive jobs");
 
@@ -247,7 +247,7 @@ where
       let message_data = fs::read_to_string(source_order).unwrap();
 
       let result = message::parse_and_process_message(
-        message_event.clone(),
+        message_event_ref.clone(),
         &message_data,
         count,
         channel,
@@ -329,7 +329,7 @@ where
       info!("Start to consume on queue {:?}", amqp_queue);
 
       let clone_channel = channel.clone();
-      let message_event = message_event.clone();
+      let message_event = message_event_ref.clone();
 
       consumer
         .for_each(move |delivery| {

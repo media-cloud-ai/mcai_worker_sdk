@@ -1,26 +1,12 @@
 use crate::{
-  error::MessageError::RuntimeError,
-  job::Job,
-  message::media::srt::SrtStream,
-  MessageError, MessageEvent,
+  error::MessageError::RuntimeError, job::Job, message::media::srt::SrtStream, MessageError,
+  MessageEvent,
 };
-use std::{
-  cell::RefCell,
-  collections::HashMap,
-  rc::Rc,
-};
-use stainless_ffmpeg::{
-  format_context::FormatContext,
-  frame::Frame,
-  video_decoder::VideoDecoder
-};
-
+use stainless_ffmpeg::{format_context::FormatContext, frame::Frame, video_decoder::VideoDecoder};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 pub enum DecodeResult {
-  Frame {
-    stream_index: usize,
-    frame: Frame,
-  },
+  Frame { stream_index: usize, frame: Frame },
   Nothing,
   EndOfStream,
 }
@@ -34,7 +20,7 @@ impl Source {
   pub fn new<ME: MessageEvent>(
     message_event: Rc<RefCell<ME>>,
     job: &Job,
-    source_url: &str
+    source_url: &str,
   ) -> Result<Self, MessageError> {
     info!(target: &job.job_id.to_string(), "Openning source: {}", source_url);
 
@@ -72,7 +58,8 @@ impl Source {
   }
 
   pub fn get_duration(&self) -> Option<f64> {
-    self.format_context
+    self
+      .format_context
       .get_duration()
       .map(|duration| duration * 25.0)
   }
@@ -92,7 +79,10 @@ impl Source {
         if let Some(decoder) = self.decoders.get(&stream_index) {
           match decoder.decode(&packet) {
             Ok(frame) => {
-              return Ok(DecodeResult::Frame{stream_index, frame});
+              return Ok(DecodeResult::Frame {
+                stream_index,
+                frame,
+              });
             }
             Err(message) => {
               println!("{:?}", message);

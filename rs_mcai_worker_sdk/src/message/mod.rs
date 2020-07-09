@@ -65,9 +65,9 @@ pub fn parse_and_process_message<
 ) -> Result<JobResult, MessageError> {
   let job = Job::new(message_data)?;
   debug!(target: &job.job_id.to_string(),
-    "received message: {:?} (iteration: {})",
-    job,
-    count.unwrap_or(0));
+         "received message: {:?} (iteration: {})",
+         job,
+         count.unwrap_or(0));
 
   job.check_requirements()?;
   let parameters: P = job.get_parameters()?;

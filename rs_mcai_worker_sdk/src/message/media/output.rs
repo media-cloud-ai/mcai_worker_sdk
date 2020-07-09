@@ -1,6 +1,6 @@
+use crate::message::media::srt::SrtStream;
 use crate::{MessageError, ProcessResult};
 use bytes::Bytes;
-use crate::message::media::srt::SrtStream;
 
 pub struct Output {
   srt_stream: Option<SrtStream>,

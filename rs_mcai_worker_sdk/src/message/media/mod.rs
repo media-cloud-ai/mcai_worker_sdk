@@ -7,8 +7,8 @@ use crate::{
 use std::cell::RefCell;
 use std::rc::Rc;
 
-mod source;
 mod output;
+mod source;
 mod srt;
 use source::DecodeResult;
 
@@ -35,7 +35,10 @@ pub fn process<ME: MessageEvent>(
 
   loop {
     match source.next_frame()? {
-      DecodeResult::Frame{stream_index, frame} => {
+      DecodeResult::Frame {
+        stream_index,
+        frame,
+      } => {
         count += 1;
 
         if stream_index == 0 {
@@ -51,18 +54,17 @@ pub fn process<ME: MessageEvent>(
         }
 
         trace!(target: &job_result.get_str_job_id(), "Process frame {}", count);
-        let result =
-          message_event
-            .borrow_mut()
-            .process_frame(&str_job_id, stream_index, frame)?;
+        let result = message_event
+          .borrow_mut()
+          .process_frame(&str_job_id, stream_index, frame)?;
 
         output.push(result);
-      },
-      DecodeResult::Nothing => {},
+      }
+      DecodeResult::Nothing => {}
       DecodeResult::EndOfStream => {
         output.to_destination_path()?;
         return Ok(job_result);
-      }  
+      }
     }
   }
 }
