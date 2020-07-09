@@ -2,7 +2,7 @@ use mcai_worker_sdk::job::{Job, JobResult, JobStatus};
 use mcai_worker_sdk::worker::{Parameter, ParameterType};
 #[cfg(feature = "media")]
 use mcai_worker_sdk::{info, FormatContext, Frame};
-use mcai_worker_sdk::{publish_job_progression, McaiChannel};
+use mcai_worker_sdk::{publish_job_progression, McaiChannel, ProcessResult};
 use mcai_worker_sdk::{MessageError, MessageEvent, ParametersContainer};
 use semver::Version;
 
@@ -37,28 +37,18 @@ Do no use in production, just for developments."#
     }]
   }
 
-  #[cfg(not(feature = "media"))]
-  fn process(
-    &self,
-    channel: Option<McaiChannel>,
-    job: &Job,
-    job_result: JobResult,
-  ) -> Result<JobResult, MessageError> {
-    process_message(channel, job, job_result)
-  }
-
   #[cfg(feature = "media")]
-  fn init_process(&self, format_context: &FormatContext) -> Result<Vec<usize>, MessageError> {
+  fn init_process(&mut self, _job: &Job, _format_context: &FormatContext) -> Result<Vec<usize>, MessageError> {
     Ok(vec![1])
   }
 
   #[cfg(feature = "media")]
   fn process_frame(
-    &self,
+    &mut self,
     job_id: &str,
-    stream_index: usize,
+    _stream_index: usize,
     frame: Frame,
-  ) -> Result<(), MessageError> {
+  ) -> Result<ProcessResult, MessageError> {
     unsafe {
       let width = (*frame.frame).width;
       let height = (*frame.frame).height;
@@ -85,7 +75,17 @@ Do no use in production, just for developments."#
         );
       }
     }
-    Ok(())
+    Ok(ProcessResult::new_json(""))
+  }
+
+  #[cfg(not(feature = "media"))]
+  fn process(
+    &self,
+    channel: Option<McaiChannel>,
+    job: &Job,
+    job_result: JobResult,
+  ) -> Result<JobResult, MessageError> {
+    process_message(channel, job, job_result)
   }
 }
 
