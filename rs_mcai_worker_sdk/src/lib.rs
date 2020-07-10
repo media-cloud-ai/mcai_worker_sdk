@@ -97,7 +97,7 @@ pub use log::{debug, error, info, trace, warn};
 /// Re-export from semver:
 pub use semver::Version;
 
-pub use error::MessageError;
+pub use error::{MessageError, Result};
 pub use message::publish_job_progression;
 pub use parameter::container::ParametersContainer;
 #[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
@@ -150,16 +150,12 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
   fn get_description(&self) -> String;
   fn get_version(&self) -> semver::Version;
 
-  fn init(&mut self) -> Result<(), MessageError> {
+  fn init(&mut self) -> Result<()> {
     Ok(())
   }
 
   #[cfg(feature = "media")]
-  fn init_process(
-    &mut self,
-    _job: &Job,
-    _format_context: &FormatContext,
-  ) -> Result<Vec<usize>, MessageError> {
+  fn init_process(&mut self, _job: &Job, _format_context: &FormatContext) -> Result<Vec<usize>> {
     Ok(vec![])
   }
 
@@ -169,12 +165,12 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
     _str_job_id: &str,
     _stream_index: usize,
     _frame: Frame,
-  ) -> Result<ProcessResult, MessageError> {
+  ) -> Result<ProcessResult> {
     Err(MessageError::NotImplemented())
   }
 
   #[cfg(feature = "media")]
-  fn ending_process(&self) -> Result<(), MessageError> {
+  fn ending_process(&self) -> Result<()> {
     Ok(())
   }
 
@@ -185,7 +181,7 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
     _job: &Job,
     _parameters: P,
     _job_result: JobResult,
-  ) -> Result<JobResult, MessageError>
+  ) -> Result<JobResult>
   where
     Self: std::marker::Sized,
   {

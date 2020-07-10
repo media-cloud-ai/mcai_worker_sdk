@@ -19,3 +19,5 @@ impl MessageError {
     MessageError::ProcessingError(result)
   }
 }
+
+pub type Result<T> = std::result::Result<T, MessageError>;

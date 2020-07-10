@@ -7,8 +7,11 @@ use semver::Version;
 use serde::Deserialize;
 
 #[cfg(feature = "media")]
-use crate::message::{DESTINATION_PATH_PARAMETER, SOURCE_PATH_PARAMETER};
-use crate::{MessageError, MessageEvent};
+use crate::{
+  message::{DESTINATION_PATH_PARAMETER, SOURCE_PATH_PARAMETER},
+  MessageError,
+};
+use crate::{MessageEvent, Result};
 use serde::de::DeserializeOwned;
 
 pub mod docker;
@@ -59,7 +62,7 @@ impl WorkerConfiguration {
   pub fn new<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
     queue_name: &str,
     message_event: &ME,
-  ) -> Result<Self, MessageError> {
+  ) -> Result<Self> {
     let sdk_version =
       Version::parse(built_info::PKG_VERSION).unwrap_or_else(|_| Version::new(0, 0, 0));
 
@@ -79,7 +82,7 @@ impl WorkerConfiguration {
   }
 
   #[cfg(feature = "media")]
-  fn get_parameter_schema<P: JsonSchema>() -> Result<RootSchema, MessageError> {
+  fn get_parameter_schema<P: JsonSchema>() -> Result<RootSchema> {
     let mut parameters: RootSchema = schema_for!(P);
     if !parameters
       .schema
@@ -107,7 +110,7 @@ impl WorkerConfiguration {
   }
 
   #[cfg(not(feature = "media"))]
-  fn get_parameter_schema<P: JsonSchema>() -> Result<RootSchema, MessageError> {
+  fn get_parameter_schema<P: JsonSchema>() -> Result<RootSchema> {
     Ok(schema_for!(P))
   }
 

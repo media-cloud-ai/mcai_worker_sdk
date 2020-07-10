@@ -1,12 +1,12 @@
 use crate::parameter::{Parameter, ParameterValue};
-use crate::MessageError;
+use crate::{MessageError, Result};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
 pub trait ParametersContainer {
   fn get_parameters(&self) -> &Vec<Parameter>;
 
-  fn get_parameter<T: DeserializeOwned>(&self, key: &str) -> Result<T, MessageError>
+  fn get_parameter<T: DeserializeOwned>(&self, key: &str) -> Result<T>
   where
     T: ParameterValue,
   {

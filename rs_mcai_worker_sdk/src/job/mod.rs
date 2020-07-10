@@ -9,6 +9,7 @@ mod job_result;
 mod job_status;
 
 use crate::parameter::credential::request_value;
+use crate::Result;
 pub use job_progression::JobProgression;
 pub use job_result::JobResult;
 pub use job_status::JobStatus;
@@ -51,13 +52,13 @@ pub struct ValueResponseBody {
 }
 
 impl Job {
-  pub fn new(message: &str) -> Result<Self, MessageError> {
-    let parsed: Result<Job, _> = serde_json::from_str(message);
+  pub fn new(message: &str) -> Result<Self> {
+    let parsed: std::result::Result<Job, _> = serde_json::from_str(message);
     parsed
       .map_err(|e| MessageError::RuntimeError(format!("unable to parse input message: {:?}", e)))
   }
 
-  pub fn get_parameters<P: Sized + DeserializeOwned>(&self) -> Result<P, MessageError> {
+  pub fn get_parameters<P: Sized + DeserializeOwned>(&self) -> Result<P> {
     let mut parameters = Map::<String, Value>::new();
     for parameter in &self.parameters {
       if let Some(value) = parameter
@@ -92,7 +93,7 @@ impl Job {
     Ok(serde_json::from_value(parameters).unwrap())
   }
 
-  pub fn check_requirements(&self) -> Result<(), MessageError> {
+  pub fn check_requirements(&self) -> Result<()> {
     if let Ok(requirements) = self.get_parameter::<Requirement>("requirements") {
       if let Some(paths) = requirements.paths {
         for path in paths.iter() {

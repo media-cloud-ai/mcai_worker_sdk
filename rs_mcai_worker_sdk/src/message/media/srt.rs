@@ -1,4 +1,4 @@
-use crate::error::MessageError;
+use crate::Result;
 use bytes::Bytes;
 use futures_util::sink::SinkExt;
 use srt::tokio::SrtSocket;
@@ -16,7 +16,7 @@ impl SrtStream {
     url.starts_with("srt://")
   }
 
-  pub fn open_connection(url: &str) -> Result<SrtStream, MessageError> {
+  pub fn open_connection(url: &str) -> Result<SrtStream> {
     let mut runtime = Runtime::new().unwrap();
 
     let socket = runtime.block_on(async {

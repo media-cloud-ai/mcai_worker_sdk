@@ -1,5 +1,5 @@
 use crate::parameter::media_segment::MediaSegment;
-use crate::MessageError;
+use crate::{MessageError, Result};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -10,7 +10,7 @@ pub mod credential;
 pub mod media_segment;
 
 pub trait ParameterValue {
-  fn parse_value(content: Value, store: &Option<String>) -> Result<Self, MessageError>
+  fn parse_value(content: Value, store: &Option<String>) -> Result<Self>
   where
     Self: Sized + DeserializeOwned,
   {
@@ -36,12 +36,12 @@ pub trait ParameterValue {
     Self::from_value(content)
   }
 
-  fn from_store(key: &str, store_code: &str) -> Result<Value, MessageError> {
+  fn from_store(key: &str, store_code: &str) -> Result<Value> {
     credential::request_value(&key, &store_code)
       .map_err(|e| MessageError::ParameterValueError(format!("{:?}", e)))
   }
 
-  fn from_value(content: Value) -> Result<Self, MessageError>
+  fn from_value(content: Value) -> Result<Self>
   where
     Self: Sized + DeserializeOwned,
   {
@@ -59,7 +59,7 @@ impl ParameterValue for String {
 }
 
 impl ParameterValue for i64 {
-  fn from_value(value: Value) -> Result<i64, MessageError> {
+  fn from_value(value: Value) -> Result<i64> {
     match value {
       Value::String(value) => value
         .parse()
@@ -85,7 +85,7 @@ impl ParameterValue for i64 {
 }
 
 impl ParameterValue for f64 {
-  fn from_value(value: Value) -> Result<f64, MessageError> {
+  fn from_value(value: Value) -> Result<f64> {
     match value {
       Value::String(value) => value
         .parse()
@@ -111,7 +111,7 @@ impl ParameterValue for f64 {
 }
 
 impl ParameterValue for bool {
-  fn from_value(value: Value) -> Result<bool, MessageError> {
+  fn from_value(value: Value) -> Result<bool> {
     match value {
       Value::String(value) => value
         .parse()
@@ -139,7 +139,7 @@ impl ParameterValue for Vec<String> {
 
 #[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
 impl ParameterValue for credential::Credential {
-  fn parse_value(content: Value, store: &Option<String>) -> Result<Self, MessageError>
+  fn parse_value(content: Value, store: &Option<String>) -> Result<Self>
   where
     Self: Sized + DeserializeOwned,
   {

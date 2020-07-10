@@ -3,11 +3,11 @@ extern crate serde_derive;
 
 #[cfg(feature = "media")]
 use mcai_worker_sdk::{info, FormatContext, Frame, ProcessResult};
-use mcai_worker_sdk::{job::Job, MessageError, MessageEvent};
+use mcai_worker_sdk::{job::Job, MessageEvent, Result};
 #[cfg(not(feature = "media"))]
 use mcai_worker_sdk::{
   job::{JobResult, JobStatus},
-  publish_job_progression, McaiChannel,
+  publish_job_progression, McaiChannel, MessageError,
 };
 use schemars::JsonSchema;
 use semver::Version;
@@ -40,11 +40,7 @@ Do no use in production, just for developments."#
   }
 
   #[cfg(feature = "media")]
-  fn init_process(
-    &mut self,
-    _job: &Job,
-    _format_context: &FormatContext,
-  ) -> Result<Vec<usize>, MessageError> {
+  fn init_process(&mut self, _job: &Job, _format_context: &FormatContext) -> Result<Vec<usize>> {
     Ok(vec![1])
   }
 
@@ -54,7 +50,7 @@ Do no use in production, just for developments."#
     job_id: &str,
     _stream_index: usize,
     frame: Frame,
-  ) -> Result<ProcessResult, MessageError> {
+  ) -> Result<ProcessResult> {
     unsafe {
       let width = (*frame.frame).width;
       let height = (*frame.frame).height;
@@ -91,7 +87,7 @@ Do no use in production, just for developments."#
     job: &Job,
     parameters: WorkerParameters,
     job_result: JobResult,
-  ) -> Result<JobResult, MessageError> {
+  ) -> Result<JobResult> {
     publish_job_progression(channel.clone(), job, 50)?;
 
     match parameters.action {

@@ -1,4 +1,4 @@
-use crate::{error::MessageError::RuntimeError, job::Job, MessageError, MessageEvent};
+use crate::{error::MessageError::RuntimeError, job::Job, MessageEvent, Result};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use stainless_ffmpeg::{format_context::FormatContext, frame::Frame, video_decoder::VideoDecoder};
@@ -20,7 +20,7 @@ impl Source {
     message_event: Rc<RefCell<ME>>,
     job: &Job,
     source_url: &str,
-  ) -> Result<Self, MessageError> {
+  ) -> Result<Self> {
     info!(target: &job.job_id.to_string(), "Openning source: {}", source_url);
 
     let mut format_context = FormatContext::new(source_url).map_err(RuntimeError)?;
@@ -63,7 +63,7 @@ impl Source {
       .map(|duration| duration * 25.0)
   }
 
-  pub fn next_frame(&mut self) -> Result<DecodeResult, MessageError> {
+  pub fn next_frame(&mut self) -> Result<DecodeResult> {
     match self.format_context.next_packet() {
       Err(message) => {
         if message == "End of data stream" || message == "Unable to read next packet" {
@@ -77,12 +77,10 @@ impl Source {
 
         if let Some(decoder) = self.decoders.get(&stream_index) {
           match decoder.decode(&packet) {
-            Ok(frame) => {
-              Ok(DecodeResult::Frame {
-                stream_index,
-                frame,
-              })
-            }
+            Ok(frame) => Ok(DecodeResult::Frame {
+              stream_index,
+              frame,
+            }),
             Err(message) => {
               println!("{:?}", message);
               if message == "Resource temporarily unavailable" {

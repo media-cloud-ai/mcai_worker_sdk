@@ -7,7 +7,7 @@ pub use media::{DESTINATION_PATH_PARAMETER, SOURCE_PATH_PARAMETER};
 
 use crate::{
   job::{Job, JobProgression, JobResult, JobStatus},
-  McaiChannel, MessageError, MessageEvent,
+  McaiChannel, MessageError, MessageEvent, Result,
 };
 use lapin::{message::Delivery, options::*, BasicProperties, Promise};
 
@@ -61,14 +61,14 @@ pub fn process_message<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
 pub fn parse_and_process_message<
   P: DeserializeOwned + JsonSchema,
   ME: MessageEvent<P>,
-  F: Fn(Option<McaiChannel>, &Job, u8) -> Result<(), MessageError> + 'static,
+  F: Fn(Option<McaiChannel>, &Job, u8) -> Result<()> + 'static,
 >(
   message_event: Rc<RefCell<ME>>,
   message_data: &str,
   count: Option<i64>,
   channel: Option<McaiChannel>,
   publish_job_progression: F,
-) -> Result<JobResult, MessageError> {
+) -> Result<JobResult> {
   let job = Job::new(message_data)?;
   debug!(target: &job.job_id.to_string(),
          "received message: {:?} (iteration: {})",
@@ -129,7 +129,7 @@ pub fn publish_job_progression(
   channel: Option<McaiChannel>,
   job: &Job,
   progression: u8,
-) -> Result<(), MessageError> {
+) -> Result<()> {
   if let Some(channel) = channel {
     let msg = json!(JobProgression::new(job, progression)).to_string();
 

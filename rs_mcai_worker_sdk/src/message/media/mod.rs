@@ -2,7 +2,7 @@ use crate::{
   job::{Job, JobResult},
   message::publish_job_progression,
   parameter::container::ParametersContainer,
-  McaiChannel, MessageError, MessageEvent,
+  McaiChannel, MessageEvent, Result,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -23,7 +23,7 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   job: &Job,
   _parameters: P,
   job_result: JobResult,
-) -> Result<JobResult, MessageError> {
+) -> Result<JobResult> {
   let str_job_id = job.job_id.to_string();
 
   let source_url: String = job.get_parameter(SOURCE_PATH_PARAMETER).unwrap();
