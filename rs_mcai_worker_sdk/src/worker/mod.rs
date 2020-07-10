@@ -62,15 +62,15 @@ impl WorkerConfiguration {
   pub fn new<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
     queue_name: &str,
     message_event: &ME,
+    instance_id: &str,
   ) -> Result<Self> {
     let sdk_version =
       Version::parse(built_info::PKG_VERSION).unwrap_or_else(|_| Version::new(0, 0, 0));
 
     let parameters = WorkerConfiguration::get_parameter_schema::<P>()?;
-    println!("parameters: {:?}", parameters);
 
     Ok(WorkerConfiguration {
-      instance_id: docker::get_instance_id("/proc/self/cgroup"),
+      instance_id: instance_id.to_string(),
       queue_name: queue_name.to_string(),
       label: message_event.get_name(),
       sdk_version,

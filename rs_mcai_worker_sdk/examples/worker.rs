@@ -12,9 +12,17 @@ use mcai_worker_sdk::{MessageEvent, Result};
 use schemars::JsonSchema;
 use semver::Version;
 
+#[cfg(not(feature = "media"))]
 #[derive(Debug, Deserialize, JsonSchema)]
 struct WorkerParameters {
   action: Option<String>,
+}
+
+#[cfg(feature = "media")]
+#[derive(Debug, Deserialize, JsonSchema)]
+struct WorkerParameters {
+  source_path: Option<String>,
+  destination_path: Option<String>,
 }
 
 #[derive(Debug)]

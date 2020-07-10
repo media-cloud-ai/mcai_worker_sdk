@@ -106,6 +106,7 @@ pub use parameter::{Parameter, ParameterValue, Requirement};
 #[cfg(feature = "media")]
 pub use stainless_ffmpeg::{format_context::FormatContext, frame::Frame};
 
+use crate::worker::docker;
 use chrono::prelude::*;
 use config::*;
 use env_logger::Builder;
@@ -198,17 +199,9 @@ where
 {
   let mut builder = Builder::from_default_env();
   let amqp_queue = get_amqp_queue();
+  let instance_id = docker::get_instance_id("/proc/self/cgroup");
 
-  let worker_configuration = worker::WorkerConfiguration::new(&amqp_queue, &message_event);
-  if let Err(configuration_error) = worker_configuration {
-    error!("{:?}", configuration_error);
-    return;
-  }
-
-  let worker_configuration = worker_configuration.unwrap();
-
-  let container_id = worker_configuration.get_instance_id();
-
+  let container_id = instance_id.clone();
   builder
     .format(move |stream, record| {
       writeln!(
@@ -216,7 +209,7 @@ where
         "{} - {} - {} - {} - {} - {}",
         Utc::now(),
         &container_id,
-        amqp_queue,
+        get_amqp_queue(),
         record.target().parse::<i64>().unwrap_or(-1),
         record.level(),
         record.args(),
@@ -224,7 +217,14 @@ where
     })
     .init();
 
-  let amqp_queue = get_amqp_queue();
+  let worker_configuration =
+    worker::WorkerConfiguration::new(&amqp_queue, &message_event, &instance_id);
+  if let Err(configuration_error) = worker_configuration {
+    error!("{:?}", configuration_error);
+    return;
+  }
+
+  let worker_configuration = worker_configuration.unwrap();
 
   info!(
     "Worker: {}, version: {} (MCAI Worker SDK {})",
