@@ -1,5 +1,7 @@
 extern crate assert_matches;
 extern crate mcai_worker_sdk;
+#[macro_use]
+extern crate serde_derive;
 
 use assert_matches::assert_matches;
 
@@ -10,6 +12,8 @@ use mcai_worker_sdk::MessageError;
 
 use mcai_worker_sdk::Credential;
 use std::collections::HashMap;
+
+use schemars::JsonSchema;
 
 #[test]
 fn test_new_job_empty_message() {
@@ -227,4 +231,66 @@ fn test_check_invalid_requirements() {
   } else {
     assert!(false);
   }
+}
+
+#[test]
+fn test_get_job_parameters() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id":"key",
+        "type":"string",
+        "value":"value"
+      }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  assert_eq!(123, job.job_id);
+
+  #[derive(JsonSchema, Deserialize)]
+  struct WorkerJobParameters {
+    key: String,
+    other: Option<String>,
+  }
+
+  let job_parameters = job.get_parameters::<WorkerJobParameters>();
+  assert!(job_parameters.is_ok());
+  let job_parameters = job_parameters.unwrap();
+
+  assert_eq!("value".to_string(), job_parameters.key);
+  assert_eq!(None, job_parameters.other);
+}
+
+#[test]
+fn test_get_missing_job_parameters() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id":"key",
+        "type":"string",
+        "value":"value"
+      }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  assert_eq!(123, job.job_id);
+
+  #[derive(JsonSchema, Deserialize, Debug)]
+  struct WorkerJobParameters {
+    other: String,
+  }
+
+  let job_parameters = job.get_parameters::<WorkerJobParameters>();
+  let expected = MessageError::ParameterValueError("Cannot get parameters from Object({\"key\": String(\"value\")}): Error(\"missing field `other`\", line: 0, column: 0)".to_string());
+
+  assert!(job_parameters.is_err());
+  assert_eq!(expected, job_parameters.unwrap_err());
 }
