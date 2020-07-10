@@ -154,7 +154,11 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
   }
 
   #[cfg(feature = "media")]
-  fn init_process(&mut self, _parameters: P, _format_context: &FormatContext) -> Result<Vec<usize>> {
+  fn init_process(
+    &mut self,
+    _parameters: P,
+    _format_context: &FormatContext,
+  ) -> Result<Vec<usize>> {
     Ok(vec![])
   }
 
@@ -177,7 +181,6 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
   fn process(
     &self,
     _channel: Option<McaiChannel>,
-    _job_id: u64,
     _parameters: P,
     _job_result: JobResult,
   ) -> Result<JobResult>
@@ -381,8 +384,8 @@ fn empty_message_event_impl() {
     parameters: vec![],
   };
 
-  let job_result = job::JobResult::new(1234);
+  let job_result = job::JobResult::new(job.job_id);
 
-  let result = custom_event.process(None, job.job_id, parameters, job_result);
+  let result = custom_event.process(None, parameters, job_result);
   assert!(result == Err(MessageError::NotImplemented()));
 }

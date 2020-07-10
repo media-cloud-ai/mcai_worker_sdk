@@ -29,7 +29,12 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   let source_url: String = job.get_parameter(SOURCE_PATH_PARAMETER).unwrap();
   let output_url: String = job.get_parameter(DESTINATION_PATH_PARAMETER).unwrap();
 
-  let mut source = source::Source::new(message_event.clone(), job.job_id, parameters, &source_url)?;
+  let mut source = source::Source::new(
+    message_event.clone(),
+    job_result.clone(),
+    parameters,
+    &source_url,
+  )?;
 
   info!(target: &str_job_id, "Start to process media");
 

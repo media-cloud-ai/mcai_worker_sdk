@@ -1,3 +1,4 @@
+use crate::job::JobResult;
 use crate::{error::MessageError::RuntimeError, MessageEvent, Result};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
@@ -18,16 +19,16 @@ pub struct Source {
 impl Source {
   pub fn new<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
     message_event: Rc<RefCell<ME>>,
-    job_id: u64,
+    job_result: JobResult,
     parameters: P,
     source_url: &str,
   ) -> Result<Self> {
-    info!(target: &job_id.to_string(), "Openning source: {}", source_url);
+    info!(target: &job_result.get_job_id().to_string(), "Openning source: {}", source_url);
 
     let mut format_context = FormatContext::new(source_url).map_err(RuntimeError)?;
     format_context.open_input().map_err(RuntimeError)?;
 
-    let str_job_id = job_id.to_string();
+    let str_job_id = job_result.get_job_id().to_string();
 
     let selected_streams = message_event
       .borrow_mut()

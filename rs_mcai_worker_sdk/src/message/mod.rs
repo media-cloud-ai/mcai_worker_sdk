@@ -88,7 +88,7 @@ pub fn parse_and_process_message<
   #[cfg(not(feature = "media"))]
   message_event
     .borrow_mut()
-    .process(channel, job.job_id, parameters, job_result)
+    .process(channel, parameters, job_result)
 }
 
 fn publish_job_completed(
