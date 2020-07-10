@@ -111,7 +111,6 @@ use config::*;
 use env_logger::Builder;
 use futures_executor::LocalPool;
 use futures_util::{future::FutureExt, stream::StreamExt, task::LocalSpawnExt};
-use job::Job;
 #[cfg(not(feature = "media"))]
 use job::JobResult;
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
@@ -155,7 +154,7 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
   }
 
   #[cfg(feature = "media")]
-  fn init_process(&mut self, _job: &Job, _format_context: &FormatContext) -> Result<Vec<usize>> {
+  fn init_process(&mut self, _parameters: P, _format_context: &FormatContext) -> Result<Vec<usize>> {
     Ok(vec![])
   }
 
@@ -178,7 +177,7 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
   fn process(
     &self,
     _channel: Option<McaiChannel>,
-    _job: &Job,
+    _job_id: u64,
     _parameters: P,
     _job_result: JobResult,
   ) -> Result<JobResult>
@@ -384,6 +383,6 @@ fn empty_message_event_impl() {
 
   let job_result = job::JobResult::new(1234);
 
-  let result = custom_event.process(None, &job, parameters, job_result);
+  let result = custom_event.process(None, job.job_id, parameters, job_result);
   assert!(result == Err(MessageError::NotImplemented()));
 }

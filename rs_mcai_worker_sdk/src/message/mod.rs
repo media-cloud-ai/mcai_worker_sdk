@@ -61,7 +61,7 @@ pub fn process_message<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
 pub fn parse_and_process_message<
   P: DeserializeOwned + JsonSchema,
   ME: MessageEvent<P>,
-  F: Fn(Option<McaiChannel>, &Job, u8) -> Result<()> + 'static,
+  F: Fn(Option<McaiChannel>, u64, u8) -> Result<()> + 'static,
 >(
   message_event: Rc<RefCell<ME>>,
   message_data: &str,
@@ -78,7 +78,7 @@ pub fn parse_and_process_message<
   job.check_requirements()?;
   let parameters: P = job.get_parameters()?;
 
-  publish_job_progression(channel.clone(), &job, 0)?;
+  publish_job_progression(channel.clone(), job.job_id, 0)?;
 
   let job_result = JobResult::new(job.job_id);
 
@@ -88,7 +88,7 @@ pub fn parse_and_process_message<
   #[cfg(not(feature = "media"))]
   message_event
     .borrow_mut()
-    .process(channel, &job, parameters, job_result)
+    .process(channel, job.job_id, parameters, job_result)
 }
 
 fn publish_job_completed(
@@ -127,11 +127,11 @@ fn publish_job_completed(
 /// It will be an integer between 0 and 100.
 pub fn publish_job_progression(
   channel: Option<McaiChannel>,
-  job: &Job,
+  job_id: u64,
   progression: u8,
 ) -> Result<()> {
   if let Some(channel) = channel {
-    let msg = json!(JobProgression::new(job, progression)).to_string();
+    let msg = json!(JobProgression::new(job_id, progression)).to_string();
 
     channel
       .basic_publish(
@@ -143,14 +143,14 @@ pub fn publish_job_progression(
       )
       .wait()
       .map_err(|e| {
-        let result = JobResult::new(job.job_id)
+        let result = JobResult::new(job_id)
           .with_status(JobStatus::Error)
           .with_message(&e.to_string());
         MessageError::ProcessingError(result)
       })
       .map(|_| ())
   } else {
-    info!(target: &job.job_id.to_string(), "progression: {}%", progression);
+    info!(target: &job_id.to_string(), "progression: {}%", progression);
     Ok(())
   }
 }

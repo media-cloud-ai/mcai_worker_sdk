@@ -21,7 +21,7 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   message_event: Rc<RefCell<ME>>,
   channel: Option<McaiChannel>,
   job: &Job,
-  _parameters: P,
+  parameters: P,
   job_result: JobResult,
 ) -> Result<JobResult> {
   let str_job_id = job.job_id.to_string();
@@ -29,7 +29,7 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   let source_url: String = job.get_parameter(SOURCE_PATH_PARAMETER).unwrap();
   let output_url: String = job.get_parameter(DESTINATION_PATH_PARAMETER).unwrap();
 
-  let mut source = source::Source::new(message_event.clone(), job, &source_url)?;
+  let mut source = source::Source::new(message_event.clone(), job.job_id, parameters, &source_url)?;
 
   info!(target: &str_job_id, "Start to process media");
 
@@ -53,7 +53,7 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
           if let Some(duration) = total_duration {
             let progress = std::cmp::min((count as f64 / duration * 100.0) as u8, 100);
             if progress > previous_progress {
-              publish_job_progression(channel.clone(), &job, progress)?;
+              publish_job_progression(channel.clone(), job.job_id, progress)?;
               previous_progress = progress;
             }
           }

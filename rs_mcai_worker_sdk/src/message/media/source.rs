@@ -1,4 +1,4 @@
-use crate::{error::MessageError::RuntimeError, job::Job, MessageEvent, Result};
+use crate::{error::MessageError::RuntimeError, MessageEvent, Result};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use stainless_ffmpeg::{format_context::FormatContext, frame::Frame, video_decoder::VideoDecoder};
@@ -18,19 +18,20 @@ pub struct Source {
 impl Source {
   pub fn new<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
     message_event: Rc<RefCell<ME>>,
-    job: &Job,
+    job_id: u64,
+    parameters: P,
     source_url: &str,
   ) -> Result<Self> {
-    info!(target: &job.job_id.to_string(), "Openning source: {}", source_url);
+    info!(target: &job_id.to_string(), "Openning source: {}", source_url);
 
     let mut format_context = FormatContext::new(source_url).map_err(RuntimeError)?;
     format_context.open_input().map_err(RuntimeError)?;
 
-    let str_job_id = job.job_id.to_string();
+    let str_job_id = job_id.to_string();
 
     let selected_streams = message_event
       .borrow_mut()
-      .init_process(job, &format_context)?;
+      .init_process(parameters, &format_context)?;
 
     info!(
       target: &str_job_id,

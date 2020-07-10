@@ -3,7 +3,7 @@ extern crate serde_derive;
 
 #[cfg(feature = "media")]
 use mcai_worker_sdk::{info, FormatContext, Frame, ProcessResult};
-use mcai_worker_sdk::{job::Job, MessageEvent, Result};
+use mcai_worker_sdk::{MessageEvent, Result};
 #[cfg(not(feature = "media"))]
 use mcai_worker_sdk::{
   job::{JobResult, JobStatus},
@@ -40,7 +40,7 @@ Do no use in production, just for developments."#
   }
 
   #[cfg(feature = "media")]
-  fn init_process(&mut self, _job: &Job, _format_context: &FormatContext) -> Result<Vec<usize>> {
+  fn init_process(&mut self, _parameters: WorkerParameters, _format_context: &FormatContext) -> Result<Vec<usize>> {
     Ok(vec![1])
   }
 
@@ -84,16 +84,16 @@ Do no use in production, just for developments."#
   fn process(
     &self,
     channel: Option<McaiChannel>,
-    job: &Job,
+    job_id: u64,
     parameters: WorkerParameters,
     job_result: JobResult,
   ) -> Result<JobResult> {
-    publish_job_progression(channel.clone(), job, 50)?;
+    publish_job_progression(channel.clone(), job_id, 50)?;
 
     match parameters.action {
       Some(action_label) => match action_label.as_str() {
         "completed" => {
-          publish_job_progression(channel, job, 100)?;
+          publish_job_progression(channel, job_id, 100)?;
           Ok(job_result.with_status(JobStatus::Completed))
         }
         action_label => {
