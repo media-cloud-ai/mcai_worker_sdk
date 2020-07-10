@@ -2,6 +2,9 @@ mod helpers;
 #[cfg(feature = "media")]
 mod media;
 
+#[cfg(feature = "media")]
+pub use media::{DESTINATION_PATH_PARAMETER, SOURCE_PATH_PARAMETER};
+
 use crate::{
   job::{Job, JobProgression, JobResult, JobStatus},
   McaiChannel, MessageError, MessageEvent,
@@ -80,7 +83,7 @@ pub fn parse_and_process_message<
   let job_result = JobResult::new(job.job_id);
 
   #[cfg(feature = "media")]
-  return media::process(message_event, channel, &job, job_result);
+  return media::process(message_event, channel, &job, parameters, job_result);
 
   #[cfg(not(feature = "media"))]
   message_event

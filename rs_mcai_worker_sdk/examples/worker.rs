@@ -3,9 +3,11 @@ extern crate serde_derive;
 
 #[cfg(feature = "media")]
 use mcai_worker_sdk::{info, FormatContext, Frame, ProcessResult};
+use mcai_worker_sdk::{job::Job, MessageError, MessageEvent};
+#[cfg(not(feature = "media"))]
 use mcai_worker_sdk::{
-  job::{Job, JobResult, JobStatus},
-  publish_job_progression, McaiChannel, MessageError, MessageEvent,
+  job::{JobResult, JobStatus},
+  publish_job_progression, McaiChannel,
 };
 use schemars::JsonSchema;
 use semver::Version;

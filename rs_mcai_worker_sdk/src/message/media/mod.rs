@@ -10,18 +10,24 @@ use std::rc::Rc;
 mod output;
 mod source;
 mod srt;
+use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
 use source::DecodeResult;
 
-pub fn process<ME: MessageEvent>(
+pub const SOURCE_PATH_PARAMETER: &str = "source_path";
+pub const DESTINATION_PATH_PARAMETER: &str = "source_path";
+
+pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   message_event: Rc<RefCell<ME>>,
   channel: Option<McaiChannel>,
   job: &Job,
+  _parameters: P,
   job_result: JobResult,
 ) -> Result<JobResult, MessageError> {
   let str_job_id = job.job_id.to_string();
 
-  let source_url: String = job.get_parameter("source_path").unwrap();
-  let output_url: String = job.get_parameter("destination_path").unwrap();
+  let source_url: String = job.get_parameter(SOURCE_PATH_PARAMETER).unwrap();
+  let output_url: String = job.get_parameter(DESTINATION_PATH_PARAMETER).unwrap();
 
   let mut source = source::Source::new(message_event.clone(), job, &source_url)?;
 

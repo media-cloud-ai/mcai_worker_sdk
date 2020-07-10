@@ -1,7 +1,6 @@
-use crate::{
-  error::MessageError::RuntimeError, job::Job, message::media::srt::SrtStream, MessageError,
-  MessageEvent,
-};
+use crate::{error::MessageError::RuntimeError, job::Job, MessageError, MessageEvent};
+use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
 use stainless_ffmpeg::{format_context::FormatContext, frame::Frame, video_decoder::VideoDecoder};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
@@ -17,7 +16,7 @@ pub struct Source {
 }
 
 impl Source {
-  pub fn new<ME: MessageEvent>(
+  pub fn new<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
     message_event: Rc<RefCell<ME>>,
     job: &Job,
     source_url: &str,

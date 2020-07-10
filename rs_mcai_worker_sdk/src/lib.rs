@@ -200,7 +200,14 @@ where
 {
   let mut builder = Builder::from_default_env();
   let amqp_queue = get_amqp_queue();
+
   let worker_configuration = worker::WorkerConfiguration::new(&amqp_queue, &message_event);
+  if let Err(configuration_error) = worker_configuration {
+    error!("{:?}", configuration_error);
+    return;
+  }
+
+  let worker_configuration = worker_configuration.unwrap();
 
   let container_id = worker_configuration.get_instance_id();
 
@@ -348,6 +355,7 @@ where
 }
 
 #[test]
+#[cfg(not(feature = "media"))]
 fn empty_message_event_impl() {
   #[derive(Debug)]
   struct CustomEvent {}

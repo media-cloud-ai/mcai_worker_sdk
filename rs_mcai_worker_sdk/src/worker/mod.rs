@@ -6,7 +6,9 @@ use schemars::JsonSchema;
 use semver::Version;
 use serde::Deserialize;
 
-use crate::MessageEvent;
+#[cfg(feature = "media")]
+use crate::message::{DESTINATION_PATH_PARAMETER, SOURCE_PATH_PARAMETER};
+use crate::{MessageError, MessageEvent};
 use serde::de::DeserializeOwned;
 
 pub mod docker;
@@ -57,13 +59,14 @@ impl WorkerConfiguration {
   pub fn new<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
     queue_name: &str,
     message_event: &ME,
-  ) -> Self {
+  ) -> Result<Self, MessageError> {
     let sdk_version =
       Version::parse(built_info::PKG_VERSION).unwrap_or_else(|_| Version::new(0, 0, 0));
 
-    let parameters = schema_for!(P);
+    let parameters = WorkerConfiguration::get_parameter_schema::<P>()?;
+    println!("parameters: {:?}", parameters);
 
-    WorkerConfiguration {
+    Ok(WorkerConfiguration {
       instance_id: docker::get_instance_id("/proc/self/cgroup"),
       queue_name: queue_name.to_string(),
       label: message_event.get_name(),
@@ -72,7 +75,40 @@ impl WorkerConfiguration {
       short_description: message_event.get_short_description(),
       description: message_event.get_description(),
       parameters,
+    })
+  }
+
+  #[cfg(feature = "media")]
+  fn get_parameter_schema<P: JsonSchema>() -> Result<RootSchema, MessageError> {
+    let mut parameters: RootSchema = schema_for!(P);
+    if !parameters
+      .schema
+      .object()
+      .properties
+      .contains_key(SOURCE_PATH_PARAMETER)
+    {
+      return Err(MessageError::ParameterValueError(format!(
+        "Expected media parameter missing: '{}'",
+        SOURCE_PATH_PARAMETER
+      )));
     }
+    if !parameters
+      .schema
+      .object()
+      .properties
+      .contains_key(DESTINATION_PATH_PARAMETER)
+    {
+      return Err(MessageError::ParameterValueError(format!(
+        "Expected media parameter missing: '{}'",
+        DESTINATION_PATH_PARAMETER
+      )));
+    }
+    Ok(parameters)
+  }
+
+  #[cfg(not(feature = "media"))]
+  fn get_parameter_schema<P: JsonSchema>() -> Result<RootSchema, MessageError> {
+    Ok(schema_for!(P))
   }
 
   pub fn get_instance_id(&self) -> String {
