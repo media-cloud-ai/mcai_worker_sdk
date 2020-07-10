@@ -15,7 +15,7 @@ use serde::de::DeserializeOwned;
 use source::DecodeResult;
 
 pub const SOURCE_PATH_PARAMETER: &str = "source_path";
-pub const DESTINATION_PATH_PARAMETER: &str = "source_path";
+pub const DESTINATION_PATH_PARAMETER: &str = "destination_path";
 
 pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   message_event: Rc<RefCell<ME>>,
