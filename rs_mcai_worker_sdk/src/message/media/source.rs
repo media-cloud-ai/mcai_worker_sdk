@@ -78,17 +78,17 @@ impl Source {
         if let Some(decoder) = self.decoders.get(&stream_index) {
           match decoder.decode(&packet) {
             Ok(frame) => {
-              return Ok(DecodeResult::Frame {
+              Ok(DecodeResult::Frame {
                 stream_index,
                 frame,
-              });
+              })
             }
             Err(message) => {
               println!("{:?}", message);
               if message == "Resource temporarily unavailable" {
                 return Ok(DecodeResult::Nothing);
               }
-              return Err(RuntimeError(message));
+              Err(RuntimeError(message))
             }
           }
         } else {

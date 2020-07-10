@@ -33,7 +33,6 @@ impl Output {
       srt_stream.send(data);
     } else {
       self.results.push(content);
-      return;
     }
   }
 
