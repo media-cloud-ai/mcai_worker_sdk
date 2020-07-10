@@ -1,6 +1,6 @@
-use crate::{MessageError, ProcessResult};
-use bytes::Bytes;
 use crate::message::media::srt::SrtStream;
+use crate::{ProcessResult, Result};
+use bytes::Bytes;
 
 pub struct Output {
   srt_stream: Option<SrtStream>,
@@ -9,7 +9,7 @@ pub struct Output {
 }
 
 impl Output {
-  pub fn new(output: &str) -> Result<Self, MessageError> {
+  pub fn new(output: &str) -> Result<Self> {
     if SrtStream::is_srt_stream(output) {
       let srt_stream = Some(SrtStream::open_connection(output)?);
 
@@ -33,11 +33,10 @@ impl Output {
       srt_stream.send(data);
     } else {
       self.results.push(content);
-      return;
     }
   }
 
-  pub fn to_destination_path(&self) -> Result<(), MessageError> {
+  pub fn to_destination_path(&self) -> Result<()> {
     let results: Vec<serde_json::Value> = self
       .results
       .iter()

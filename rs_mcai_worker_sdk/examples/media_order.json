@@ -6,6 +6,12 @@
 			"type": "string",
 			"store": "environment",
 			"value": "SOURCE_PATH"
+		},
+		{
+			"id": "destination_path",
+			"type": "string",
+			"store": "environment",
+			"value": "DESTINATION_PATH"
 		}
 	]
 }

@@ -17,16 +17,20 @@
 //!   Version,
 //!   worker::Parameter,
 //! };
+//! use serde_derive::Deserialize;
+//! use schemars::JsonSchema;
 //!
 //! #[derive(Debug)]
 //! struct WorkerNameEvent {}
 //!
-//! impl MessageEvent for WorkerNameEvent {
+//! #[derive(Debug, Deserialize, JsonSchema)]
+//! struct WorkerParameters {}
+//!
+//! impl MessageEvent<WorkerParameters> for WorkerNameEvent {
 //!   fn get_name(&self) -> String {"sample_worker".to_string()}
 //!   fn get_short_description(&self) -> String {"Short description".to_string()}
 //!   fn get_description(&self) -> String {"Long description".to_string()}
 //!   fn get_version(&self) -> Version { Version::new(0, 0, 1) }
-//!   fn get_parameters(&self) -> Vec<Parameter> { vec![] }
 //! }
 //! static WORKER_NAME_EVENT: WorkerNameEvent = WorkerNameEvent {};
 //!
@@ -93,7 +97,7 @@ pub use log::{debug, error, info, trace, warn};
 /// Re-export from semver:
 pub use semver::Version;
 
-pub use error::MessageError;
+pub use error::{MessageError, Result};
 pub use message::publish_job_progression;
 pub use parameter::container::ParametersContainer;
 #[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
@@ -102,15 +106,17 @@ pub use parameter::{Parameter, ParameterValue, Requirement};
 #[cfg(feature = "media")]
 pub use stainless_ffmpeg::{format_context::FormatContext, frame::Frame};
 
+use crate::worker::docker;
 use chrono::prelude::*;
 use config::*;
 use env_logger::Builder;
 use futures_executor::LocalPool;
 use futures_util::{future::FutureExt, stream::StreamExt, task::LocalSpawnExt};
-use job::Job;
 #[cfg(not(feature = "media"))]
 use job::JobResult;
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
+use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
 #[cfg(feature = "media")]
 use serde::Serialize;
 use std::{cell::RefCell, fs, io::Write, rc::Rc, sync::Arc, thread, time};
@@ -138,24 +144,22 @@ impl ProcessResult {
 /// Trait to describe a worker
 ///
 /// Implement this trait to implement a worker
-pub trait MessageEvent {
+pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
   fn get_name(&self) -> String;
   fn get_short_description(&self) -> String;
   fn get_description(&self) -> String;
   fn get_version(&self) -> semver::Version;
 
-  fn get_parameters(&self) -> Vec<worker::Parameter>;
-
-  fn init(&mut self) -> Result<(), MessageError> {
+  fn init(&mut self) -> Result<()> {
     Ok(())
   }
 
   #[cfg(feature = "media")]
   fn init_process(
     &mut self,
-    _job: &Job,
+    _parameters: P,
     _format_context: &FormatContext,
-  ) -> Result<Vec<usize>, MessageError> {
+  ) -> Result<Vec<usize>> {
     Ok(vec![])
   }
 
@@ -165,12 +169,12 @@ pub trait MessageEvent {
     _str_job_id: &str,
     _stream_index: usize,
     _frame: Frame,
-  ) -> Result<ProcessResult, MessageError> {
+  ) -> Result<ProcessResult> {
     Err(MessageError::NotImplemented())
   }
 
   #[cfg(feature = "media")]
-  fn ending_process(&self) -> Result<(), MessageError> {
+  fn ending_process(&self) -> Result<()> {
     Ok(())
   }
 
@@ -178,9 +182,9 @@ pub trait MessageEvent {
   fn process(
     &self,
     _channel: Option<McaiChannel>,
-    _job: &Job,
+    _parameters: P,
     _job_result: JobResult,
-  ) -> Result<JobResult, MessageError>
+  ) -> Result<JobResult>
   where
     Self: std::marker::Sized,
   {
@@ -189,16 +193,15 @@ pub trait MessageEvent {
 }
 
 /// Function to start a worker
-pub fn start_worker<ME: MessageEvent>(mut message_event: ME)
+pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(mut message_event: ME)
 where
   ME: std::marker::Sync,
 {
   let mut builder = Builder::from_default_env();
   let amqp_queue = get_amqp_queue();
-  let worker_configuration = worker::WorkerConfiguration::new(&amqp_queue, &message_event);
+  let instance_id = docker::get_instance_id("/proc/self/cgroup");
 
-  let container_id = worker_configuration.get_instance_id();
-
+  let container_id = instance_id.clone();
   builder
     .format(move |stream, record| {
       writeln!(
@@ -206,7 +209,7 @@ where
         "{} - {} - {} - {} - {} - {}",
         Utc::now(),
         &container_id,
-        amqp_queue,
+        get_amqp_queue(),
         record.target().parse::<i64>().unwrap_or(-1),
         record.level(),
         record.args(),
@@ -214,7 +217,14 @@ where
     })
     .init();
 
-  let amqp_queue = get_amqp_queue();
+  let worker_configuration =
+    worker::WorkerConfiguration::new(&amqp_queue, &message_event, &instance_id);
+  if let Err(configuration_error) = worker_configuration {
+    error!("{:?}", configuration_error);
+    return;
+  }
+
+  let worker_configuration = worker_configuration.unwrap();
 
   info!(
     "Worker: {}, version: {} (MCAI Worker SDK {})",
@@ -228,7 +238,7 @@ where
     return;
   }
 
-  let message_event = Rc::new(RefCell::new(message_event));
+  let message_event_ref = Rc::new(RefCell::new(message_event));
 
   info!("Worker initialized, ready to receive jobs");
 
@@ -242,7 +252,7 @@ where
       let message_data = fs::read_to_string(source_order).unwrap();
 
       let result = message::parse_and_process_message(
-        message_event.clone(),
+        message_event_ref.clone(),
         &message_data,
         count,
         channel,
@@ -324,7 +334,7 @@ where
       info!("Start to consume on queue {:?}", amqp_queue);
 
       let clone_channel = channel.clone();
-      let message_event = message_event.clone();
+      let message_event = message_event_ref.clone();
 
       consumer
         .for_each(move |delivery| {
@@ -343,11 +353,15 @@ where
 }
 
 #[test]
+#[cfg(not(feature = "media"))]
 fn empty_message_event_impl() {
   #[derive(Debug)]
   struct CustomEvent {}
 
-  impl MessageEvent for CustomEvent {
+  #[derive(JsonSchema, Deserialize)]
+  struct CustomParameters {}
+
+  impl MessageEvent<CustomParameters> for CustomEvent {
     fn get_name(&self) -> String {
       "custom".to_string()
     }
@@ -360,21 +374,18 @@ fn empty_message_event_impl() {
     fn get_version(&self) -> semver::Version {
       semver::Version::new(1, 2, 3)
     }
-
-    fn get_parameters(&self) -> Vec<worker::Parameter> {
-      vec![]
-    }
   }
 
   let custom_event = CustomEvent {};
+  let parameters = CustomParameters {};
 
   let job = job::Job {
     job_id: 1234,
     parameters: vec![],
   };
 
-  let job_result = job::JobResult::new(1234);
+  let job_result = job::JobResult::new(job.job_id);
 
-  let result = custom_event.process(None, &job, job_result);
+  let result = custom_event.process(None, parameters, job_result);
   assert!(result == Err(MessageError::NotImplemented()));
 }

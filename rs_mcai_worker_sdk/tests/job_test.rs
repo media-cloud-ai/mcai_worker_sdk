@@ -8,7 +8,6 @@ use mcai_worker_sdk::job::*;
 use mcai_worker_sdk::parameter::media_segment::MediaSegment;
 use mcai_worker_sdk::MessageError;
 
-use mcai_worker_sdk::parameter::ParameterValueError;
 use mcai_worker_sdk::Credential;
 use std::collections::HashMap;
 
@@ -109,7 +108,10 @@ fn test_new_job() {
   let part_1 = "error sending request for url (http://127.0.0.1:4000/api/sessions): ";
   let part_2 = "error trying to connect: tcp connect error: Connection refused (os error";
   let error_message = format!(r#""{}{} {})""#, part_1, part_2, code);
-  assert_eq!(ParameterValueError::new(&error_message), credential_value);
+  assert_eq!(
+    MessageError::ParameterValueError(error_message),
+    credential_value
+  );
 
   let option_array = job.get_parameter::<Vec<String>>("array_of_string_parameter");
   assert!(option_array.is_ok());

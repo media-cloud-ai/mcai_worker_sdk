@@ -4,6 +4,7 @@ use crate::job::{JobResult, JobStatus};
 #[derive(Debug, PartialEq)]
 pub enum MessageError {
   RuntimeError(String),
+  ParameterValueError(String),
   ProcessingError(JobResult),
   RequirementsError(String),
   NotImplemented(),
@@ -18,3 +19,5 @@ impl MessageError {
     MessageError::ProcessingError(result)
   }
 }
+
+pub type Result<T> = std::result::Result<T, MessageError>;
