@@ -26,8 +26,8 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
 ) -> Result<JobResult> {
   let str_job_id = job.job_id.to_string();
 
-  let source_url: String = job.get_parameter(SOURCE_PATH_PARAMETER).unwrap();
-  let output_url: String = job.get_parameter(DESTINATION_PATH_PARAMETER).unwrap();
+  let source_url: String = job.get_parameter(SOURCE_PATH_PARAMETER)?;
+  let output_url: String = job.get_parameter(DESTINATION_PATH_PARAMETER)?;
 
   let mut source = source::Source::new(
     message_event.clone(),

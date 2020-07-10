@@ -90,7 +90,12 @@ impl Job {
     }
     let parameters = serde_json::Value::Object(parameters);
 
-    Ok(serde_json::from_value(parameters).unwrap())
+    serde_json::from_value(parameters.clone()).map_err(|error| {
+      MessageError::ParameterValueError(format!(
+        "Cannot get parameters from {:?}: {:?}",
+        parameters, error
+      ))
+    })
   }
 
   pub fn check_requirements(&self) -> Result<()> {
