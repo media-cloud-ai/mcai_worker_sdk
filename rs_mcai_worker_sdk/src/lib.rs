@@ -96,6 +96,7 @@ pub use lapin::Channel;
 pub use log::{debug, error, info, trace, warn};
 /// Re-export from semver:
 pub use semver::Version;
+pub use schemars::JsonSchema;
 
 pub use error::{MessageError, Result};
 pub use message::publish_job_progression;
@@ -115,7 +116,6 @@ use futures_util::{future::FutureExt, stream::StreamExt, task::LocalSpawnExt};
 #[cfg(not(feature = "media"))]
 use job::JobResult;
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
-use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 #[cfg(feature = "media")]
 use serde::Serialize;

@@ -1,9 +1,27 @@
-use crate::job::JobResult;
-use crate::{error::MessageError::RuntimeError, MessageEvent, Result};
+
+use crate::{
+  error::MessageError::RuntimeError,
+  job::JobResult,
+  message::media::{
+    srt::SrtStream,
+    media_stream::MediaStream,
+  },
+  MessageError, MessageEvent, Result
+};
+use ringbuf::RingBuffer;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use stainless_ffmpeg::{format_context::FormatContext, frame::Frame, video_decoder::VideoDecoder};
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+  cell::RefCell,
+  collections::HashMap,
+  io::Cursor,
+  rc::Rc,
+};
+use stainless_ffmpeg::{
+  format_context::FormatContext,
+  frame::Frame,
+  video_decoder::VideoDecoder
+};
 
 pub enum DecodeResult {
   Frame { stream_index: usize, frame: Frame },
@@ -14,47 +32,86 @@ pub enum DecodeResult {
 pub struct Source {
   decoders: HashMap<usize, VideoDecoder>,
   format_context: FormatContext,
+  srt_stream: Option<SrtStream>,
 }
 
 impl Source {
   pub fn new<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
     message_event: Rc<RefCell<ME>>,
-    job_result: JobResult,
+    job_result: &JobResult,
     parameters: P,
     source_url: &str,
   ) -> Result<Self> {
-    info!(target: &job_result.get_job_id().to_string(), "Openning source: {}", source_url);
-
-    let mut format_context = FormatContext::new(source_url).map_err(RuntimeError)?;
-    format_context.open_input().map_err(RuntimeError)?;
-
-    let str_job_id = job_result.get_job_id().to_string();
-
-    let selected_streams = message_event
-      .borrow_mut()
-      .init_process(parameters, &format_context)?;
-
-    info!(
-      target: &str_job_id,
-      "Selected stream IDs: {:?}", selected_streams
-    );
+    info!(target: &job_result.get_str_job_id(), "Openning source: {}", source_url);
 
     let mut decoders = HashMap::<usize, VideoDecoder>::new();
 
-    for selected_stream in &selected_streams {
-      // VideoDecoder can decode any codec, not only video
-      let decoder = VideoDecoder::new(
-        format!("decoder_{}", selected_stream),
-        &format_context,
-        *selected_stream as isize,
-      )
-      .unwrap();
-      decoders.insert(*selected_stream, decoder);
-    }
+    let (srt_stream, format_context) =
+      if SrtStream::is_srt_stream(source_url) {
+        let mut srt_stream = SrtStream::open_connection(source_url)?;
+
+        let format = "mpegts";
+
+        let ring_buffer = RingBuffer::<u8>::new(100 * 1024 * 1024);
+        let (mut producer, consumer) = ring_buffer.split();
+        let media_stream = MediaStream::new(format, consumer).map_err(|error| MessageError::from(error, job_result.clone()))?;
+
+        loop {
+          if let Some((_instant, bytes)) = srt_stream.receive() {
+            trace!("{:?}", bytes);
+            let size = bytes.len();
+            let mut cursor = Cursor::new(bytes);
+
+            let cloned_job_result = job_result.clone();
+
+            producer.read_from(&mut cursor, Some(size))
+              .map_err(|e| MessageError::from(e, cloned_job_result))?;
+
+            if producer.len() > 1024 * 1024 {
+
+              match media_stream.stream_info() {
+                Err(error) => error!("{}", error),
+                Ok(()) => {
+                  println!("GOT STREAM INFO !!!");
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        let format_context = FormatContext::new(source_url).map_err(RuntimeError)?;
+        (Some(srt_stream), format_context)
+      } else {
+        let mut format_context = FormatContext::new(source_url).map_err(RuntimeError)?;
+        format_context.open_input().map_err(RuntimeError)?;
+
+        let selected_streams = message_event
+          .borrow_mut()
+          .init_process(parameters, &format_context)?;
+
+        info!(
+          target: &job_result.get_str_job_id(),
+          "Selected stream IDs: {:?}", selected_streams
+        );
+
+        for selected_stream in &selected_streams {
+          // VideoDecoder can decode any codec, not only video
+          let decoder = VideoDecoder::new(
+            format!("decoder_{}", selected_stream),
+            &format_context,
+            *selected_stream as isize,
+          )
+          .unwrap();
+          decoders.insert(*selected_stream, decoder);
+        }
+        (None, format_context)
+      };
 
     Ok(Source {
       decoders,
       format_context,
+      srt_stream,
     })
   }
 

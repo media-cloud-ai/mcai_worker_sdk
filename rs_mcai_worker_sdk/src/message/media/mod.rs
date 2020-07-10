@@ -7,6 +7,7 @@ use crate::{
 use std::cell::RefCell;
 use std::rc::Rc;
 
+mod media_stream;
 mod output;
 mod source;
 mod srt;
@@ -31,7 +32,7 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
 
   let mut source = source::Source::new(
     message_event.clone(),
-    job_result.clone(),
+    &job_result,
     parameters,
     &source_url,
   )?;
