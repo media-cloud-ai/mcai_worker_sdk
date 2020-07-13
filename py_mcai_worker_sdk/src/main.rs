@@ -1,20 +1,33 @@
+#[macro_use]
+extern crate serde_derive;
+
+use std::collections::{BTreeMap, HashMap};
+use std::{env, fs};
+
+use pyo3::{prelude::*, types::*};
+use schemars::{
+  gen::SchemaGenerator,
+  schema::{InstanceType, ObjectValidation, Schema, SchemaObject},
+  JsonSchema,
+};
+
+use serde_json::Value;
+
 use crate::helpers::get_destination_paths;
 use mcai_worker_sdk::{
   job::*,
   publish_job_progression, start_worker,
   worker::{Parameter, ParameterType},
-  McaiChannel, MessageError, MessageEvent, ParameterValue, Version,
+  McaiChannel, MessageError, MessageEvent, Result, Version,
 };
-use pyo3::{prelude::*, types::*};
-use std::{env, fs};
 
 mod helpers;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PythonWorkerEvent {}
 
 impl PythonWorkerEvent {
-  fn read_python_file(&self) -> String {
+  fn read_python_file() -> String {
     let filename = env::var("PYTHON_WORKER_FILENAME").unwrap_or_else(|_| "worker.py".to_string());
 
     fs::read_to_string(&filename)
@@ -22,7 +35,7 @@ impl PythonWorkerEvent {
   }
 
   fn get_string_from_module(&self, method: &str) -> String {
-    let contents = self.read_python_file();
+    let contents = PythonWorkerEvent::read_python_file();
 
     let gil = Python::acquire_gil();
     let py = gil.python();
@@ -37,41 +50,9 @@ impl PythonWorkerEvent {
 
     response
   }
-}
 
-#[pyclass]
-struct CallbackHandle {
-  channel: Option<McaiChannel>,
-  job: Job,
-}
-
-#[pymethods]
-impl CallbackHandle {
-  fn publish_job_progression(&self, value: u8) -> bool {
-    publish_job_progression(self.channel.clone(), &self.job, value).is_ok()
-  }
-}
-
-impl MessageEvent for PythonWorkerEvent {
-  fn get_name(&self) -> String {
-    self.get_string_from_module("get_name")
-  }
-
-  fn get_short_description(&self) -> String {
-    self.get_string_from_module("get_short_description")
-  }
-
-  fn get_description(&self) -> String {
-    self.get_string_from_module("get_description")
-  }
-
-  fn get_version(&self) -> Version {
-    Version::parse(&self.get_string_from_module("get_version"))
-      .expect("unable to parse version (please use SemVer format)")
-  }
-
-  fn get_parameters(&self) -> Vec<Parameter> {
-    let contents = self.read_python_file();
+  fn get_parameters() -> Vec<Parameter> {
+    let contents = PythonWorkerEvent::read_python_file();
 
     let gil = Python::acquire_gil();
     let py = gil.python();
@@ -132,14 +113,101 @@ impl MessageEvent for PythonWorkerEvent {
 
     parameters
   }
+}
 
+#[pyclass]
+struct CallbackHandle {
+  channel: Option<McaiChannel>,
+  job_id: u64,
+}
+
+#[pymethods]
+impl CallbackHandle {
+  fn publish_job_progression(&self, value: u8) -> bool {
+    publish_job_progression(self.channel.clone(), self.job_id, value).is_ok()
+  }
+}
+
+#[derive(Deserialize)]
+struct PythonWorkerParameters {
+  #[serde(flatten)]
+  parameters: HashMap<String, Value>,
+}
+
+fn get_instance_type_from_parameter_type(parameter_type: &ParameterType) -> InstanceType {
+  match parameter_type {
+    ParameterType::String => InstanceType::String,
+    ParameterType::ArrayOfStrings => InstanceType::Array,
+    ParameterType::Boolean => InstanceType::Boolean,
+    ParameterType::Credential => InstanceType::String,
+    ParameterType::Integer => InstanceType::Integer,
+    ParameterType::Requirement => InstanceType::Array,
+  }
+}
+
+impl JsonSchema for PythonWorkerParameters {
+  fn schema_name() -> String {
+    "PythonWorkerParameters".to_string()
+  }
+
+  fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+    let parameters = PythonWorkerEvent::get_parameters();
+
+    let mut schema_parameters: BTreeMap<String, Schema> = BTreeMap::new();
+    for parameter in &parameters {
+      let parameter_type = &parameter.kind[0];
+      let object = SchemaObject {
+        instance_type: Some(if parameter.required {
+          get_instance_type_from_parameter_type(parameter_type).into()
+        } else {
+          vec![
+            get_instance_type_from_parameter_type(parameter_type),
+            InstanceType::Null,
+          ]
+          .into()
+        }),
+        ..Default::default()
+      };
+      schema_parameters.insert(parameter.identifier.clone(), object.into());
+    }
+
+    let schema = SchemaObject {
+      instance_type: Some(InstanceType::Object.into()),
+      object: Some(Box::new(ObjectValidation {
+        properties: schema_parameters.into(),
+        ..Default::default()
+      })),
+      ..Default::default()
+    };
+
+    schema.into()
+  }
+}
+
+impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
+  fn get_name(&self) -> String {
+    self.get_string_from_module("get_name")
+  }
+
+  fn get_short_description(&self) -> String {
+    self.get_string_from_module("get_short_description")
+  }
+
+  fn get_description(&self) -> String {
+    self.get_string_from_module("get_description")
+  }
+
+  fn get_version(&self) -> Version {
+    Version::parse(&self.get_string_from_module("get_version"))
+      .expect("unable to parse version (please use SemVer format)")
+  }
   fn process(
     &self,
     channel: Option<McaiChannel>,
-    job: &Job,
+    parameters: PythonWorkerParameters,
     mut job_result: JobResult,
-  ) -> Result<JobResult, MessageError> {
-    let contents = self.read_python_file();
+  ) -> Result<JobResult> {
+    let contents = PythonWorkerEvent::read_python_file();
 
     let gil = Python::acquire_gil();
     let py = gil.python();
@@ -147,17 +215,11 @@ impl MessageEvent for PythonWorkerEvent {
     let python_module = PyModule::from_code(py, &contents, "worker.py", "worker")
       .expect("unable to create the python module");
 
-    let list_of_parameters = PyDict::new(py);
-    if let Err(error) = self.build_parameters(job, py, list_of_parameters) {
-      let result = job_result
-        .with_status(JobStatus::Error)
-        .with_message(&error);
-      return Err(MessageError::ProcessingError(result));
-    }
+    let list_of_parameters = build_parameters(parameters, py)?;
 
     let callback_handle = CallbackHandle {
       channel,
-      job: job.clone(),
+      job_id: job_result.get_job_id(),
     };
 
     match python_module.call1("process", (callback_handle, list_of_parameters)) {
@@ -207,83 +269,105 @@ fn py_err_to_string(py: Python, error: PyErr) -> String {
     .to_string()
 }
 
-impl PythonWorkerEvent {
-  fn build_parameters(
-    &self,
-    job: &Job,
-    py: Python,
-    list_of_parameters: &PyDict,
-  ) -> Result<(), String> {
-    for parameter in &job.parameters {
-      let current_value = if let Some(value) = parameter.value.clone() {
-        value
-      } else if let Some(default) = parameter.default.clone() {
-        default
-      } else {
-        continue;
-      };
-
-      let id = parameter.get_id();
-
-      match &parameter.kind {
-        array_of_strings if array_of_strings == &Vec::<String>::get_type_as_string() => {
-          let v = Vec::<String>::parse_value(current_value, &parameter.store)
-            .map_err(|e| format!("{:?}", e))?;
-          list_of_parameters
-            .set_item(id.to_string(), PyList::new(py, v))
-            .map_err(|e| py_err_to_string(py, e))?
-        }
-        string if string == &String::get_type_as_string() => {
-          let v =
-            String::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
-          list_of_parameters
-            .set_item(id.to_string(), v)
-            .map_err(|e| py_err_to_string(py, e))?;
-        }
-        boolean if boolean == &bool::get_type_as_string() => {
-          let v =
-            bool::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
-          list_of_parameters
-            .set_item(id.to_string(), v)
-            .map_err(|e| py_err_to_string(py, e))?;
-        }
-        integer if integer == &i64::get_type_as_string() => {
-          let v =
-            i64::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
-          list_of_parameters
-            .set_item(id.to_string(), v)
-            .map_err(|e| py_err_to_string(py, e))?;
-        }
-        float if float == &f64::get_type_as_string() => {
-          let v =
-            f64::parse_value(current_value, &parameter.store).map_err(|e| format!("{:?}", e))?;
-          list_of_parameters
-            .set_item(id.to_string(), v)
-            .map_err(|e| py_err_to_string(py, e))?;
-        }
-        credential if credential == &mcai_worker_sdk::Credential::get_type_as_string() => {
-          let credential =
-            mcai_worker_sdk::Credential::parse_value(current_value, &parameter.store)
-              .map_err(|e| format!("{:?}", e))?;
-          list_of_parameters
-            .set_item(id.to_string(), credential.value)
-            .map_err(|e| py_err_to_string(py, e))?;
-        }
-        other => {
-          return Err(format!(
-            "Parameter type not supported by Python SDK: {}",
-            other
+fn build_parameters(parameters: PythonWorkerParameters, py: Python) -> Result<&PyDict> {
+  let list_of_parameters = PyDict::new(py);
+  for (key, value) in parameters.parameters {
+    match value {
+      Value::String(string) => {
+        let _result = list_of_parameters.set_item(key, string).map_err(|e| {
+          MessageError::ParameterValueError(format!(
+            "Cannot set item to parameters: {}",
+            py_err_to_string(py, e)
           ))
-        }
+        })?;
+      }
+      Value::Null => {}
+      Value::Bool(boolean) => {
+        let _result = list_of_parameters.set_item(key, boolean).map_err(|e| {
+          MessageError::ParameterValueError(format!(
+            "Cannot set item to parameters: {}",
+            py_err_to_string(py, e)
+          ))
+        })?;
+      }
+      Value::Number(number) => {
+        let _result = list_of_parameters
+          .set_item(key, number.as_u64())
+          .map_err(|e| {
+            MessageError::ParameterValueError(format!(
+              "Cannot set item to parameters: {}",
+              py_err_to_string(py, e)
+            ))
+          })?;
+      }
+      Value::Array(array) => {
+        let list = get_parameters_array_values(array, py)?;
+        let _result = list_of_parameters.set_item(key, list).map_err(|e| {
+          MessageError::ParameterValueError(format!(
+            "Cannot set item to parameters: {}",
+            py_err_to_string(py, e)
+          ))
+        })?;
+      }
+      Value::Object(map) => {
+        return Err(MessageError::ParameterValueError(format!(
+          "Unsupported parameter object value: {:?}",
+          map
+        )));
       }
     }
-
-    Ok(())
   }
+  Ok(list_of_parameters)
+}
+
+fn get_parameters_array_values(values: Vec<Value>, py: Python) -> Result<&PyList> {
+  let array = PyList::empty(py);
+  for value in values {
+    match value {
+      Value::String(string) => {
+        let _result = array.append(string).map_err(|e| {
+          MessageError::ParameterValueError(format!(
+            "Cannot append item to array: {}",
+            py_err_to_string(py, e)
+          ))
+        })?;
+      }
+      Value::Null => {}
+      Value::Bool(boolean) => {
+        let _result = array.append(boolean).map_err(|e| {
+          MessageError::ParameterValueError(format!(
+            "Cannot append item to array: {}",
+            py_err_to_string(py, e)
+          ))
+        })?;
+      }
+      Value::Number(number) => {
+        let _result = array.append(number.as_u64()).map_err(|e| {
+          MessageError::ParameterValueError(format!(
+            "Cannot append item to array: {}",
+            py_err_to_string(py, e)
+          ))
+        })?;
+      }
+      Value::Array(_) => {
+        return Err(MessageError::ParameterValueError(format!(
+          "Unsupported parameter array of array value: {:?}",
+          value
+        )));
+      }
+      Value::Object(_) => {
+        return Err(MessageError::ParameterValueError(format!(
+          "Unsupported parameter array of object value: {:?}",
+          value
+        )));
+      }
+    }
+  }
+  Ok(array)
 }
 
 static PYTHON_WORKER_EVENT: PythonWorkerEvent = PythonWorkerEvent {};
 
 fn main() {
-  start_worker(&PYTHON_WORKER_EVENT);
+  start_worker(PYTHON_WORKER_EVENT.clone());
 }

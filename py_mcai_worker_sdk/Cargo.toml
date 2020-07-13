@@ -10,4 +10,7 @@ edition = "2018"
 [dependencies]
 mcai_worker_sdk = { path = "../rs_mcai_worker_sdk" }
 pyo3 = "0.10"
+schemars = "0.7.6"
+serde = "^1.0"
+serde_derive = "^1.0"
 serde_json = "^1.0"
