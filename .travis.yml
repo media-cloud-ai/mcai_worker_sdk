@@ -87,6 +87,11 @@ script:
   - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
   - cargo test --package mcai_worker_sdk --package c_mcai_worker_sdk
 
+before_script:
+  - sudo add-apt-repository ppa:jonathonf/ffmpeg-4 -y
+  - sudo apt-get update -q
+  - sudo apt-get install ffmpeg libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libavfilter-dev libavresample-dev libpostproc-dev libswscale-dev -y
+
 # Need to cache the whole `.cargo` directory to keep .crates.toml for
 # cargo-update to work
 cache:

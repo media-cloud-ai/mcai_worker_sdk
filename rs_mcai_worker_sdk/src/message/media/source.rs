@@ -42,7 +42,7 @@ impl Source {
     parameters: P,
     source_url: &str,
   ) -> Result<Self> {
-    info!(target: &job_result.get_str_job_id(), "Openning source: {}", source_url);
+    info!(target: &job_result.get_str_job_id(), "Opening source: {}", source_url);
 
     let mut decoders = HashMap::<usize, VideoDecoder>::new();
 
