@@ -4,10 +4,7 @@ use futures_util::sink::SinkExt;
 use srt::tokio::SrtSocket;
 use srt::SrtSocketBuilder;
 use std::{cell::RefCell, rc::Rc, time::Instant};
-use tokio::{
-  runtime::Runtime,
-  stream::StreamExt
-};
+use tokio::{runtime::Runtime, stream::StreamExt};
 
 pub struct SrtStream {
   socket: Rc<RefCell<SrtSocket>>,
@@ -54,9 +51,8 @@ impl SrtStream {
 
   pub fn receive(&mut self) -> Option<(Instant, Bytes)> {
     let socket = self.socket.clone();
-    self.runtime.block_on(async {
-      socket.borrow_mut().try_next().await.unwrap()
-    })
+    self
+      .runtime
+      .block_on(async { socket.borrow_mut().try_next().await.unwrap() })
   }
 }
-

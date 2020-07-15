@@ -94,9 +94,9 @@ pub mod worker;
 /// Re-export from lapin Channel
 pub use lapin::Channel;
 pub use log::{debug, error, info, trace, warn};
+pub use schemars::JsonSchema;
 /// Re-export from semver:
 pub use semver::Version;
-pub use schemars::JsonSchema;
 
 pub use error::{MessageError, Result};
 pub use message::publish_job_progression;
@@ -113,7 +113,6 @@ use config::*;
 use env_logger::Builder;
 use futures_executor::LocalPool;
 use futures_util::{future::FutureExt, stream::StreamExt, task::LocalSpawnExt};
-#[cfg(not(feature = "media"))]
 use job::JobResult;
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use serde::de::DeserializeOwned;
@@ -167,7 +166,7 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
   #[cfg(feature = "media")]
   fn process_frame(
     &mut self,
-    _str_job_id: &str,
+    _job_result: JobResult,
     _stream_index: usize,
     _frame: Frame,
   ) -> Result<ProcessResult> {

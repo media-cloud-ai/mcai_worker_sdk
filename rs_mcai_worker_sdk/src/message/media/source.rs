@@ -1,4 +1,3 @@
-
 use crate::{
   error::MessageError::RuntimeError,
   job::JobResult,
@@ -6,7 +5,7 @@ use crate::{
     srt::SrtStream,
     media_stream::MediaStream,
   },
-  MessageEvent, Result
+  MessageError, MessageEvent, Result,
 };
 use ringbuf::RingBuffer;
 use schemars::JsonSchema;
@@ -70,11 +69,10 @@ impl Source {
 
         let mut got_stream_info = false;
 
-        loop {
-          if let Some((_instant, bytes)) = srt_stream.receive() {
-            trace!("{:?}", bytes);
-            let size = bytes.len();
-            let mut cursor = Cursor::new(bytes);
+      let ring_buffer = RingBuffer::<u8>::new(100 * 1024 * 1024);
+      let (mut producer, consumer) = ring_buffer.split();
+      let media_stream = MediaStream::new(format, consumer)
+        .map_err(|error| MessageError::from(error, job_result.clone()))?;
 
             producer.read_from(&mut cursor, Some(size)).unwrap();
 
@@ -118,6 +116,7 @@ impl Source {
         format_context,
         thread: Some(source_thread),
       })
+
     } else {
       let mut format_context = FormatContext::new(source_url).map_err(RuntimeError)?;
       format_context.open_input().map_err(RuntimeError)?;

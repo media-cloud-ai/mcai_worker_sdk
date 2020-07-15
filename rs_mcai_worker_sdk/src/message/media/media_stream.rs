@@ -1,9 +1,6 @@
 use log::{info, trace};
 use ringbuf::Consumer;
-use stainless_ffmpeg::{
-  audio_decoder::AudioDecoder,
-  filter_graph::FilterGraph,  
-};
+use stainless_ffmpeg::{audio_decoder::AudioDecoder, filter_graph::FilterGraph};
 use stainless_ffmpeg_sys::*;
 use std::collections::HashMap;
 use std::ffi::{c_void, CStr, CString};
@@ -72,7 +69,9 @@ unsafe extern "C" fn read_data(opaque: *mut c_void, raw_buffer: *mut u8, buf_siz
   let vec = Vec::from_raw_parts(raw_buffer, buf_size as usize, buf_size as usize);
 
   let mut buffer = Cursor::new(vec);
-  let size = consumer.write_into(&mut buffer, Some(buf_size as usize)).unwrap();
+  let size = consumer
+    .write_into(&mut buffer, Some(buf_size as usize))
+    .unwrap();
 
   mem::forget(buffer);
   size as i32
