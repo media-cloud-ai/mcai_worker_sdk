@@ -1,5 +1,8 @@
+#[cfg(feature = "media")]
+use mcai_worker_sdk::{MessageError, Result};
 use pyo3::{prelude::*, types::*};
 
+#[cfg(not(feature = "media"))]
 pub fn get_destination_paths(response: &PyAny) -> Option<Vec<String>> {
   if response.is_none() {
     return None;
@@ -30,4 +33,27 @@ pub fn get_destination_paths(response: &PyAny) -> Option<Vec<String>> {
         .flatten()
     })
     .unwrap_or(None)
+}
+
+#[cfg(feature = "media")]
+pub fn get_stream_indexes(response: &PyAny) -> Result<Vec<usize>> {
+  response
+    .downcast::<PyList>()
+    .map(|py_list| {
+      let mut items = vec![];
+      for item in py_list.iter() {
+        if let Ok(value) = item.downcast::<PyLong>() {
+          if let Ok(int_value) = value.extract::<usize>() {
+            items.push(int_value);
+          }
+        }
+      }
+      items
+    })
+    .map_err(|e| {
+      MessageError::RuntimeError(format!(
+        "unable to access init_process(..) python response: {:?}",
+        e
+      ))
+    })
 }

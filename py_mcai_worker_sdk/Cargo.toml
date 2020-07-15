@@ -7,6 +7,10 @@ authors = [
 ]
 edition = "2018"
 
+[features]
+default = []
+media = ["mcai_worker_sdk/media"]
+
 [dependencies]
 mcai_worker_sdk = { path = "../rs_mcai_worker_sdk" }
 pyo3 = "0.10"

@@ -5,16 +5,24 @@ use std::{env, fs};
 
 use pyo3::{prelude::*, types::*};
 
+#[cfg(not(feature = "media"))]
 use crate::helpers::get_destination_paths;
 use crate::parameters::{build_parameters, PythonWorkerParameters};
 use mcai_worker_sdk::{
-  job::*,
+  job::{JobResult, JobStatus},
   publish_job_progression, start_worker,
   worker::{Parameter, ParameterType},
   McaiChannel, MessageError, MessageEvent, Result, Version,
 };
 
+#[cfg(feature = "media")]
+use crate::helpers::get_stream_indexes;
+#[cfg(feature = "media")]
+pub use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
+
 mod helpers;
+#[cfg(feature = "media")]
+mod media;
 mod parameters;
 
 #[derive(Debug, Clone)]
@@ -46,12 +54,8 @@ impl PythonWorkerEvent {
   }
 
   fn get_parameters() -> Vec<Parameter> {
-    let contents = PythonWorkerEvent::read_python_file();
-
     let gil = Python::acquire_gil();
-    let py = gil.python();
-    let python_module = PyModule::from_code(py, &contents, "worker.py", "worker")
-      .expect("unable to create the python module");
+    let (py, python_module) = get_python_module(&gil).unwrap();
 
     let response = python_module
       .call0("get_parameters")
@@ -122,6 +126,51 @@ impl CallbackHandle {
   }
 }
 
+fn get_python_module<'a>(gil: &'a GILGuard) -> Result<(Python<'a>, &'a PyModule)> {
+  let python_file_content = PythonWorkerEvent::read_python_file();
+  let py = gil.python();
+  let python_module = PyModule::from_code(py, &python_file_content, "worker.py", "worker")
+    .map_err(|e| {
+      MessageError::RuntimeError(format!("unable to create the python module: {:?}", e))
+    })?;
+  Ok((py, python_module))
+}
+
+fn call_module_function<'a>(
+  py: Python,
+  python_module: &'a PyModule,
+  function_name: &'a str,
+  args: impl IntoPy<Py<PyTuple>>,
+) -> std::result::Result<&'a PyAny, String> {
+  match python_module.call1(function_name, args) {
+    Ok(response) => Ok(response),
+    Err(error) => {
+      let stacktrace = if let Some(tb) = &error.ptraceback {
+        let traceback = py.import("traceback").unwrap();
+        let locals = [("traceback", traceback)].into_py_dict(py);
+
+        locals.set_item("tb", tb).unwrap();
+
+        py.eval("traceback.format_tb(tb)", None, Some(locals))
+          .expect("Unknown python error, unable to get the stacktrace")
+          .to_string()
+      } else {
+        "Unknown python error, no stackstrace".to_string()
+      };
+
+      let locals = [("error", error)].into_py_dict(py);
+
+      let error_msg = py
+        .eval("repr(error)", None, Some(locals))
+        .expect("Unknown python error, unable to get the error message")
+        .to_string();
+
+      let error_message = format!("{}\n\nStacktrace:\n{}", error_msg, stacktrace);
+      Err(error_message)
+    }
+  }
+}
+
 impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
   fn get_name(&self) -> String {
     self.get_string_from_module("get_name")
@@ -140,19 +189,83 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
       .expect("unable to parse version (please use SemVer format)")
   }
 
+  fn init(&mut self) -> Result<()> {
+    let gil = Python::acquire_gil();
+    let (py, python_module) = get_python_module(&gil)?;
+
+    let _result = call_module_function(py, python_module, "init", ())
+      .map_err(|error_message| MessageError::ParameterValueError(error_message))?;
+    Ok(())
+  }
+
+  #[cfg(feature = "media")]
+  fn init_process(
+    &mut self,
+    parameters: PythonWorkerParameters,
+    format_context: &FormatContext,
+  ) -> Result<Vec<usize>> {
+    let gil = Python::acquire_gil();
+    let (py, python_module) = get_python_module(&gil)?;
+
+    let context = media::FormatContext::from(format_context);
+    let list_of_parameters = build_parameters(parameters, py)?;
+
+    let response = call_module_function(
+      py,
+      python_module,
+      "init_process",
+      (context, list_of_parameters),
+    )
+    .map_err(|error_message| MessageError::ParameterValueError(error_message))?;
+    get_stream_indexes(response)
+  }
+
+  #[cfg(feature = "media")]
+  fn process_frame(
+    &mut self,
+    job_result: JobResult,
+    stream_index: usize,
+    frame: Frame,
+  ) -> Result<ProcessResult> {
+    let gil = Python::acquire_gil();
+    let (py, python_module) = get_python_module(&gil)?;
+
+    let media_frame = media::Frame::from(&frame);
+
+    let response = call_module_function(
+      py,
+      python_module,
+      "process_frame",
+      (&job_result.get_str_job_id(), stream_index, media_frame),
+    )
+    .map_err(|error_message| {
+      let result = job_result
+        .with_status(JobStatus::Error)
+        .with_message(&error_message);
+      MessageError::ProcessingError(result)
+    })?;
+    Ok(ProcessResult::new_json(&response.to_string()))
+  }
+
+  #[cfg(feature = "media")]
+  fn ending_process(&self) -> Result<()> {
+    let gil = Python::acquire_gil();
+    let (py, python_module) = get_python_module(&gil)?;
+
+    let _result = call_module_function(py, python_module, "ending_process", ())
+      .map_err(|error_message| MessageError::ParameterValueError(error_message))?;
+    Ok(())
+  }
+
+  #[cfg(not(feature = "media"))]
   fn process(
     &self,
     channel: Option<McaiChannel>,
     parameters: PythonWorkerParameters,
     mut job_result: JobResult,
   ) -> Result<JobResult> {
-    let contents = PythonWorkerEvent::read_python_file();
-
     let gil = Python::acquire_gil();
-    let py = gil.python();
-    let traceback = py.import("traceback").unwrap();
-    let python_module = PyModule::from_code(py, &contents, "worker.py", "worker")
-      .expect("unable to create the python module");
+    let (py, python_module) = get_python_module(&gil)?;
 
     let list_of_parameters = build_parameters(parameters, py)?;
 
@@ -161,42 +274,24 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
       job_id: job_result.get_job_id(),
     };
 
-    match python_module.call1("process", (callback_handle, list_of_parameters)) {
-      Ok(response) => {
-        if let Some(mut destination_paths) = get_destination_paths(response) {
-          job_result = job_result.with_destination_paths(&mut destination_paths);
-        }
+    let response = call_module_function(
+      py,
+      python_module,
+      "process",
+      (callback_handle, list_of_parameters),
+    )
+    .map_err(|error_message| {
+      let result = job_result
+        .clone()
+        .with_status(JobStatus::Error)
+        .with_message(&error_message);
+      MessageError::ProcessingError(result)
+    })?;
 
-        Ok(job_result.with_status(JobStatus::Completed))
-      }
-      Err(error) => {
-        let stacktrace = if let Some(tb) = &error.ptraceback {
-          let locals = [("traceback", traceback)].into_py_dict(py);
-
-          locals.set_item("tb", tb).unwrap();
-
-          py.eval("traceback.format_tb(tb)", None, Some(locals))
-            .expect("Unknown python error, unable to get the stacktrace")
-            .to_string()
-        } else {
-          "Unknown python error, no stackstrace".to_string()
-        };
-
-        let locals = [("error", error)].into_py_dict(py);
-
-        let error_msg = py
-          .eval("repr(error)", None, Some(locals))
-          .expect("Unknown python error, unable to get the error message")
-          .to_string();
-
-        let error_message = format!("{}\n\nStacktrace:\n{}", error_msg, stacktrace);
-
-        let result = job_result
-          .with_status(JobStatus::Error)
-          .with_message(&error_message);
-        Err(MessageError::ProcessingError(result))
-      }
+    if let Some(mut destination_paths) = get_destination_paths(response) {
+      job_result = job_result.with_destination_paths(&mut destination_paths);
     }
+    Ok(job_result.with_status(JobStatus::Completed))
   }
 }
 
