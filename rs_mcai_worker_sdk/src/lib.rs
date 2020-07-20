@@ -119,7 +119,8 @@ use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use serde::de::DeserializeOwned;
 #[cfg(feature = "media")]
 use serde::Serialize;
-use std::{cell::RefCell, fs, io::Write, rc::Rc, sync::Arc, thread, time};
+use std::{
+  cell::RefCell, fs, io::Write, rc::Rc, sync::{Arc, Mutex}, thread, time};
 
 /// Exposed Channel type
 pub type McaiChannel = Arc<Channel>;
@@ -158,7 +159,7 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
   fn init_process(
     &mut self,
     _parameters: P,
-    _format_context: &FormatContext,
+    _format_context: Arc<Mutex<FormatContext>>,
   ) -> Result<Vec<usize>> {
     Ok(vec![])
   }

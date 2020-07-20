@@ -47,7 +47,7 @@ macro_rules! check_result {
 
 #[derive(Debug)]
 pub struct MediaStream {
-  format_context: *mut AVFormatContext,
+  pub format_context: *mut AVFormatContext,
   stream_info: bool,
   stream_ids: Vec<u8>,
   decoders: HashMap<u8, Decoder>,

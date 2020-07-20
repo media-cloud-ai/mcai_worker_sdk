@@ -72,6 +72,7 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
 
         output.push(result);
       }
+      DecodeResult::WaitMore => {}
       DecodeResult::Nothing => {}
       DecodeResult::EndOfStream => {
         output.to_destination_path()?;
