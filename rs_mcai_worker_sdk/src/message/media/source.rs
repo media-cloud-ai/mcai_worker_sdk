@@ -6,7 +6,7 @@ use crate::{
     srt::SrtStream,
     media_stream::MediaStream,
   },
-  MessageError, MessageEvent, Result
+  MessageEvent, Result
 };
 use ringbuf::RingBuffer;
 use schemars::JsonSchema;
