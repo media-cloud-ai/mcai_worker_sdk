@@ -47,7 +47,6 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
         stream_index,
         frame,
       } => {
-        count += 1;
 
         if stream_index == 0 {
           count += 1;
