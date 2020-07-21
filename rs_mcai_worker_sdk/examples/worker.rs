@@ -8,6 +8,8 @@ use mcai_worker_sdk::{job::JobResult, MessageEvent, Result};
 use mcai_worker_sdk::{job::JobStatus, publish_job_progression, McaiChannel, MessageError};
 use schemars::JsonSchema;
 use semver::Version;
+#[cfg(feature = "media")]
+use std::sync::{Arc, Mutex};
 
 #[cfg(not(feature = "media"))]
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -52,9 +54,9 @@ Do no use in production, just for developments."#
   fn init_process(
     &mut self,
     _parameters: WorkerParameters,
-    _format_context: &FormatContext,
+    _format_context: Arc<Mutex<FormatContext>>,
   ) -> Result<Vec<usize>> {
-    Ok(vec![1])
+    Ok(vec![0])
   }
 
   #[cfg(feature = "media")]

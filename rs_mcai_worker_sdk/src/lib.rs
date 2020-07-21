@@ -118,8 +118,9 @@ use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use serde::de::DeserializeOwned;
 #[cfg(feature = "media")]
 use serde::Serialize;
-use std::{
-  cell::RefCell, fs, io::Write, rc::Rc, sync::{Arc, Mutex}, thread, time};
+#[cfg(feature = "media")]
+use std::sync::Mutex;
+use std::{cell::RefCell, fs, io::Write, rc::Rc, sync::Arc, thread, time};
 
 /// Exposed Channel type
 pub type McaiChannel = Arc<Channel>;

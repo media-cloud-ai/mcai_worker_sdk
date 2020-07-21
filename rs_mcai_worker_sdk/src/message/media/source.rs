@@ -1,34 +1,22 @@
+#[cfg(not(feature = "media"))]
+use crate::MessageError;
 use crate::{
   error::MessageError::RuntimeError,
   job::JobResult,
-  message::media::{
-    srt::SrtStream,
-    media_stream::MediaStream,
-  },
-  MessageError, MessageEvent, Result,
+  message::media::{media_stream::MediaStream, srt::SrtStream},
+  MessageEvent, Result,
 };
 use ringbuf::RingBuffer;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use std::{
-  cell::RefCell,
-  collections::HashMap,
-  io::Cursor,
-  rc::Rc,
-  thread,
-};
 use std::sync::{
-  Arc,
-  Mutex,
   mpsc,
-  mpsc::{Sender, Receiver},
+  mpsc::{Receiver, Sender},
+  Arc, Mutex,
 };
+use std::{cell::RefCell, collections::HashMap, io::Cursor, rc::Rc, thread};
 
-use stainless_ffmpeg::{
-  format_context::FormatContext,
-  frame::Frame,
-  video_decoder::VideoDecoder
-};
+use stainless_ffmpeg::{format_context::FormatContext, frame::Frame, video_decoder::VideoDecoder};
 
 pub enum DecodeResult {
   EndOfStream,
@@ -55,8 +43,10 @@ impl Source {
     let mut decoders = HashMap::<usize, VideoDecoder>::new();
 
     if SrtStream::is_srt_stream(source_url) {
-
-      let (tx, rx): (Sender<Arc<Mutex<FormatContext>>>, Receiver<Arc<Mutex<FormatContext>>>) = mpsc::channel();
+      let (tx, rx): (
+        Sender<Arc<Mutex<FormatContext>>>,
+        Receiver<Arc<Mutex<FormatContext>>>,
+      ) = mpsc::channel();
       let cloned_source_url = source_url.to_string();
       let source_thread = thread::spawn(move || {
         let mut srt_stream = SrtStream::open_connection(&cloned_source_url).unwrap();
@@ -69,10 +59,11 @@ impl Source {
 
         let mut got_stream_info = false;
 
-      let ring_buffer = RingBuffer::<u8>::new(100 * 1024 * 1024);
-      let (mut producer, consumer) = ring_buffer.split();
-      let media_stream = MediaStream::new(format, consumer)
-        .map_err(|error| MessageError::from(error, job_result.clone()))?;
+        loop {
+          if let Some((_instant, bytes)) = srt_stream.receive() {
+            trace!("{:?}", bytes);
+            let size = bytes.len();
+            let mut cursor = Cursor::new(bytes);
 
             producer.read_from(&mut cursor, Some(size)).unwrap();
 
@@ -81,7 +72,10 @@ impl Source {
                 Err(error) => error!("{}", error),
                 Ok(()) => {
                   got_stream_info = true;
-                  tx.send(Arc::new(Mutex::new(FormatContext::from(media_stream.format_context)))).unwrap();
+                  tx.send(Arc::new(Mutex::new(FormatContext::from(
+                    media_stream.format_context,
+                  ))))
+                  .unwrap();
                 }
               }
             }
@@ -116,7 +110,6 @@ impl Source {
         format_context,
         thread: Some(source_thread),
       })
-
     } else {
       let mut format_context = FormatContext::new(source_url).map_err(RuntimeError)?;
       format_context.open_input().map_err(RuntimeError)?;
@@ -158,7 +151,8 @@ impl Source {
 
     self
       .format_context
-      .lock().unwrap()
+      .lock()
+      .unwrap()
       .get_duration()
       .map(|duration| duration * 25.0)
   }

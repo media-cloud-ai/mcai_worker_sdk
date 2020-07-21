@@ -20,6 +20,8 @@ use crate::helpers::get_stream_indexes;
 use crate::helpers::py_err_to_string;
 #[cfg(feature = "media")]
 pub use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
+#[cfg(feature = "media")]
+use std::sync::{Arc, Mutex};
 
 mod helpers;
 #[cfg(feature = "media")]
@@ -200,7 +202,7 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
   fn init_process(
     &mut self,
     parameters: PythonWorkerParameters,
-    format_context: &FormatContext,
+    format_context: Arc<Mutex<FormatContext>>,
   ) -> Result<Vec<usize>> {
     let gil = Python::acquire_gil();
     let (py, python_module) = get_python_module(&gil)?;

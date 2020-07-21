@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 use std::collections::{BTreeMap, HashMap};
+use std::sync::{Arc, Mutex};
 
 #[pyclass]
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
@@ -27,7 +28,9 @@ pub struct FormatContext {
 }
 
 impl FormatContext {
-  pub fn from(context: &mcai_worker_sdk::FormatContext) -> FormatContext {
+  pub fn from(format_context: Arc<Mutex<mcai_worker_sdk::FormatContext>>) -> FormatContext {
+    let context = format_context.lock().unwrap();
+
     let format_name = context.get_format_name();
     let format_long_name = context.get_format_long_name();
 
