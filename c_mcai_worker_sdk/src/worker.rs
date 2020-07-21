@@ -4,14 +4,18 @@ use std::ptr::null;
 
 use libloading::Library;
 
-use mcai_worker_sdk::job::Job;
-use mcai_worker_sdk::worker::{Parameter, ParameterType};
-use mcai_worker_sdk::ParametersContainer;
-use mcai_worker_sdk::{debug, error, info, trace, warn};
-use mcai_worker_sdk::{publish_job_progression, McaiChannel};
+use mcai_worker_sdk::{
+  debug, error, info,
+  job::JobResult,
+  publish_job_progression, trace, warn,
+  worker::{Parameter, ParameterType},
+  McaiChannel,
+};
 
 use crate::constants;
+use crate::parameters::CWorkerParameters;
 use crate::process_return::ProcessReturn;
+use serde_json::Value;
 
 macro_rules! get_c_string {
   ($name:expr) => {
@@ -26,7 +30,8 @@ macro_rules! get_c_string {
 #[repr(C)]
 #[derive(Debug)]
 pub struct Handler {
-  pub job: Job,
+  pub job_id: u64,
+  pub parameters: CWorkerParameters,
   pub channel: Option<McaiChannel>,
 }
 
@@ -74,8 +79,16 @@ extern "C" fn get_parameter_value(
 
   let key = unsafe { get_c_string!(parameter_id) };
 
-  let param_value = if let Some(value) = handler.job.get_parameters_as_map().get(&key) {
-    let string = CString::new(value.as_str()).unwrap();
+  let param_value = if let Some(value) = handler.parameters.parameters.get(&key) {
+    let string = match value {
+      Value::String(string) => CString::new(string.as_str()).unwrap(),
+      Value::Number(number) => CString::new(format!("{}", number.as_i64().unwrap())).unwrap(),
+      Value::Bool(boolean) => CString::new(format!("{}", boolean)).unwrap(),
+      Value::Array(array) => CString::new(format!("{:?}", array)).unwrap(),
+      Value::Object(object) => CString::new(format!("{:?}", object)).unwrap(),
+      Value::Null => CString::new(format!("")).unwrap(),
+    };
+
     let string_ptr = string.as_ptr();
     std::mem::forget(string);
     string_ptr
@@ -123,7 +136,7 @@ extern "C" fn progress(mut c_handler: *mut c_void, progression: c_uchar) {
 
   let handler: Box<Handler> = unsafe { Box::from_raw(c_handler as *mut Handler) };
 
-  publish_job_progression(handler.channel.clone(), &handler.job, progression)
+  publish_job_progression(handler.channel.clone(), handler.job_id, progression)
     .map_err(|error| error!("Could not publish job progression: {:?}", error))
     .unwrap();
 
@@ -237,7 +250,11 @@ pub fn get_worker_parameters() -> Vec<Parameter> {
   parameters
 }
 
-pub fn call_worker_process(job: &Job, channel: Option<McaiChannel>) -> ProcessReturn {
+pub fn call_worker_process(
+  job_result: JobResult,
+  parameters: CWorkerParameters,
+  channel: Option<McaiChannel>,
+) -> ProcessReturn {
   let library = get_library_file_path();
   debug!("Call worker process from library: {}", library);
 
@@ -248,7 +265,8 @@ pub fn call_worker_process(job: &Job, channel: Option<McaiChannel>) -> ProcessRe
       {
         Ok(process_func) => {
           let handler = Handler {
-            job: job.clone(),
+            job_id: job_result.get_job_id(),
+            parameters,
             channel,
           };
 

@@ -1,16 +1,21 @@
 mod constants;
+mod parameters;
 mod process_return;
 mod worker;
 
+#[macro_use]
+extern crate serde_derive;
+
+use crate::parameters::CWorkerParameters;
 use crate::worker::*;
 use mcai_worker_sdk::{
-  debug, job::*, start_worker, worker::Parameter, McaiChannel, MessageError, MessageEvent, Version,
+  debug, job::*, start_worker, McaiChannel, MessageError, MessageEvent, Version,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct CWorkerEvent {}
 
-impl MessageEvent for CWorkerEvent {
+impl MessageEvent<CWorkerParameters> for CWorkerEvent {
   fn get_name(&self) -> String {
     get_worker_function_string_value(constants::GET_NAME_FUNCTION)
   }
@@ -33,18 +38,14 @@ impl MessageEvent for CWorkerEvent {
     })
   }
 
-  fn get_parameters(&self) -> Vec<Parameter> {
-    get_worker_parameters()
-  }
-
   fn process(
     &self,
     channel: Option<McaiChannel>,
-    job: &Job,
+    parameters: CWorkerParameters,
     job_result: JobResult,
   ) -> Result<JobResult, MessageError> {
-    debug!("Process job: {:?}", job.job_id);
-    let process_return = call_worker_process(job, channel);
+    debug!("Process job: {}", job_result.get_job_id());
+    let process_return = call_worker_process(job_result.clone(), parameters, channel);
     debug!("Returned: {:?}", process_return);
     process_return.as_result(job_result)
   }
@@ -53,7 +54,7 @@ impl MessageEvent for CWorkerEvent {
 static C_WORKER_EVENT: CWorkerEvent = CWorkerEvent {};
 
 fn main() {
-  start_worker(&C_WORKER_EVENT);
+  start_worker(C_WORKER_EVENT.clone());
 }
 
 #[test]
