@@ -17,6 +17,7 @@ use mcai_worker_sdk::{
 
 #[cfg(feature = "media")]
 use crate::helpers::get_stream_indexes;
+use crate::helpers::py_err_to_string;
 #[cfg(feature = "media")]
 pub use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
 
@@ -130,8 +131,11 @@ fn get_python_module<'a>(gil: &'a GILGuard) -> Result<(Python<'a>, &'a PyModule)
   let python_file_content = PythonWorkerEvent::read_python_file();
   let py = gil.python();
   let python_module = PyModule::from_code(py, &python_file_content, "worker.py", "worker")
-    .map_err(|e| {
-      MessageError::RuntimeError(format!("unable to create the python module: {:?}", e))
+    .map_err(|error| {
+      MessageError::RuntimeError(format!(
+        "unable to create the python module: {}",
+        py_err_to_string(py, error)
+      ))
     })?;
   Ok((py, python_module))
 }
@@ -158,13 +162,7 @@ fn call_module_function<'a>(
         "Unknown python error, no stackstrace".to_string()
       };
 
-      let locals = [("error", error)].into_py_dict(py);
-
-      let error_msg = py
-        .eval("repr(error)", None, Some(locals))
-        .expect("Unknown python error, unable to get the error message")
-        .to_string();
-
+      let error_msg = py_err_to_string(py, error);
       let error_message = format!("{}\n\nStacktrace:\n{}", error_msg, stacktrace);
       Err(error_message)
     }
@@ -244,6 +242,7 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
         .with_message(&error_message);
       MessageError::ProcessingError(result)
     })?;
+
     Ok(ProcessResult::new_json(&response.to_string()))
   }
 
@@ -254,6 +253,7 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
 
     let _result = call_module_function(py, python_module, "ending_process", ())
       .map_err(|error_message| MessageError::ParameterValueError(error_message))?;
+
     Ok(())
   }
 
@@ -291,6 +291,7 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
     if let Some(mut destination_paths) = get_destination_paths(response) {
       job_result = job_result.with_destination_paths(&mut destination_paths);
     }
+
     Ok(job_result.with_status(JobStatus::Completed))
   }
 }

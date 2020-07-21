@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use pyo3::{types::*, PyErr, Python};
+use pyo3::{types::*, Python};
 use schemars::{
   gen::SchemaGenerator,
   schema::{InstanceType, ObjectValidation, Schema, SchemaObject},
@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use mcai_worker_sdk::{worker::ParameterType, MessageError, Result};
 
-use crate::PythonWorkerEvent;
+use crate::{helpers::py_err_to_string, PythonWorkerEvent};
 
 #[derive(Deserialize)]
 pub struct PythonWorkerParameters {
@@ -66,14 +66,6 @@ fn get_instance_type_from_parameter_type(parameter_type: &ParameterType) -> Inst
     ParameterType::Integer => InstanceType::Integer,
     ParameterType::Requirement => InstanceType::Array,
   }
-}
-
-fn py_err_to_string(py: Python, error: PyErr) -> String {
-  let locals = [("error", error)].into_py_dict(py);
-
-  py.eval("repr(error)", None, Some(locals))
-    .expect("Unknown python error, unable to get the error message")
-    .to_string()
 }
 
 pub fn build_parameters(parameters: PythonWorkerParameters, py: Python) -> Result<&PyDict> {

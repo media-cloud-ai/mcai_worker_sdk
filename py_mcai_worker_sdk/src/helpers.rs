@@ -2,6 +2,14 @@
 use mcai_worker_sdk::{MessageError, Result};
 use pyo3::{prelude::*, types::*};
 
+pub fn py_err_to_string(py: Python, error: PyErr) -> String {
+  let locals = [("error", error)].into_py_dict(py);
+
+  py.eval("repr(error)", None, Some(locals))
+    .expect("Unknown python error, unable to get the error message")
+    .to_string()
+}
+
 #[cfg(not(feature = "media"))]
 pub fn get_destination_paths(response: &PyAny) -> Option<Vec<String>> {
   if response.is_none() {
