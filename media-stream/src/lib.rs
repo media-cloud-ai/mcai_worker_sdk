@@ -1,20 +1,18 @@
-use log::{debug, error, info, trace, warn};
-use ringbuf::Consumer;
-use stainless_ffmpeg::{
-  audio_decoder::AudioDecoder,
-  filter_graph::FilterGraph,
-  frame::Frame,
-  order,
-  order::filter_output::FilterOutput,
-  order::parameters::ParameterValue,
-};
-use stainless_ffmpeg_sys::*;
 use std::collections::HashMap;
 use std::ffi::{c_void, CStr, CString};
 use std::io::{Cursor, Error, ErrorKind, Result};
 use std::mem;
 use std::ptr::null_mut;
 use std::str::from_utf8_unchecked;
+
+use log::{debug, error, info, trace, warn};
+use ringbuf::Consumer;
+use stainless_ffmpeg::{
+  audio_decoder::AudioDecoder, filter_graph::FilterGraph, format_context::FormatContext,
+  frame::Frame, order, order::filter_output::FilterOutput, order::parameters::ParameterValue,
+  video_decoder::VideoDecoder,
+};
+use stainless_ffmpeg_sys::*;
 
 unsafe fn to_string(data: *const i8) -> String {
   if data.is_null() {
@@ -76,7 +74,9 @@ unsafe extern "C" fn read_data(opaque: *mut c_void, raw_buffer: *mut u8, buf_siz
   let vec = Vec::from_raw_parts(raw_buffer, buf_size as usize, buf_size as usize);
 
   let mut buffer = Cursor::new(vec);
-  let size = consumer.write_into(&mut buffer, Some(buf_size as usize)).unwrap();
+  let size = consumer
+    .write_into(&mut buffer, Some(buf_size as usize))
+    .unwrap();
 
   mem::forget(buffer);
   size as i32
@@ -89,14 +89,22 @@ impl MediaStream {
       // av_log_set_level(AV_LOG_QUIET);
     }
 
-    let mut context = FormatContext::new(filename)?;
-    context.open_input()?;
+    let mut context =
+      FormatContext::new(source_url).map_err(|e| Error::new(ErrorKind::Other, e))?;
+    context
+      .open_input()
+      .map_err(|e| Error::new(ErrorKind::Other, e))?;
 
-    let video_decoder = VideoDecoder::new("h264".to_string(), &context, 0)?;
+    let video_decoder = VideoDecoder::new("h264".to_string(), &context, 0)
+      .map_err(|e| Error::new(ErrorKind::Other, e))?;
 
-    let mut graph = FilterGraph::new()?;
-    graph.add_input_from_video_decoder("video_input", &video_decoder)?;
-    graph.add_video_output("video_output")?;
+    let mut graph = FilterGraph::new().map_err(|e| Error::new(ErrorKind::Other, e))?;
+    graph
+      .add_input_from_video_decoder("video_input", &video_decoder)
+      .map_err(|e| Error::new(ErrorKind::Other, e))?;
+    graph
+      .add_video_output("video_output")
+      .map_err(|e| Error::new(ErrorKind::Other, e))?;
 
     let parameters: HashMap<String, ParameterValue> = [("pix_fmts", "rgb24")]
       .iter()
@@ -114,12 +122,34 @@ impl MediaStream {
       }]),
     };
 
-    let filter = graph.add_filter(&filter_definition)?;
-    graph.connect_input("video_input", 0, &filter, 0)?;
-    graph.connect_output(&filter, 0, "video_output", 0)?;
+    let filter = graph
+      .add_filter(&filter_definition)
+      .map_err(|e| Error::new(ErrorKind::Other, e))?;
+    graph
+      .connect_input("video_input", 0, &filter, 0)
+      .map_err(|e| Error::new(ErrorKind::Other, e))?;
+    graph
+      .connect_output(&filter, 0, "video_output", 0)
+      .map_err(|e| Error::new(ErrorKind::Other, e))?;
 
-    graph.validate()?;
+    let _result = graph
+      .validate()
+      .map_err(|e| Error::new(ErrorKind::Other, e))?;
 
+    info!("MediaStream created");
+
+    let mut stream_ids = vec![];
+    for i in 0..context.get_nb_streams() as u8 {
+      stream_ids.push(i);
+    }
+
+    Ok(MediaStream {
+      decoders: HashMap::new(),
+      format_context: context.format_context,
+      stream_info: false,
+      stream_ids,
+      graph: None,
+    })
   }
 
   pub fn new_stream(format: &str, consumer: Consumer<u8>, stream_ids: &[u8]) -> Result<Self> {
@@ -127,9 +157,6 @@ impl MediaStream {
       av_log_set_level(AV_LOG_ERROR);
       av_log_set_level(AV_LOG_QUIET);
     }
-
-    let mut context = FormatContext::new(filename)?;
-    context.open_input()?;
 
     let buffer_size = 2048;
     let mut format_context = unsafe { avformat_alloc_context() };
@@ -175,7 +202,7 @@ impl MediaStream {
     })
   }
 
-  pub fn read_packet(&mut self) -> Result<Option<*mut AVPacket>>  {
+  pub fn read_packet(&mut self) -> Result<Option<*mut AVPacket>> {
     if !self.stream_info {
       info!("[FFMpeg] Find stream info");
       unsafe {
@@ -188,14 +215,18 @@ impl MediaStream {
           let source_codec = (**stream).codec;
 
           let refcounted_frames = CString::new("refcounted_frames").unwrap();
-          av_opt_set_int(source_codec as *mut c_void, refcounted_frames.as_ptr(), 1, 0);
+          av_opt_set_int(
+            source_codec as *mut c_void,
+            refcounted_frames.as_ptr(),
+            1,
+            0,
+          );
 
           let codec = avcodec_find_decoder((*source_codec).codec_id);
           let context = avcodec_alloc_context3(codec);
 
           check_result!(avcodec_parameters_to_context(context, (**stream).codecpar));
           check_result!(avcodec_open2(context, codec, null_mut()));
-
 
           let audio_decoder = AudioDecoder {
             identifier: "audio_source_1".to_string(),
@@ -204,7 +235,14 @@ impl MediaStream {
           };
           self.create_graph(&audio_decoder);
 
-          self.decoders.insert(*stream_id, Decoder {codec, context, decoder: audio_decoder});
+          self.decoders.insert(
+            *stream_id,
+            Decoder {
+              codec,
+              context,
+              decoder: audio_decoder,
+            },
+          );
         }
       }
       self.stream_info = true;
@@ -219,7 +257,10 @@ impl MediaStream {
         trace!("[FFMpeg] Read frame");
 
         check_result!(av_read_frame(self.format_context, packet));
-        debug!("[FFMpeg] Got a packet for stream ID {}", (*packet).stream_index);
+        debug!(
+          "[FFMpeg] Got a packet for stream ID {}",
+          (*packet).stream_index
+        );
 
         return Ok(Some(packet));
       }
@@ -268,20 +309,18 @@ impl MediaStream {
           index: 1,
         };
 
-        let av_frame =
-          if let Some(graph) = &self.graph {
-
-            trace!("[FFmpeg] Process graph");
-            if let Ok((audio_frames, _video_frames)) = graph.process(&[frame], &[]) {
-              trace!("[FFmpeg] Output graph count {} frames", audio_frames.len());
-              let frame = audio_frames.first().unwrap();
-              av_frame_clone((*frame).frame)
-            } else {
-              av_frame
-            }
+        let av_frame = if let Some(graph) = &self.graph {
+          trace!("[FFmpeg] Process graph");
+          if let Ok((audio_frames, _video_frames)) = graph.process(&[frame], &[]) {
+            trace!("[FFmpeg] Output graph count {} frames", audio_frames.len());
+            let frame = audio_frames.first().unwrap();
+            av_frame_clone((*frame).frame)
           } else {
             av_frame
-          };
+          }
+        } else {
+          av_frame
+        };
 
         return Ok(Some(av_frame));
       }
@@ -343,5 +382,4 @@ impl MediaStream {
 
     self.graph = Some(graph);
   }
-
 }
