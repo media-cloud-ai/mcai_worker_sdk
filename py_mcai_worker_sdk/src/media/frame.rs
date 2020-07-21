@@ -1,15 +1,16 @@
-use pyo3::prelude::*;
-use std::ffi::CString;
 use std::os::raw::c_uchar;
 
+use pyo3::prelude::*;
+use pyo3::types::{PyBytes, PyList};
+
 #[pyclass]
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, PartialEq)]
 pub struct Frame {
   #[pyo3(get)]
   pub name: Option<String>,
   #[pyo3(get)]
   pub index: usize,
-  pub data: [Vec<u8>; 8],
+  pub data: [*mut c_uchar; 8],
   #[pyo3(get)]
   pub line_size: [i32; 8],
   #[pyo3(get)]
@@ -43,12 +44,18 @@ pub struct Frame {
 #[pymethods]
 impl Frame {
   #[getter]
-  fn get_data(&self) -> PyResult<Vec<Vec<u8>>> {
-    let mut result = vec![];
-    for i in 0..self.data.len() {
-      result.push(self.data[i].clone())
+  fn get_data<'p>(&self, py: Python<'p>) -> PyResult<&'p PyList> {
+    let data = PyList::empty(py);
+    for plane_index in 0..self.data.len() {
+      unsafe {
+        data.append(PyBytes::from_ptr(
+          py,
+          self.data[plane_index],
+          self.line_size[plane_index] as usize,
+        ))?;
+      }
     }
-    Ok(result)
+    Ok(data)
   }
 }
 
@@ -56,24 +63,12 @@ impl Frame {
   pub fn from(frame: &mcai_worker_sdk::Frame) -> Frame {
     let av_frame = unsafe { *frame.frame };
 
-    let av_frame_data: [*mut c_uchar; 8] = av_frame.data;
-    let mut frame_data: [Vec<u8>; 8] = Default::default();
-    unsafe {
-      for i in 0..8 {
-        let av_frame_data_plan = av_frame_data[i] as *mut i8;
-        if av_frame_data_plan == std::ptr::null_mut() {
-          continue;
-        }
-        frame_data[i] = CString::from_raw(av_frame_data_plan).into();
-      }
-    }
-
     // TODO complete frame struct
 
     Frame {
       name: frame.name.clone(),
       index: frame.index,
-      data: frame_data,
+      data: av_frame.data,
       line_size: av_frame.linesize,
       nb_samples: av_frame.nb_samples,
       format: av_frame.format,

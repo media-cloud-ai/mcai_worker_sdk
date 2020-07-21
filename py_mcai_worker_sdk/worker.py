@@ -55,15 +55,21 @@ def init_process(format_context, parameters):
 	print("format_context: ", format_context)
 	print("parameters: ", parameters)
 
+	# raise "This is an error !!!"
+
 	return [0]
 
 def process_frame(job_id, stream_index, frame):
 	# TODO: be able to raise, return job in errors
 	# raise Exception("my error")
+	data_length = 0
+	for plane in range(0, len(frame.data)):
+		data_length = data_length + len(frame.data[plane])
+
 	if frame.width != 0 and frame.height != 0 :
-		print(f"Job: {job_id} - Process video stream {stream_index} frame - PTS: {frame.pts}, image size: {frame.width}x{frame.height}")
+		print(f"Job: {job_id} - Process video stream {stream_index} frame - PTS: {frame.pts}, image size: {frame.width}x{frame.height}, data length: {data_length}")
 	else:
-		print(f"Job: {job_id} - Process audio stream {stream_index} frame - PTS: {frame.pts}, sample_rate: {frame.sample_rate}Hz, channels: {frame.channels}, nb_samples: {frame.nb_samples}")
+		print(f"Job: {job_id} - Process audio stream {stream_index} frame - PTS: {frame.pts}, sample_rate: {frame.sample_rate}Hz, channels: {frame.channels}, nb_samples: {frame.nb_samples}, data length: {data_length}")
 
 	return {}
 
