@@ -1,5 +1,6 @@
 mod constants;
 mod parameters;
+#[cfg(not(feature = "media"))]
 mod process_return;
 mod worker;
 
@@ -8,9 +9,13 @@ extern crate serde_derive;
 
 use crate::parameters::CWorkerParameters;
 use crate::worker::*;
-use mcai_worker_sdk::{
-  debug, job::*, start_worker, McaiChannel, MessageError, MessageEvent, Version,
-};
+#[cfg(not(feature = "media"))]
+use mcai_worker_sdk::{debug, job::*, McaiChannel};
+use mcai_worker_sdk::{start_worker, MessageEvent, Result, Version};
+#[cfg(feature = "media")]
+use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
+#[cfg(feature = "media")]
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 struct CWorkerEvent {}
@@ -38,14 +43,43 @@ impl MessageEvent<CWorkerParameters> for CWorkerEvent {
     })
   }
 
+  fn init(&mut self) -> Result<()> {
+    call_optional_worker_init()
+  }
+
+  #[cfg(feature = "media")]
+  fn init_process(
+    &mut self,
+    parameters: CWorkerParameters,
+    format_context: Arc<Mutex<FormatContext>>,
+  ) -> Result<Vec<usize>> {
+    call_worker_init_process(parameters, format_context)
+  }
+
+  #[cfg(feature = "media")]
+  fn process_frame(
+    &mut self,
+    str_job_id: &str,
+    stream_index: usize,
+    frame: Frame,
+  ) -> Result<ProcessResult> {
+    call_worker_process_frame(str_job_id, stream_index, frame)
+  }
+
+  #[cfg(feature = "media")]
+  fn ending_process(&self) -> Result<()> {
+    call_worker_ending_process()
+  }
+
+  #[cfg(not(feature = "media"))]
   fn process(
     &self,
     channel: Option<McaiChannel>,
     parameters: CWorkerParameters,
     job_result: JobResult,
-  ) -> Result<JobResult, MessageError> {
+  ) -> Result<JobResult> {
     debug!("Process job: {}", job_result.get_job_id());
-    let process_return = call_worker_process(job_result.clone(), parameters, channel);
+    let process_return = call_worker_process(job_result.clone(), parameters, channel)?;
     debug!("Returned: {:?}", process_return);
     process_return.as_result(job_result)
   }

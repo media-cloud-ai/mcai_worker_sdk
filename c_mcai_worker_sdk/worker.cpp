@@ -61,6 +61,39 @@ void get_parameters(Parameter* parameters) {
     memcpy(parameters, worker_parameters, sizeof(worker_parameters));
 }
 
+void init(Logger logger) {
+    // Print message through the Rust Logger
+    logger("debug", "Init C Worker...");
+}
+
+int init_process(
+    Handler handler,
+    GetParameterValueCallback parameters_value_getter,
+    Logger logger,
+    void* format_context,
+    const unsigned int* output_stream_indexes
+  ) {
+    logger("debug", "Initialize C Worker media process...");
+    return 0;
+}
+
+int process_frame(
+    Handler handler,
+    GetParameterValueCallback parameters_value_getter,
+    Logger logger,
+    const unsigned int stream_index,
+    void* frame,
+    const char** message
+  ) {
+    logger("debug", "Process C Worker media frame...");
+    return 0;
+}
+
+void endingProcess(Logger logger) {
+    // Print message through the Rust Logger
+    logger("debug", "Ending C Worker media process...");
+}
+
 /**
  * Worker main process function
  * @param handler                  Handler

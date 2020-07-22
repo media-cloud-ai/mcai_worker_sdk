@@ -1,21 +1,30 @@
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_uchar, c_uint, c_void};
+use std::os::raw::{c_char, c_uint, c_void};
+#[cfg(not(feature = "media"))]
+use std::os::raw::{c_int, c_uchar};
 use std::ptr::null;
 
 use libloading::Library;
+use serde_json::Value;
 
 use mcai_worker_sdk::{
-  debug, error, info,
-  job::JobResult,
-  publish_job_progression, trace, warn,
+  debug, error, info, trace, warn,
   worker::{Parameter, ParameterType},
-  McaiChannel,
+  McaiChannel, MessageError, Result,
 };
+#[cfg(not(feature = "media"))]
+use mcai_worker_sdk::{job::JobResult, publish_job_progression};
+#[cfg(feature = "media")]
+use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
 
 use crate::constants;
 use crate::parameters::CWorkerParameters;
+#[cfg(not(feature = "media"))]
 use crate::process_return::ProcessReturn;
-use serde_json::Value;
+#[cfg(feature = "media")]
+use std::str::FromStr;
+#[cfg(feature = "media")]
+use std::sync::{Arc, Mutex};
 
 macro_rules! get_c_string {
   ($name:expr) => {
@@ -30,8 +39,8 @@ macro_rules! get_c_string {
 #[repr(C)]
 #[derive(Debug)]
 pub struct Handler {
-  pub job_id: u64,
-  pub parameters: CWorkerParameters,
+  pub job_id: Option<u64>,
+  pub parameters: Option<CWorkerParameters>,
   pub channel: Option<McaiChannel>,
 }
 
@@ -55,6 +64,27 @@ type GetParametersFunc = unsafe fn(parameters: *mut WorkerParameter);
 
 type GetParameterValueCallback = extern "C" fn(*mut c_void, *const c_char) -> *const c_char;
 type LoggerCallback = extern "C" fn(*const c_char, *const c_char);
+type InitFunc = unsafe fn(logger: LoggerCallback);
+#[cfg(feature = "media")]
+type InitProcessFunc = unsafe fn(
+  handler: *mut c_void,
+  callback: GetParameterValueCallback,
+  logger: LoggerCallback,
+  av_format_context: *mut c_void,
+  output_stream_indexes: &*mut c_uint,
+) -> c_uint;
+#[cfg(feature = "media")]
+type ProcessFrameFunc = unsafe fn(
+  handler: *mut c_void,
+  callback: GetParameterValueCallback,
+  logger: LoggerCallback,
+  stream_index: c_uint,
+  frame: *mut c_void,
+  output_message: &*const c_char,
+) -> c_uint;
+#[cfg(feature = "media")]
+type EndingProcessFunc = unsafe fn(logger: LoggerCallback);
+#[cfg(not(feature = "media"))]
 type ProcessFunc = unsafe fn(
   handler: *mut c_void,
   callback: GetParameterValueCallback,
@@ -63,6 +93,7 @@ type ProcessFunc = unsafe fn(
   output_message: &*const c_char,
   output_paths: &*mut *const c_char,
 ) -> c_int;
+#[cfg(not(feature = "media"))]
 type ProgressCallback = extern "C" fn(*mut c_void, c_uchar);
 
 #[allow(unused_assignments)]
@@ -77,28 +108,32 @@ extern "C" fn get_parameter_value(
 
   let handler: Box<Handler> = unsafe { Box::from_raw(c_handler as *mut Handler) };
 
-  let key = unsafe { get_c_string!(parameter_id) };
+  if let Some(parameters) = handler.parameters.clone() {
+    let key = unsafe { get_c_string!(parameter_id) };
 
-  let param_value = if let Some(value) = handler.parameters.parameters.get(&key) {
-    let string = match value {
-      Value::String(string) => CString::new(string.as_str()).unwrap(),
-      Value::Number(number) => CString::new(format!("{}", number.as_i64().unwrap())).unwrap(),
-      Value::Bool(boolean) => CString::new(format!("{}", boolean)).unwrap(),
-      Value::Array(array) => CString::new(format!("{:?}", array)).unwrap(),
-      Value::Object(object) => CString::new(format!("{:?}", object)).unwrap(),
-      Value::Null => CString::new(format!("")).unwrap(),
+    let param_value = if let Some(value) = parameters.parameters.get(&key) {
+      let string = match value {
+        Value::String(string) => CString::new(string.as_str()).unwrap(),
+        Value::Number(number) => CString::new(format!("{}", number.as_i64().unwrap())).unwrap(),
+        Value::Bool(boolean) => CString::new(format!("{}", boolean)).unwrap(),
+        Value::Array(array) => CString::new(format!("{:?}", array)).unwrap(),
+        Value::Object(object) => CString::new(format!("{:?}", object)).unwrap(),
+        Value::Null => CString::new(format!("")).unwrap(),
+      };
+
+      let string_ptr = string.as_ptr();
+      std::mem::forget(string);
+      string_ptr
+    } else {
+      null()
     };
 
-    let string_ptr = string.as_ptr();
-    std::mem::forget(string);
-    string_ptr
+    // reset job parameters pointer
+    c_handler = Box::into_raw(handler) as *mut c_void;
+    param_value
   } else {
     null()
-  };
-
-  // reset job parameters pointer
-  c_handler = Box::into_raw(handler) as *mut c_void;
-  param_value
+  }
 }
 
 extern "C" fn logger(level: *const c_char, raw_value: *const c_char) {
@@ -127,6 +162,7 @@ extern "C" fn logger(level: *const c_char, raw_value: *const c_char) {
   }
 }
 
+#[cfg(not(feature = "media"))]
 #[allow(unused_assignments)]
 extern "C" fn progress(mut c_handler: *mut c_void, progression: c_uchar) {
   if c_handler.is_null() {
@@ -135,10 +171,18 @@ extern "C" fn progress(mut c_handler: *mut c_void, progression: c_uchar) {
   }
 
   let handler: Box<Handler> = unsafe { Box::from_raw(c_handler as *mut Handler) };
+  if handler.job_id.is_none() {
+    warn!("Null job id. Progression: {}%", progression);
+    return;
+  }
 
-  publish_job_progression(handler.channel.clone(), handler.job_id, progression)
-    .map_err(|error| error!("Could not publish job progression: {:?}", error))
-    .unwrap();
+  publish_job_progression(
+    handler.channel.clone(),
+    handler.job_id.unwrap(),
+    progression,
+  )
+  .map_err(|error| error!("Could not publish job progression: {:?}", error))
+  .unwrap();
 
   c_handler = Box::into_raw(handler) as *mut c_void;
 }
@@ -190,7 +234,7 @@ fn get_library_file_path() -> String {
 unsafe fn get_library_function<'a, T>(
   library: &'a Library,
   func_name: &str,
-) -> Result<libloading::Symbol<'a, T>, String> {
+) -> std::result::Result<libloading::Symbol<'a, T>, String> {
   library.get(func_name.as_bytes()).map_err(|error| {
     format!(
       "Could not find function '{:?}' from worker library: {:?}",
@@ -250,85 +294,272 @@ pub fn get_worker_parameters() -> Vec<Parameter> {
   parameters
 }
 
+pub fn call_optional_worker_init() -> Result<()> {
+  let library = get_library_file_path();
+  debug!("Call worker process from library: {}", library);
+
+  let worker_lib = libloading::Library::new(library).map_err(|error| {
+    MessageError::RuntimeError(format!(
+      "Could not load worker dynamic library: {:?}",
+      error
+    ))
+  })?;
+
+  unsafe {
+    if let Ok(init_func) =
+      get_library_function::<libloading::Symbol<InitFunc>>(&worker_lib, constants::INIT_FUNCTION)
+    {
+      init_func(logger);
+    }
+  }
+
+  Ok(())
+}
+
+#[cfg(feature = "media")]
+pub fn call_worker_init_process(
+  parameters: CWorkerParameters,
+  format_context: Arc<Mutex<FormatContext>>,
+) -> Result<Vec<usize>> {
+  let library = get_library_file_path();
+  debug!("Call worker process from library: {}", library);
+
+  let worker_lib = libloading::Library::new(library).map_err(|error| {
+    MessageError::RuntimeError(format!(
+      "Could not load worker dynamic library: {:?}",
+      error
+    ))
+  })?;
+
+  unsafe {
+    let init_process_func: libloading::Symbol<InitProcessFunc> =
+      get_library_function(&worker_lib, constants::INIT_PROCESS_FUNCTION).map_err(|error| {
+        MessageError::RuntimeError(format!(
+          "Could not access {:?} function from worker library: {:?}",
+          constants::INIT_PROCESS_FUNCTION,
+          error
+        ))
+      })?;
+
+    let handler = Handler {
+      job_id: None,
+      parameters: Some(parameters),
+      channel: None,
+    };
+
+    let handler_ptr = Box::into_raw(Box::new(handler));
+    let format_context_ptr = Box::into_raw(Box::new(format_context.lock().unwrap()));
+
+    let output_stream_indexes_ptr = Vec::<c_uint>::new().as_mut_ptr();
+    let return_code = init_process_func(
+      handler_ptr as *mut c_void,
+      get_parameter_value,
+      logger,
+      format_context_ptr as *mut c_void,
+      &output_stream_indexes_ptr,
+    );
+
+    if return_code == 0 {
+      let mut output_streams = vec![];
+      if !output_stream_indexes_ptr.is_null() {
+        let mut offset = 0;
+        loop {
+          let value_ptr = output_stream_indexes_ptr.offset(offset);
+          if value_ptr.is_null() {
+            break;
+          }
+          output_streams.push((*value_ptr) as usize);
+          offset += 1;
+        }
+      }
+
+      Ok(output_streams)
+    } else {
+      Err(MessageError::RuntimeError(format!(
+        "{:?} function returned error code: {:?}",
+        constants::INIT_PROCESS_FUNCTION,
+        return_code
+      )))
+    }
+  }
+}
+
+#[cfg(feature = "media")]
+pub fn call_worker_process_frame(
+  str_job_id: &str,
+  stream_index: usize,
+  frame: Frame,
+) -> Result<ProcessResult> {
+  let library = get_library_file_path();
+  debug!("Call worker process from library: {}", library);
+
+  let worker_lib = libloading::Library::new(library).map_err(|error| {
+    MessageError::RuntimeError(format!(
+      "Could not load worker dynamic library: {:?}",
+      error
+    ))
+  })?;
+
+  unsafe {
+    let process_frame_func: libloading::Symbol<ProcessFrameFunc> =
+      get_library_function(&worker_lib, constants::PROCESS_FRAME_FUNCTION).map_err(|error| {
+        MessageError::RuntimeError(format!(
+          "Could not access {:?} function from worker library: {:?}",
+          constants::PROCESS_FRAME_FUNCTION,
+          error
+        ))
+      })?;
+
+    let job_id = u64::from_str(&str_job_id).ok();
+
+    let handler = Handler {
+      job_id,
+      parameters: None,
+      channel: None,
+    };
+
+    let handler_ptr = Box::into_raw(Box::new(handler));
+    let frame_ptr = Box::into_raw(Box::new(frame));
+
+    let json_ptr = std::ptr::null();
+
+    let return_code = process_frame_func(
+      handler_ptr as *mut c_void,
+      get_parameter_value,
+      logger,
+      stream_index as u32,
+      frame_ptr as *mut c_void,
+      &json_ptr,
+    );
+
+    if return_code == 0 {
+      let json = get_c_string!(json_ptr);
+      libc::free(json_ptr as *mut libc::c_void);
+      Ok(ProcessResult::new_json(&json))
+    } else {
+      Err(MessageError::RuntimeError(format!(
+        "{:?} function returned error code: {:?}",
+        constants::PROCESS_FRAME_FUNCTION,
+        return_code
+      )))
+    }
+  }
+}
+
+#[cfg(feature = "media")]
+pub fn call_worker_ending_process() -> Result<()> {
+  let library = get_library_file_path();
+  debug!("Call worker process from library: {}", library);
+
+  let worker_lib = libloading::Library::new(library).map_err(|error| {
+    MessageError::RuntimeError(format!(
+      "Could not load worker dynamic library: {:?}",
+      error
+    ))
+  })?;
+
+  unsafe {
+    let process_func: libloading::Symbol<EndingProcessFunc> =
+      get_library_function(&worker_lib, constants::ENDING_PROCESS_FUNCTION).map_err(|error| {
+        MessageError::RuntimeError(format!(
+          "Could not access {:?} function from worker library: {:?}",
+          constants::ENDING_PROCESS_FUNCTION,
+          error
+        ))
+      })?;
+
+    process_func(logger);
+  }
+  Ok(())
+}
+
+#[cfg(not(feature = "media"))]
 pub fn call_worker_process(
   job_result: JobResult,
   parameters: CWorkerParameters,
   channel: Option<McaiChannel>,
-) -> ProcessReturn {
+) -> Result<ProcessReturn> {
   let library = get_library_file_path();
   debug!("Call worker process from library: {}", library);
 
-  match libloading::Library::new(library) {
-    Ok(worker_lib) => unsafe {
-      match get_library_function(&worker_lib, constants::PROCESS_FUNCTION)
-        as Result<libloading::Symbol<ProcessFunc>, String>
-      {
-        Ok(process_func) => {
-          let handler = Handler {
-            job_id: job_result.get_job_id(),
-            parameters,
-            channel,
-          };
+  let worker_lib = libloading::Library::new(library).map_err(|error| {
+    MessageError::RuntimeError(format!(
+      "Could not load worker dynamic library: {:?}",
+      error
+    ))
+  })?;
 
-          let boxed_handler = Box::new(handler);
-          let handler_ptr = Box::into_raw(boxed_handler);
-
-          let message_ptr = std::ptr::null();
-
-          let mut output_paths_ptr = vec![std::ptr::null()];
-          let ptr = output_paths_ptr.as_mut_ptr();
-
-          // Call C worker process function
-          let return_code = process_func(
-            handler_ptr as *mut c_void,
-            get_parameter_value,
-            progress,
-            logger,
-            &message_ptr,
-            &ptr,
-          );
-
-          let mut output_paths = vec![];
-
-          if !ptr.is_null() {
-            let mut offset = 0;
-            loop {
-              let cur_ptr = *ptr.offset(offset);
-              if cur_ptr.is_null() {
-                break;
-              }
-
-              output_paths.push(get_c_string!(cur_ptr));
-
-              libc::free(cur_ptr as *mut libc::c_void);
-              offset += 1;
-            }
-
-            if offset > 0 {
-              libc::free(ptr as *mut libc::c_void);
-            }
-          }
-
-          // Retrieve message as string and free pointer
-          let mut message = "".to_string();
-          if !message_ptr.is_null() {
-            message = get_c_string!(message_ptr);
-            libc::free(message_ptr as *mut libc::c_void);
-          }
-
-          ProcessReturn::new(return_code, &message).with_output_paths(output_paths)
-        }
-        Err(error) => ProcessReturn::new_error(&format!(
+  unsafe {
+    let process_func: libloading::Symbol<ProcessFunc> =
+      get_library_function(&worker_lib, constants::PROCESS_FUNCTION).map_err(|error| {
+        MessageError::RuntimeError(format!(
           "Could not access {:?} function from worker library: {:?}",
           constants::PROCESS_FUNCTION,
           error
-        )),
+        ))
+      })?;
+
+    let handler = Handler {
+      job_id: Some(job_result.get_job_id()),
+      parameters: Some(parameters),
+      channel,
+    };
+
+    let boxed_handler = Box::new(handler);
+    let handler_ptr = Box::into_raw(boxed_handler);
+
+    let message_ptr = std::ptr::null();
+
+    let mut output_paths_ptr = vec![std::ptr::null()];
+    let ptr = output_paths_ptr.as_mut_ptr();
+
+    // Call C worker process function
+    let return_code = process_func(
+      handler_ptr as *mut c_void,
+      get_parameter_value,
+      progress,
+      logger,
+      &message_ptr,
+      &ptr,
+    );
+
+    let mut output_paths = vec![];
+
+    if return_code == 0 {
+      if !ptr.is_null() {
+        let mut offset = 0;
+        loop {
+          let cur_ptr = *ptr.offset(offset);
+          if cur_ptr.is_null() {
+            break;
+          }
+
+          output_paths.push(get_c_string!(cur_ptr));
+
+          libc::free(cur_ptr as *mut libc::c_void);
+          offset += 1;
+        }
+
+        if offset > 0 {
+          libc::free(ptr as *mut libc::c_void);
+        }
       }
-    },
-    Err(error) => ProcessReturn::new_error(&format!(
-      "Could not load worker dynamic library: {:?}",
-      error
-    )),
+
+      // Retrieve message as string and free pointer
+      let mut message = "".to_string();
+      if !message_ptr.is_null() {
+        message = get_c_string!(message_ptr);
+        libc::free(message_ptr as *mut libc::c_void);
+      }
+
+      Ok(ProcessReturn::new(return_code, &message).with_output_paths(output_paths))
+    } else {
+      Ok(ProcessReturn::new_error(&format!(
+        "{:?} function returned error code: {:?}",
+        constants::PROCESS_FUNCTION,
+        return_code
+      )))
+    }
   }
 }
 

@@ -9,7 +9,7 @@ use mcai_worker_sdk::worker::ParameterType;
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct CWorkerParameters {
   #[serde(flatten)]
   pub parameters: HashMap<String, Value>,
