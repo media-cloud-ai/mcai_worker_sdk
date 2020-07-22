@@ -23,7 +23,7 @@ impl TimeExpression {
   pub fn new_frames(offset: f32) -> Self {
     TimeExpression::OffsetTime {
       offset,
-      unit: TimeUnit::Frames
+      unit: TimeUnit::Frames,
     }
   }
 

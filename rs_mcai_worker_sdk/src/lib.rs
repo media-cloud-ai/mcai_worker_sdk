@@ -102,18 +102,9 @@ pub use schemars::JsonSchema;
 pub use semver::Version;
 
 pub use error::{MessageError, Result};
-pub use message::publish_job_progression;
 #[cfg(feature = "media")]
-pub use message::media::ttml::{
-  Body,
-  Div,
-  Head,
-  Paragraph,
-  Span,
-  TimeExpression,
-  TimeUnit,
-  Ttml,
-};
+pub use message::media::ttml::{Body, Div, Head, Paragraph, Span, TimeExpression, TimeUnit, Ttml};
+pub use message::publish_job_progression;
 pub use parameter::container::ParametersContainer;
 #[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
 pub use parameter::credential::Credential;
