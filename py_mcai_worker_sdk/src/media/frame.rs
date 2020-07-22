@@ -85,22 +85,4 @@ impl Frame {
       height: av_frame.height,
     }
   }
-
-  pub fn display(&self) -> String {
-    format!("name: {:?}, index: {:?}, line_size: {:?}, nb_samples: {:?}, format: {:?}, key_frame: {:?}, pts: {:?}, coded_picture_number: {:?}, display_picture_number: {:?}, interlaced_frame: {:?}, top_field_first: {:?}, sample_rate: {:?}, channels: {:?}, pkt_size: {:?}",
-            self.name,
-            self.index,
-            self.line_size,
-            self.nb_samples,
-            self.format,
-            self.key_frame,
-            self.pts,
-            self.coded_picture_number,
-            self.display_picture_number,
-            self.interlaced_frame,
-            self.top_field_first,
-            self.sample_rate,
-            self.channels,
-            self.pkt_size)
-  }
 }
