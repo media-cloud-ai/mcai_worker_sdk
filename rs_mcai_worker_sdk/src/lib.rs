@@ -82,6 +82,9 @@ extern crate log;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+#[cfg(feature = "media")]
+#[macro_use]
+extern crate yaserde_derive;
 
 mod channels;
 mod config;
@@ -100,6 +103,17 @@ pub use semver::Version;
 
 pub use error::{MessageError, Result};
 pub use message::publish_job_progression;
+#[cfg(feature = "media")]
+pub use message::media::ttml::{
+  Body,
+  Div,
+  Head,
+  Paragraph,
+  Span,
+  TimeExpression,
+  TimeUnit,
+  Ttml,
+};
 pub use parameter::container::ParametersContainer;
 #[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
 pub use parameter::credential::Credential;
@@ -121,6 +135,8 @@ use serde::Serialize;
 #[cfg(feature = "media")]
 use std::sync::Mutex;
 use std::{cell::RefCell, fs, io::Write, rc::Rc, sync::Arc, thread, time};
+#[cfg(feature = "media")]
+use yaserde::YaSerialize;
 
 /// Exposed Channel type
 pub type McaiChannel = Arc<Channel>;
@@ -128,7 +144,8 @@ pub type McaiChannel = Arc<Channel>;
 #[cfg(feature = "media")]
 #[derive(Debug)]
 pub struct ProcessResult {
-  content: Option<String>,
+  json_content: Option<String>,
+  xml_content: Option<String>,
 }
 
 #[cfg(feature = "media")]
@@ -137,7 +154,17 @@ impl ProcessResult {
     let content = serde_json::to_string(&content).unwrap();
 
     ProcessResult {
-      content: Some(content),
+      json_content: Some(content),
+      xml_content: None,
+    }
+  }
+
+  pub fn new_xml<Y: YaSerialize>(content: Y) -> Self {
+    let content = yaserde::ser::to_string(&content).unwrap();
+
+    ProcessResult {
+      json_content: None,
+      xml_content: Some(content),
     }
   }
 }

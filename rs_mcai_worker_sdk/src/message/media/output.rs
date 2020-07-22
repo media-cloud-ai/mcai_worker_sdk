@@ -29,7 +29,7 @@ impl Output {
 
   pub fn push(&mut self, content: ProcessResult) {
     if let Some(srt_stream) = &mut self.srt_stream {
-      let data = Bytes::from(content.content.unwrap_or_else(|| "{}".to_string()));
+      let data = Bytes::from(content.json_content.unwrap_or_else(|| "{}".to_string()));
       srt_stream.send(data);
     } else {
       self.results.push(content);
@@ -37,18 +37,29 @@ impl Output {
   }
 
   pub fn to_destination_path(&self) -> Result<()> {
-    let results: Vec<serde_json::Value> = self
+    let json_results: Vec<serde_json::Value> = self
       .results
       .iter()
-      .filter(|result| result.content.is_some())
-      .map(|result| serde_json::from_str(&result.content.as_ref().unwrap()).unwrap())
+      .filter(|result| result.json_content.is_some())
+      .map(|result| serde_json::from_str(&result.json_content.as_ref().unwrap()).unwrap())
       .collect();
 
-    let content = json!({
-      "frames": results,
-    });
+    let content =
+      if !json_results.is_empty() {
+        serde_json::to_string(&json!({
+          "frames": json_results,
+        })).unwrap()
+      } else {
+        self
+          .results
+          .iter()
+          .filter(|result| result.xml_content.is_some())
+          .map(|result| result.xml_content.as_ref().unwrap().clone())
+          .collect::<Vec<String>>()
+          .join("")
+      };
 
-    std::fs::write(self.url.clone(), serde_json::to_string(&content).unwrap()).unwrap();
+    std::fs::write(self.url.clone(), content).unwrap();
 
     Ok(())
   }

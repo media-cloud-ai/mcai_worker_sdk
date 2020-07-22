@@ -11,6 +11,8 @@ mod media_stream;
 mod output;
 mod source;
 mod srt;
+pub mod ttml;
+
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use source::DecodeResult;

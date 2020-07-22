@@ -1,6 +1,6 @@
 mod helpers;
 #[cfg(feature = "media")]
-mod media;
+pub mod media;
 
 #[cfg(feature = "media")]
 pub use media::{DESTINATION_PATH_PARAMETER, SOURCE_PATH_PARAMETER};
