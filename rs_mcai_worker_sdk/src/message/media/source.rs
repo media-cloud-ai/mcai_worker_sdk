@@ -25,6 +25,11 @@ pub enum DecodeResult {
   WaitMore,
 }
 
+type AsyncChannelSenderReceiver = (
+  Sender<Arc<Mutex<FormatContext>>>,
+  Receiver<Arc<Mutex<FormatContext>>>,
+);
+
 pub struct Source {
   decoders: HashMap<usize, VideoDecoder>,
   format_context: Arc<Mutex<FormatContext>>,
@@ -43,10 +48,7 @@ impl Source {
     let mut decoders = HashMap::<usize, VideoDecoder>::new();
 
     if SrtStream::is_srt_stream(source_url) {
-      let (tx, rx): (
-        Sender<Arc<Mutex<FormatContext>>>,
-        Receiver<Arc<Mutex<FormatContext>>>,
-      ) = mpsc::channel();
+      let (tx, rx): AsyncChannelSenderReceiver = mpsc::channel();
       let cloned_source_url = source_url.to_string();
       let source_thread = thread::spawn(move || {
         let mut srt_stream = SrtStream::open_connection(&cloned_source_url).unwrap();

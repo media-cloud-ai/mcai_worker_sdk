@@ -55,7 +55,7 @@ impl JsonSchema for PythonWorkerParameters {
     let schema = SchemaObject {
       instance_type: Some(InstanceType::Object.into()),
       object: Some(Box::new(ObjectValidation {
-        properties: schema_parameters.into(),
+        properties: schema_parameters,
         ..Default::default()
       })),
       ..Default::default()
@@ -81,7 +81,7 @@ pub fn build_parameters(parameters: PythonWorkerParameters, py: Python) -> Resul
   for (key, value) in parameters.parameters {
     match value {
       Value::String(string) => {
-        let _result = list_of_parameters.set_item(key, string).map_err(|e| {
+        list_of_parameters.set_item(key, string).map_err(|e| {
           MessageError::ParameterValueError(format!(
             "Cannot set item to parameters: {}",
             py_err_to_string(py, e)
@@ -90,7 +90,7 @@ pub fn build_parameters(parameters: PythonWorkerParameters, py: Python) -> Resul
       }
       Value::Null => {}
       Value::Bool(boolean) => {
-        let _result = list_of_parameters.set_item(key, boolean).map_err(|e| {
+        list_of_parameters.set_item(key, boolean).map_err(|e| {
           MessageError::ParameterValueError(format!(
             "Cannot set item to parameters: {}",
             py_err_to_string(py, e)
@@ -98,7 +98,7 @@ pub fn build_parameters(parameters: PythonWorkerParameters, py: Python) -> Resul
         })?;
       }
       Value::Number(number) => {
-        let _result = list_of_parameters
+        list_of_parameters
           .set_item(key, number.as_u64())
           .map_err(|e| {
             MessageError::ParameterValueError(format!(
@@ -109,7 +109,7 @@ pub fn build_parameters(parameters: PythonWorkerParameters, py: Python) -> Resul
       }
       Value::Array(array) => {
         let list = get_parameters_array_values(array, py)?;
-        let _result = list_of_parameters.set_item(key, list).map_err(|e| {
+        list_of_parameters.set_item(key, list).map_err(|e| {
           MessageError::ParameterValueError(format!(
             "Cannot set item to parameters: {}",
             py_err_to_string(py, e)
@@ -132,7 +132,7 @@ fn get_parameters_array_values(values: Vec<Value>, py: Python) -> Result<&PyList
   for value in values {
     match value {
       Value::String(string) => {
-        let _result = array.append(string).map_err(|e| {
+        array.append(string).map_err(|e| {
           MessageError::ParameterValueError(format!(
             "Cannot append item to array: {}",
             py_err_to_string(py, e)
@@ -141,7 +141,7 @@ fn get_parameters_array_values(values: Vec<Value>, py: Python) -> Result<&PyList
       }
       Value::Null => {}
       Value::Bool(boolean) => {
-        let _result = array.append(boolean).map_err(|e| {
+        array.append(boolean).map_err(|e| {
           MessageError::ParameterValueError(format!(
             "Cannot append item to array: {}",
             py_err_to_string(py, e)
@@ -149,7 +149,7 @@ fn get_parameters_array_values(values: Vec<Value>, py: Python) -> Result<&PyList
         })?;
       }
       Value::Number(number) => {
-        let _result = array.append(number.as_u64()).map_err(|e| {
+        array.append(number.as_u64()).map_err(|e| {
           MessageError::ParameterValueError(format!(
             "Cannot append item to array: {}",
             py_err_to_string(py, e)

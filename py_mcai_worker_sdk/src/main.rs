@@ -199,7 +199,7 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
 
     if python_module.get(optional_init_function_name).is_ok() {
       let _result = call_module_function(py, python_module, optional_init_function_name, ())
-        .map_err(|error_message| MessageError::ParameterValueError(error_message))?;
+        .map_err(MessageError::ParameterValueError)?;
     } else {
       info!(
         "No optional '{}' function to call.",
@@ -228,7 +228,7 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
       "init_process",
       (context, list_of_parameters),
     )
-    .map_err(|error_message| MessageError::ParameterValueError(error_message))?;
+    .map_err(MessageError::ParameterValueError)?;
     get_stream_indexes(response)
   }
 
@@ -266,7 +266,7 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
     let (py, python_module) = get_python_module(&gil)?;
 
     let _result = call_module_function(py, python_module, "ending_process", ())
-      .map_err(|error_message| MessageError::ParameterValueError(error_message))?;
+      .map_err(MessageError::ParameterValueError)?;
 
     Ok(())
   }
