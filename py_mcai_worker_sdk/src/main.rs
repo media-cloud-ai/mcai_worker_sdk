@@ -148,27 +148,28 @@ fn call_module_function<'a>(
   function_name: &'a str,
   args: impl IntoPy<Py<PyTuple>>,
 ) -> std::result::Result<&'a PyAny, String> {
-  match python_module.call1(function_name, args) {
-    Ok(response) => Ok(response),
-    Err(error) => {
-      let stacktrace = if let Some(tb) = &error.ptraceback {
-        let traceback = py.import("traceback").unwrap();
-        let locals = [("traceback", traceback)].into_py_dict(py);
+  python_module
+    .call1(function_name, args)
+    .map_err(move |error| {
+      let ptraceback = &error.ptraceback;
+      let stacktrace = ptraceback
+        .as_ref()
+        .map(|tb| {
+          let traceback = py.import("traceback").unwrap();
+          let locals = [("traceback", traceback)].into_py_dict(py);
 
-        locals.set_item("tb", tb).unwrap();
+          locals.set_item("tb", tb).unwrap();
 
-        py.eval("traceback.format_tb(tb)", None, Some(locals))
-          .expect("Unknown python error, unable to get the stacktrace")
-          .to_string()
-      } else {
-        "Unknown python error, no stackstrace".to_string()
-      };
+          py.eval("traceback.format_tb(tb)", None, Some(locals))
+            .expect("Unknown python error, unable to get the stacktrace")
+            .to_string()
+        })
+        .unwrap_or_else(|| "Unknown python error, no stackstrace".to_string());
 
       let error_msg = py_err_to_string(py, error);
-      let error_message = format!("{}\n\nStacktrace:\n{}", error_msg, stacktrace);
-      Err(error_message)
-    }
-  }
+
+      format!("{}\n\nStacktrace:\n{}", error_msg, stacktrace)
+    })
 }
 
 impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {

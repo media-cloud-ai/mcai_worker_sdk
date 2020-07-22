@@ -26,11 +26,12 @@ impl JsonSchema for PythonWorkerParameters {
   fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
     let parameters = PythonWorkerEvent::get_parameters();
 
-    let mut schema_parameters = BTreeMap::<String, Schema>::new();
-    for parameter in &parameters {
-      let parameter_type = &parameter.kind[0];
-      let object = SchemaObject {
-        instance_type: Some(if parameter.required {
+    let schema_parameters: BTreeMap<String, Schema> = parameters
+      .iter()
+      .map(|parameter| {
+        let parameter_type = &parameter.kind[0];
+
+        let instance_type = if parameter.required {
           get_instance_type_from_parameter_type(parameter_type).into()
         } else {
           vec![
@@ -38,11 +39,18 @@ impl JsonSchema for PythonWorkerParameters {
             InstanceType::Null,
           ]
           .into()
-        }),
-        ..Default::default()
-      };
-      schema_parameters.insert(parameter.identifier.clone(), object.into());
-    }
+        };
+
+        let instance_type = Some(instance_type);
+
+        let object = SchemaObject {
+          instance_type,
+          ..Default::default()
+        };
+
+        (parameter.identifier.clone(), object.into())
+      })
+      .collect();
 
     let schema = SchemaObject {
       instance_type: Some(InstanceType::Object.into()),
