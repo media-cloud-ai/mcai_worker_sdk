@@ -1,27 +1,28 @@
 #[macro_use]
 extern crate serde_derive;
 
+#[cfg(feature = "media")]
+use std::sync::{Arc, Mutex};
 use std::{env, fs};
 
 use pyo3::{prelude::*, types::*};
 
-#[cfg(not(feature = "media"))]
-use crate::helpers::get_destination_paths;
-use crate::parameters::{build_parameters, PythonWorkerParameters};
 use mcai_worker_sdk::{
+  info,
   job::{JobResult, JobStatus},
   publish_job_progression, start_worker,
   worker::{Parameter, ParameterType},
   McaiChannel, MessageError, MessageEvent, Result, Version,
 };
+#[cfg(feature = "media")]
+pub use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
 
+#[cfg(not(feature = "media"))]
+use crate::helpers::get_destination_paths;
 #[cfg(feature = "media")]
 use crate::helpers::get_stream_indexes;
 use crate::helpers::py_err_to_string;
-#[cfg(feature = "media")]
-pub use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
-#[cfg(feature = "media")]
-use std::sync::{Arc, Mutex};
+use crate::parameters::{build_parameters, PythonWorkerParameters};
 
 mod helpers;
 #[cfg(feature = "media")]
@@ -194,8 +195,18 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
     let gil = Python::acquire_gil();
     let (py, python_module) = get_python_module(&gil)?;
 
-    let _result = call_module_function(py, python_module, "init", ())
-      .map_err(|error_message| MessageError::ParameterValueError(error_message))?;
+    let optional_init_function_name = "init";
+
+    if python_module.get(optional_init_function_name).is_ok() {
+      let _result = call_module_function(py, python_module, optional_init_function_name, ())
+        .map_err(|error_message| MessageError::ParameterValueError(error_message))?;
+    } else {
+      info!(
+        "No optional '{}' function to call.",
+        optional_init_function_name
+      );
+    }
+
     Ok(())
   }
 

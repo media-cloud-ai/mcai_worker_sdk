@@ -31,6 +31,9 @@ def get_parameters():
 	]
 
 def init():
+	'''
+	Optional worker initialization function
+	'''
 	# TODO: be able to raise, return job in errors
 	# raise Exception("my error")
 	print("Initialise Python worker...")
