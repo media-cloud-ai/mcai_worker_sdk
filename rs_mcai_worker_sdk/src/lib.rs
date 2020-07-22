@@ -134,7 +134,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::{
   cell::RefCell, fs, io::Write, rc::Rc, sync::{Arc, Mutex}, thread, time};
- use yaserde::YaSerialize;
+use yaserde::YaSerialize;
 
 /// Exposed Channel type
 pub type McaiChannel = Arc<Channel>;
@@ -157,7 +157,7 @@ impl ProcessResult {
     }
   }
 
-  pub fn new_xml<S: YaSerialize>(content: S) -> Self {
+  pub fn new_xml<Y: YaSerialize>(content: Y) -> Self {
     let content = yaserde::ser::to_string(&content).unwrap();
 
     ProcessResult {

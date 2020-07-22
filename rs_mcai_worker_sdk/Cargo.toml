@@ -51,8 +51,7 @@ yaserde_derive = "^0.4"
 regex = "1"
 ## dependencies for media feature
 ringbuf = {version = "0.2.1", optional = true }
-# stainless_ffmpeg = { git = "https://github.com/nomalab/stainless-ffmpeg", branch = "add_some_trait_implementations", optional = true }
-stainless_ffmpeg = { path = "/Users/marco/dev/nomalab/stainless-ffmpeg", optional = true }
+stainless_ffmpeg = { git = "https://github.com/nomalab/stainless-ffmpeg", branch = "add_some_trait_implementations", optional = true }
 stainless-ffmpeg-sys = {version = "4.2.2-update.1", optional = true }
 
 [dependencies.secure-reliable-transport]

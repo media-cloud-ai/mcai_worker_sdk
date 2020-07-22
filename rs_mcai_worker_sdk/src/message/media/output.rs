@@ -37,18 +37,29 @@ impl Output {
   }
 
   pub fn to_destination_path(&self) -> Result<()> {
-    let results: Vec<serde_json::Value> = self
+    let json_results: Vec<serde_json::Value> = self
       .results
       .iter()
       .filter(|result| result.json_content.is_some())
       .map(|result| serde_json::from_str(&result.json_content.as_ref().unwrap()).unwrap())
       .collect();
 
-    let content = json!({
-      "frames": results,
-    });
+    let content =
+      if !json_results.is_empty() {
+        serde_json::to_string(&json!({
+          "frames": json_results,
+        })).unwrap()
+      } else {
+        self
+          .results
+          .iter()
+          .filter(|result| result.xml_content.is_some())
+          .map(|result| result.xml_content.as_ref().unwrap().clone())
+          .collect::<Vec<String>>()
+          .join("")
+      };
 
-    std::fs::write(self.url.clone(), serde_json::to_string(&content).unwrap()).unwrap();
+    std::fs::write(self.url.clone(), content).unwrap();
 
     Ok(())
   }

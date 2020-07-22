@@ -167,7 +167,6 @@ impl Source {
   pub fn next_frame(&mut self) -> Result<DecodeResult> {
     match self.format_context.lock().unwrap().next_packet() {
       Err(message) => {
-        println!("{:?}", message);
         if message == "Unable to read next packet" {
           if self.thread.is_none() {
             return Ok(DecodeResult::EndOfStream);
