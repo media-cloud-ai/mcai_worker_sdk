@@ -91,9 +91,6 @@ fn main() {
   start_worker(C_WORKER_EVENT.clone());
 }
 
-#[cfg(test)]
-use mcai_worker_sdk::worker::Parameter;
-
 #[test]
 pub fn test_c_binding_worker_info() {
   use mcai_worker_sdk::worker::ParameterType;
@@ -112,23 +109,40 @@ pub fn test_c_binding_worker_info() {
   assert_eq!(version, "0.1.0".to_string());
 
   let parameters = get_worker_parameters();
-  assert_eq!(1, parameters.len());
-  let expected_parameter = Parameter {
-    identifier: "my_parameter".to_string(),
-    label: "My parameter".to_string(),
-    kind: vec![ParameterType::String],
-    required: true,
-  };
-  assert_eq!(expected_parameter.identifier, parameters[0].identifier);
-  assert_eq!(expected_parameter.label, parameters[0].label);
-  assert_eq!(expected_parameter.kind.len(), parameters[0].kind.len());
+  assert_eq!(3, parameters.len());
+
+  assert_eq!("my_parameter".to_string(), parameters[0].identifier);
+  assert_eq!("My parameter".to_string(), parameters[0].label);
+  assert_eq!(1, parameters[0].kind.len());
+  assert!(!parameters[0].required);
 
   let parameter_kind =
     serde_json::to_string(&parameters[0].kind[0]).expect("cannot serialize parameter kind");
   let expected_kind =
-    serde_json::to_string(&expected_parameter.kind[0]).expect("cannot serialize parameter kind");
+    serde_json::to_string(&ParameterType::String).expect("cannot serialize parameter kind");
   assert_eq!(expected_kind, parameter_kind);
-  assert_eq!(expected_parameter.required, parameters[0].required);
+
+  assert_eq!("source_path".to_string(), parameters[1].identifier);
+  assert_eq!("Source path".to_string(), parameters[1].label);
+  assert_eq!(1, parameters[1].kind.len());
+  assert!(parameters[1].required);
+
+  let parameter_kind =
+    serde_json::to_string(&parameters[1].kind[0]).expect("cannot serialize parameter kind");
+  let expected_kind =
+    serde_json::to_string(&ParameterType::String).expect("cannot serialize parameter kind");
+  assert_eq!(expected_kind, parameter_kind);
+
+  assert_eq!("destination_path".to_string(), parameters[2].identifier);
+  assert_eq!("Destination path".to_string(), parameters[2].label);
+  assert_eq!(1, parameters[2].kind.len());
+  assert!(parameters[2].required);
+
+  let parameter_kind =
+    serde_json::to_string(&parameters[2].kind[0]).expect("cannot serialize parameter kind");
+  let expected_kind =
+    serde_json::to_string(&ParameterType::String).expect("cannot serialize parameter kind");
+  assert_eq!(expected_kind, parameter_kind);
 }
 
 #[test]

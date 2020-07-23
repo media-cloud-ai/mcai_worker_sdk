@@ -1,4 +1,6 @@
 use std::ffi::{CStr, CString};
+#[cfg(feature = "media")]
+use std::mem::size_of;
 use std::os::raw::{c_char, c_uint, c_void};
 #[cfg(not(feature = "media"))]
 use std::os::raw::{c_int, c_uchar};
@@ -72,6 +74,7 @@ type InitProcessFunc = unsafe fn(
   logger: LoggerCallback,
   av_format_context: *mut c_void,
   output_stream_indexes: &*mut c_uint,
+  output_stream_indexes_size: *mut c_uint,
 ) -> c_uint;
 #[cfg(feature = "media")]
 type ProcessFrameFunc = unsafe fn(
@@ -348,15 +351,20 @@ pub fn call_worker_init_process(
     };
 
     let handler_ptr = Box::into_raw(Box::new(handler));
-    let format_context_ptr = Box::into_raw(Box::new(format_context.lock().unwrap()));
+    let format_context = format_context.lock().unwrap();
+    let av_format_context_ptr = format_context.format_context;
 
-    let output_stream_indexes_ptr = Vec::<c_uint>::new().as_mut_ptr();
+    let mut c_output_streams = Vec::<c_uint>::with_capacity(256);
+    let output_stream_indexes_ptr = c_output_streams.as_mut_ptr();
+    let output_stream_indexes_size_ptr = libc::malloc(size_of::<c_uint>()) as *mut c_uint;
+
     let return_code = init_process_func(
       handler_ptr as *mut c_void,
       get_parameter_value,
       logger,
-      format_context_ptr as *mut c_void,
+      av_format_context_ptr as *mut c_void,
       &output_stream_indexes_ptr,
+      output_stream_indexes_size_ptr,
     );
 
     if return_code != 0 {
@@ -367,17 +375,26 @@ pub fn call_worker_init_process(
       )));
     }
 
+    let mut output_stream_indexes_size = 0;
+    if !output_stream_indexes_size_ptr.is_null() {
+      output_stream_indexes_size = *output_stream_indexes_size_ptr;
+      libc::free(output_stream_indexes_size_ptr as *mut c_void);
+    }
+
+    if output_stream_indexes_size == 0 || output_stream_indexes_ptr.is_null() {
+      return Err(MessageError::RuntimeError(format!(
+        "The worker {:?} function returned an empty array of stream indexes.",
+        constants::INIT_PROCESS_FUNCTION
+      )));
+    }
+
     let mut output_streams = vec![];
-    if !output_stream_indexes_ptr.is_null() {
-      let mut offset = 0;
-      loop {
-        let value_ptr = output_stream_indexes_ptr.offset(offset);
-        if value_ptr.is_null() {
-          break;
-        }
-        output_streams.push((*value_ptr) as usize);
-        offset += 1;
+    for offset in 0..output_stream_indexes_size {
+      let value_ptr = output_stream_indexes_ptr.offset(offset as isize);
+      if value_ptr.is_null() {
+        break;
       }
+      output_streams.push((*value_ptr) as usize);
     }
 
     Ok(output_streams)
@@ -527,19 +544,17 @@ pub fn call_worker_process(
     let mut output_paths = vec![];
 
     if return_code != 0 {
-
-      let message =
-        if !message_ptr.is_null() {
-          let from_c_string = get_c_string!(message_ptr);
-          libc::free(message_ptr as *mut libc::c_void);
-          from_c_string
-        } else {
-          format!(
-            "{:?} function returned error code: {:?}",
-            constants::PROCESS_FUNCTION,
-            return_code
-          )
-        };
+      let message = if !message_ptr.is_null() {
+        let from_c_string = get_c_string!(message_ptr);
+        libc::free(message_ptr as *mut libc::c_void);
+        from_c_string
+      } else {
+        format!(
+          "{:?} function returned error code: {:?}",
+          constants::PROCESS_FUNCTION,
+          return_code
+        )
+      };
 
       return Ok(ProcessReturn::new_error(&message));
     }
@@ -573,7 +588,6 @@ pub fn call_worker_process(
     Ok(ProcessReturn::new(return_code, &message).with_output_paths(output_paths))
   }
 }
-
 
 #[cfg(test)]
 use mcai_worker_sdk::job::Job;

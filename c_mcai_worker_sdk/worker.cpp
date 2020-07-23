@@ -1,5 +1,6 @@
 
 #include "worker.h"
+#include <libavformat/avformat.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,11 +36,25 @@ char* get_version() {
 }
 
 // Example of worker parameters
-char* kind[1] = { (char*)"string" };
-Parameter worker_parameters[1] = {
+char* kind[3] = { (char*)"string" };
+Parameter worker_parameters[3] = {
     {
         .identifier = (char*)"my_parameter",
         .label = (char*)"My parameter",
+        .kind_size = 1,
+        .kind = kind,
+        .required = 0
+    },
+    {
+        .identifier = (char*)"source_path",
+        .label = (char*)"Source path",
+        .kind_size = 1,
+        .kind = kind,
+        .required = 1
+    },
+    {
+        .identifier = (char*)"destination_path",
+        .label = (char*)"Destination path",
         .kind_size = 1,
         .kind = kind,
         .required = 1
@@ -71,9 +86,25 @@ int init_process(
     GetParameterValueCallback parameters_value_getter,
     Logger logger,
     void* format_context,
-    const unsigned int* output_stream_indexes
+    unsigned int** output_stream_indexes,
+    unsigned int* output_stream_indexes_size
   ) {
     logger("debug", "Initialize C Worker media process...");
+
+    // Cast to FFmpeg AVFormatContext pointer
+    AVFormatContext* av_format_context = (AVFormatContext*)format_context;
+
+    // Get nb streams
+    const unsigned int nb_streams = av_format_context->nb_streams;
+    const size_t length = sizeof(unsigned int) * nb_streams;
+    *output_stream_indexes_size = nb_streams;
+
+    // Return stream indexes
+    unsigned int streams[nb_streams];
+    for (unsigned int i = 0; i < nb_streams; ++i) {
+        streams[i] = i;
+    }
+    memcpy(*output_stream_indexes, &streams, length);
     return 0;
 }
 

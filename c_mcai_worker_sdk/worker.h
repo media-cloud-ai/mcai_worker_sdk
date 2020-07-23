@@ -97,7 +97,8 @@ int init_process(
     GetParameterValueCallback parameters_value_getter,
     Logger logger,
     void* format_context,
-    const unsigned int* output_stream_indexes
+    unsigned int** output_stream_indexes,
+    unsigned int* output_stream_indexes_size
   );
 
 /**
