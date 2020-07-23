@@ -91,6 +91,9 @@ fn main() {
   start_worker(C_WORKER_EVENT.clone());
 }
 
+#[cfg(test)]
+use mcai_worker_sdk::worker::Parameter;
+
 #[test]
 pub fn test_c_binding_worker_info() {
   use mcai_worker_sdk::worker::ParameterType;
@@ -108,7 +111,7 @@ pub fn test_c_binding_worker_info() {
   );
   assert_eq!(version, "0.1.0".to_string());
 
-  let parameters = C_WORKER_EVENT.get_parameters();
+  let parameters = get_worker_parameters();
   assert_eq!(1, parameters.len());
   let expected_parameter = Parameter {
     identifier: "my_parameter".to_string(),
@@ -129,6 +132,7 @@ pub fn test_c_binding_worker_info() {
 }
 
 #[test]
+#[cfg(not(feature = "media"))]
 pub fn test_process() {
   let message = r#"{
     "job_id": 123,
@@ -143,8 +147,9 @@ pub fn test_process() {
 
   let job = Job::new(message).unwrap();
   let job_result = JobResult::new(job.job_id);
+  let parameters = job.get_parameters().unwrap();
 
-  let result = C_WORKER_EVENT.process(None, &job, job_result);
+  let result = C_WORKER_EVENT.process(None, parameters, job_result);
   assert!(result.is_ok());
   let job_result = result.unwrap();
   assert_eq!(job_result.get_job_id(), 123);
@@ -156,6 +161,7 @@ pub fn test_process() {
 }
 
 #[test]
+#[cfg(not(feature = "media"))]
 pub fn test_failing_process() {
   let message = r#"{
     "job_id": 123,
@@ -170,8 +176,9 @@ pub fn test_failing_process() {
 
   let job = Job::new(message).unwrap();
   let job_result = JobResult::new(job.job_id);
+  let parameters = job.get_parameters().unwrap();
 
-  let result = C_WORKER_EVENT.process(None, &job, job_result);
+  let result = C_WORKER_EVENT.process(None, parameters, job_result);
   assert!(result.is_err());
   let _message_error = result.unwrap_err();
 }

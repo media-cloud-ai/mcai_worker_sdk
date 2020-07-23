@@ -527,11 +527,21 @@ pub fn call_worker_process(
     let mut output_paths = vec![];
 
     if return_code != 0 {
-      return Ok(ProcessReturn::new_error(&format!(
-        "{:?} function returned error code: {:?}",
-        constants::PROCESS_FUNCTION,
-        return_code
-      )));
+
+      let message =
+        if !message_ptr.is_null() {
+          let from_c_string = get_c_string!(message_ptr);
+          libc::free(message_ptr as *mut libc::c_void);
+          from_c_string
+        } else {
+          format!(
+            "{:?} function returned error code: {:?}",
+            constants::PROCESS_FUNCTION,
+            return_code
+          )
+        };
+
+      return Ok(ProcessReturn::new_error(&message));
     }
 
     if !ptr.is_null() {
@@ -564,7 +574,12 @@ pub fn call_worker_process(
   }
 }
 
+
+#[cfg(test)]
+use mcai_worker_sdk::job::Job;
+
 #[test]
+#[cfg(not(feature = "media"))]
 pub fn test_c_binding_process() {
   let message = r#"{
     "job_id": 123,
@@ -578,7 +593,10 @@ pub fn test_c_binding_process() {
   }"#;
 
   let job = Job::new(message).unwrap();
-  let returned_code = call_worker_process(&job, None);
+  let job_result = JobResult::from(job.clone());
+  let parameters = job.get_parameters().unwrap();
+
+  let returned_code = call_worker_process(job_result, parameters, None).unwrap();
   assert_eq!(returned_code.get_code(), 0);
   assert_eq!(returned_code.get_message(), "Everything worked well!");
   assert_eq!(
@@ -588,6 +606,7 @@ pub fn test_c_binding_process() {
 }
 
 #[test]
+#[cfg(not(feature = "media"))]
 pub fn test_c_binding_failing_process() {
   let message = r#"{
     "job_id": 123,
@@ -601,13 +620,17 @@ pub fn test_c_binding_failing_process() {
   }"#;
 
   let job = Job::new(message).unwrap();
-  let returned_code = call_worker_process(&job, None);
+  let job_result = JobResult::from(job.clone());
+  let parameters = job.get_parameters().unwrap();
+
+  let returned_code = call_worker_process(job_result, parameters, None).unwrap();
   assert_eq!(returned_code.get_code(), 1);
   assert_eq!(returned_code.get_message(), "Something went wrong...");
   assert!(returned_code.get_output_paths().is_empty());
 }
 
 #[test]
+#[cfg(not(feature = "media"))]
 pub fn test_c_progress_ptr() {
   let message = r#"{
     "job_id": 123,
@@ -621,8 +644,11 @@ pub fn test_c_progress_ptr() {
   }"#;
 
   let job = Job::new(message).unwrap();
+  let parameters = job.get_parameters().ok();
+
   let handler = Handler {
-    job: job.clone(),
+    job_id: Some(job.job_id),
+    parameters,
     channel: None,
   };
 
@@ -634,6 +660,7 @@ pub fn test_c_progress_ptr() {
 }
 
 #[test]
+#[cfg(not(feature = "media"))]
 pub fn test_c_progress_with_null_ptr() {
   let null_handler = std::ptr::null_mut();
   progress(null_handler, 50);
@@ -654,8 +681,11 @@ pub fn test_c_get_parameter_value() {
   }"#;
 
   let job = Job::new(message).unwrap();
+  let parameters = job.get_parameters().ok();
+
   let handler = Handler {
-    job: job.clone(),
+    job_id: Some(job.job_id),
+    parameters,
     channel: None,
   };
 
@@ -689,8 +719,11 @@ pub fn test_c_get_unknown_parameter_value() {
   }"#;
 
   let job = Job::new(message).unwrap();
+  let parameters = job.get_parameters().ok();
+
   let handler = Handler {
-    job: job.clone(),
+    job_id: Some(job.job_id),
+    parameters,
     channel: None,
   };
 
