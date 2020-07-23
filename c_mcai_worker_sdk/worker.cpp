@@ -112,11 +112,32 @@ int process_frame(
     Handler handler,
     GetParameterValueCallback parameters_value_getter,
     Logger logger,
+    const unsigned int job_id,
     const unsigned int stream_index,
     void* frame,
     const char** message
   ) {
-    logger("debug", "Process C Worker media frame...");
+    // Cast to FFmpeg AVFrame pointer
+    AVFrame* av_frame = (AVFrame*) frame;
+
+    // Log process details
+    char* info_message = (char*)malloc(256);
+    if(av_frame->width != 0 && av_frame->height != 0) {
+        sprintf(info_message, "Job: %d - Process video stream %d frame - PTS: %ld, image size: %dx%d, data: %p",
+            job_id, stream_index, av_frame->pts, av_frame->width, av_frame->height, av_frame->data);
+    } else {
+        sprintf(info_message, "Job: %d - Process audio stream %d frame - PTS: %ld, sample_rate: %dHz, channels: %d, nb_samples: %d, data: %p",
+            job_id, stream_index, av_frame->pts, av_frame->sample_rate, av_frame->channels, av_frame->nb_samples, av_frame->data);
+    }
+    logger("debug", info_message);
+    free(info_message);
+
+    // Return process result as JSON
+    char* json_result = (char*)malloc(256);
+    sprintf(json_result, "{\"job_id\": %d, \"pts\": %ld, \"result\":\"OK\"}", job_id, av_frame->pts);
+    set_str_on_ptr(message, json_result);
+    free(json_result);
+
     return 0;
 }
 

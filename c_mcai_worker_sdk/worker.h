@@ -115,6 +115,7 @@ int process_frame(
     Handler handler,
     GetParameterValueCallback parameters_value_getter,
     Logger logger,
+    const unsigned int job_id,
     const unsigned int stream_index,
     void* frame,
     const char** message

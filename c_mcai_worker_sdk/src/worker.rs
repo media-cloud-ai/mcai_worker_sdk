@@ -81,6 +81,7 @@ type ProcessFrameFunc = unsafe fn(
   handler: *mut c_void,
   callback: GetParameterValueCallback,
   logger: LoggerCallback,
+  job_id: c_uint,
   stream_index: c_uint,
   frame: *mut c_void,
   output_message: &*const c_char,
@@ -427,16 +428,21 @@ pub fn call_worker_process_frame(
         ))
       })?;
 
-    let job_id = u64::from_str(&str_job_id).ok();
+    let job_id = u64::from_str(&str_job_id).map_err(|error|MessageError::RuntimeError(format!(
+      "Could not parse job_id {} into '{}' function: {:?}",
+      str_job_id,
+      constants::PROCESS_FRAME_FUNCTION,
+      error
+    )))?;
 
     let handler = Handler {
-      job_id,
+      job_id: Some(job_id),
       parameters: None,
       channel: None,
     };
 
     let handler_ptr = Box::into_raw(Box::new(handler));
-    let frame_ptr = Box::into_raw(Box::new(frame));
+    let av_frame_ptr = frame.frame;
 
     let json_ptr = std::ptr::null();
 
@@ -444,8 +450,9 @@ pub fn call_worker_process_frame(
       handler_ptr as *mut c_void,
       get_parameter_value,
       logger,
+      job_id as u32,
       stream_index as u32,
-      frame_ptr as *mut c_void,
+      av_frame_ptr as *mut c_void,
       &json_ptr,
     );
 
