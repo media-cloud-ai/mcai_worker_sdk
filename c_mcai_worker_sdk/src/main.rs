@@ -11,7 +11,7 @@ use crate::parameters::CWorkerParameters;
 use crate::worker::*;
 #[cfg(not(feature = "media"))]
 use mcai_worker_sdk::{debug, job::*, McaiChannel};
-use mcai_worker_sdk::{start_worker, MessageEvent, Result, Version};
+use mcai_worker_sdk::{job::JobResult, start_worker, MessageEvent, Result, Version};
 #[cfg(feature = "media")]
 use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
 #[cfg(feature = "media")]
@@ -59,11 +59,11 @@ impl MessageEvent<CWorkerParameters> for CWorkerEvent {
   #[cfg(feature = "media")]
   fn process_frame(
     &mut self,
-    str_job_id: &str,
+    job_result: JobResult,
     stream_index: usize,
     frame: Frame,
   ) -> Result<ProcessResult> {
-    call_worker_process_frame(str_job_id, stream_index, frame)
+    call_worker_process_frame(job_result, stream_index, frame)
   }
 
   #[cfg(feature = "media")]

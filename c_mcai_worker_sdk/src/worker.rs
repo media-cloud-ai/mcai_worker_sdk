@@ -9,13 +9,15 @@ use std::ptr::null;
 use libloading::Library;
 use serde_json::Value;
 
+#[cfg(not(feature = "media"))]
+use mcai_worker_sdk::publish_job_progression;
 use mcai_worker_sdk::{
-  debug, error, info, trace, warn,
+  debug, error, info,
+  job::JobResult,
+  trace, warn,
   worker::{Parameter, ParameterType},
   McaiChannel, MessageError, Result,
 };
-#[cfg(not(feature = "media"))]
-use mcai_worker_sdk::{job::JobResult, publish_job_progression};
 #[cfg(feature = "media")]
 use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
 
@@ -412,7 +414,7 @@ pub fn call_worker_init_process(
 
 #[cfg(feature = "media")]
 pub fn call_worker_process_frame(
-  str_job_id: &str,
+  job_result: JobResult,
   stream_index: usize,
   frame: Frame,
 ) -> Result<ProcessResult> {
@@ -440,17 +442,8 @@ pub fn call_worker_process_frame(
         ))
       })?;
 
-    let job_id = u64::from_str(&str_job_id).map_err(|error| {
-      MessageError::RuntimeError(format!(
-        "Could not parse job_id {} into '{}' function: {:?}",
-        str_job_id,
-        constants::PROCESS_FRAME_FUNCTION,
-        error
-      ))
-    })?;
-
     let handler = Handler {
-      job_id: Some(job_id),
+      job_id: Some(job_result.get_job_id()),
       parameters: None,
       channel: None,
     };
@@ -464,7 +457,7 @@ pub fn call_worker_process_frame(
       handler_ptr as *mut c_void,
       get_parameter_value,
       logger,
-      job_id as u32,
+      job_result.get_job_id() as u32,
       stream_index as u32,
       av_frame_ptr as *mut c_void,
       &json_ptr,
