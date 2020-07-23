@@ -82,6 +82,7 @@ extern crate log;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+#[cfg(feature = "media")]
 #[macro_use]
 extern crate yaserde_derive;
 
@@ -96,23 +97,14 @@ pub mod worker;
 /// Re-export from lapin Channel
 pub use lapin::Channel;
 pub use log::{debug, error, info, trace, warn};
+pub use schemars::JsonSchema;
 /// Re-export from semver:
 pub use semver::Version;
-pub use schemars::JsonSchema;
 
 pub use error::{MessageError, Result};
-pub use message::publish_job_progression;
 #[cfg(feature = "media")]
-pub use message::media::ttml::{
-  Body,
-  Div,
-  Head,
-  Paragraph,
-  Span,
-  TimeExpression,
-  TimeUnit,
-  Ttml,
-};
+pub use message::media::ttml::{Body, Div, Head, Paragraph, Span, TimeExpression, TimeUnit, Ttml};
+pub use message::publish_job_progression;
 pub use parameter::container::ParametersContainer;
 #[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
 pub use parameter::credential::Credential;
@@ -126,14 +118,15 @@ use config::*;
 use env_logger::Builder;
 use futures_executor::LocalPool;
 use futures_util::{future::FutureExt, stream::StreamExt, task::LocalSpawnExt};
-#[cfg(not(feature = "media"))]
 use job::JobResult;
 use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use serde::de::DeserializeOwned;
 #[cfg(feature = "media")]
 use serde::Serialize;
-use std::{
-  cell::RefCell, fs, io::Write, rc::Rc, sync::{Arc, Mutex}, thread, time};
+#[cfg(feature = "media")]
+use std::sync::Mutex;
+use std::{cell::RefCell, fs, io::Write, rc::Rc, sync::Arc, thread, time};
+#[cfg(feature = "media")]
 use yaserde::YaSerialize;
 
 /// Exposed Channel type
@@ -192,7 +185,7 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
   #[cfg(feature = "media")]
   fn process_frame(
     &mut self,
-    _str_job_id: &str,
+    _job_result: JobResult,
     _stream_index: usize,
     _frame: Frame,
   ) -> Result<ProcessResult> {

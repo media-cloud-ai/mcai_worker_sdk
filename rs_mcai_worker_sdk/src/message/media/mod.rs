@@ -32,12 +32,8 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   let source_url: String = job.get_parameter(SOURCE_PATH_PARAMETER)?;
   let output_url: String = job.get_parameter(DESTINATION_PATH_PARAMETER)?;
 
-  let mut source = source::Source::new(
-    message_event.clone(),
-    &job_result,
-    parameters,
-    &source_url,
-  )?;
+  let mut source =
+    source::Source::new(message_event.clone(), &job_result, parameters, &source_url)?;
 
   info!(target: &str_job_id, "Start to process media");
 
@@ -53,8 +49,6 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
         stream_index,
         frame,
       } => {
-        count += 1;
-
         if stream_index == 0 {
           count += 1;
 
@@ -68,9 +62,10 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
         }
 
         trace!(target: &job_result.get_str_job_id(), "Process frame {}", count);
-        let result = message_event
-          .borrow_mut()
-          .process_frame(&str_job_id, stream_index, frame)?;
+        let result =
+          message_event
+            .borrow_mut()
+            .process_frame(job_result.clone(), stream_index, frame)?;
 
         output.push(result);
       }

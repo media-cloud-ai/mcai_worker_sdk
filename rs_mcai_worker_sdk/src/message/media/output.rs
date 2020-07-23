@@ -44,20 +44,20 @@ impl Output {
       .map(|result| serde_json::from_str(&result.json_content.as_ref().unwrap()).unwrap())
       .collect();
 
-    let content =
-      if !json_results.is_empty() {
-        serde_json::to_string(&json!({
-          "frames": json_results,
-        })).unwrap()
-      } else {
-        self
-          .results
-          .iter()
-          .filter(|result| result.xml_content.is_some())
-          .map(|result| result.xml_content.as_ref().unwrap().clone())
-          .collect::<Vec<String>>()
-          .join("")
-      };
+    let content = if !json_results.is_empty() {
+      serde_json::to_string(&json!({
+        "frames": json_results,
+      }))
+      .unwrap()
+    } else {
+      self
+        .results
+        .iter()
+        .filter(|result| result.xml_content.is_some())
+        .map(|result| result.xml_content.as_ref().unwrap().clone())
+        .collect::<Vec<String>>()
+        .join("")
+    };
 
     std::fs::write(self.url.clone(), content).unwrap();
 

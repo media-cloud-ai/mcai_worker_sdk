@@ -1,35 +1,22 @@
-
+#[cfg(not(feature = "media"))]
+use crate::MessageError;
 use crate::{
   error::MessageError::RuntimeError,
   job::JobResult,
-  message::media::{
-    srt::SrtStream,
-    media_stream::MediaStream,
-  },
-  MessageEvent, Result
+  message::media::{media_stream::MediaStream, srt::SrtStream},
+  MessageEvent, Result,
 };
 use ringbuf::RingBuffer;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use std::{
-  cell::RefCell,
-  collections::HashMap,
-  io::Cursor,
-  rc::Rc,
-  thread,
-};
 use std::sync::{
-  Arc,
-  Mutex,
   mpsc,
-  mpsc::{Sender, Receiver},
+  mpsc::{Receiver, Sender},
+  Arc, Mutex,
 };
+use std::{cell::RefCell, collections::HashMap, io::Cursor, rc::Rc, thread};
 
-use stainless_ffmpeg::{
-  format_context::FormatContext,
-  frame::Frame,
-  video_decoder::VideoDecoder
-};
+use stainless_ffmpeg::{format_context::FormatContext, frame::Frame, video_decoder::VideoDecoder};
 
 pub enum DecodeResult {
   EndOfStream,
@@ -37,6 +24,11 @@ pub enum DecodeResult {
   Nothing,
   WaitMore,
 }
+
+type AsyncChannelSenderReceiver = (
+  Sender<Arc<Mutex<FormatContext>>>,
+  Receiver<Arc<Mutex<FormatContext>>>,
+);
 
 pub struct Source {
   decoders: HashMap<usize, VideoDecoder>,
@@ -56,8 +48,7 @@ impl Source {
     let mut decoders = HashMap::<usize, VideoDecoder>::new();
 
     if SrtStream::is_srt_stream(source_url) {
-
-      let (tx, rx): (Sender<Arc<Mutex<FormatContext>>>, Receiver<Arc<Mutex<FormatContext>>>) = mpsc::channel();
+      let (tx, rx): AsyncChannelSenderReceiver = mpsc::channel();
       let cloned_source_url = source_url.to_string();
       let source_thread = thread::spawn(move || {
         let mut srt_stream = SrtStream::open_connection(&cloned_source_url).unwrap();
@@ -83,7 +74,10 @@ impl Source {
                 Err(error) => error!("{}", error),
                 Ok(()) => {
                   got_stream_info = true;
-                  tx.send(Arc::new(Mutex::new(FormatContext::from(media_stream.format_context)))).unwrap();
+                  tx.send(Arc::new(Mutex::new(FormatContext::from(
+                    media_stream.format_context,
+                  ))))
+                  .unwrap();
                 }
               }
             }
@@ -159,7 +153,8 @@ impl Source {
 
     self
       .format_context
-      .lock().unwrap()
+      .lock()
+      .unwrap()
       .get_duration()
       .map(|duration| duration * 25.0)
   }

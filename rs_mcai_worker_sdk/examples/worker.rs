@@ -3,14 +3,13 @@ extern crate serde_derive;
 
 #[cfg(feature = "media")]
 use mcai_worker_sdk::{info, FormatContext, Frame, ProcessResult};
+use mcai_worker_sdk::{job::JobResult, MessageEvent, Result};
 #[cfg(not(feature = "media"))]
-use mcai_worker_sdk::{
-  job::{JobResult, JobStatus},
-  publish_job_progression, McaiChannel, MessageError,
-};
-use mcai_worker_sdk::{MessageEvent, Result};
+use mcai_worker_sdk::{job::JobStatus, publish_job_progression, McaiChannel, MessageError};
 use schemars::JsonSchema;
 use semver::Version;
+#[cfg(feature = "media")]
+use std::sync::{Arc, Mutex};
 
 #[cfg(not(feature = "media"))]
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -47,19 +46,23 @@ Do no use in production, just for developments."#
     Version::new(1, 2, 3)
   }
 
+  fn init(&mut self) -> Result<()> {
+    Ok(())
+  }
+
   #[cfg(feature = "media")]
   fn init_process(
     &mut self,
     _parameters: WorkerParameters,
-    _format_context: &FormatContext,
+    _format_context: Arc<Mutex<FormatContext>>,
   ) -> Result<Vec<usize>> {
-    Ok(vec![1])
+    Ok(vec![0])
   }
 
   #[cfg(feature = "media")]
   fn process_frame(
     &mut self,
-    job_id: &str,
+    job_result: JobResult,
     _stream_index: usize,
     frame: Frame,
   ) -> Result<ProcessResult> {
@@ -72,7 +75,7 @@ Do no use in production, just for developments."#
 
       if width != 0 && height != 0 {
         info!(
-          target: job_id,
+          target: &job_result.get_str_job_id(),
           "PTS: {}, image size: {}x{}",
           frame.get_pts(),
           width,
@@ -80,7 +83,7 @@ Do no use in production, just for developments."#
         );
       } else {
         info!(
-          target: job_id,
+          target: &job_result.get_str_job_id(),
           "PTS: {}, sample_rate: {}Hz, channels: {}, nb_samples: {}",
           frame.get_pts(),
           sample_rate,
@@ -90,6 +93,11 @@ Do no use in production, just for developments."#
       }
     }
     Ok(ProcessResult::new_json(""))
+  }
+
+  #[cfg(feature = "media")]
+  fn ending_process(&self) -> Result<()> {
+    Ok(())
   }
 
   #[cfg(not(feature = "media"))]
