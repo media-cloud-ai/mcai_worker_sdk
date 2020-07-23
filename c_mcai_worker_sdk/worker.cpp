@@ -1,5 +1,6 @@
 
 #include "worker.h"
+#include <libavformat/avformat.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,11 +36,25 @@ char* get_version() {
 }
 
 // Example of worker parameters
-char* kind[1] = { (char*)"string" };
-Parameter worker_parameters[1] = {
+char* kind[3] = { (char*)"string" };
+Parameter worker_parameters[3] = {
     {
         .identifier = (char*)"my_parameter",
         .label = (char*)"My parameter",
+        .kind_size = 1,
+        .kind = kind,
+        .required = 0
+    },
+    {
+        .identifier = (char*)"source_path",
+        .label = (char*)"Source path",
+        .kind_size = 1,
+        .kind = kind,
+        .required = 1
+    },
+    {
+        .identifier = (char*)"destination_path",
+        .label = (char*)"Destination path",
         .kind_size = 1,
         .kind = kind,
         .required = 1
@@ -59,6 +74,76 @@ unsigned int get_parameters_size() {
  */
 void get_parameters(Parameter* parameters) {
     memcpy(parameters, worker_parameters, sizeof(worker_parameters));
+}
+
+void init(Logger logger) {
+    // Print message through the Rust Logger
+    logger("debug", "Init C Worker...");
+}
+
+int init_process(
+    Handler handler,
+    GetParameterValueCallback parameters_value_getter,
+    Logger logger,
+    void* format_context,
+    unsigned int** output_stream_indexes,
+    unsigned int* output_stream_indexes_size
+  ) {
+    logger("debug", "Initialize C Worker media process...");
+
+    // Cast to FFmpeg AVFormatContext pointer
+    AVFormatContext* av_format_context = (AVFormatContext*)format_context;
+
+    // Get nb streams
+    const unsigned int nb_streams = av_format_context->nb_streams;
+    const size_t length = sizeof(unsigned int) * nb_streams;
+    *output_stream_indexes_size = nb_streams;
+
+    // Return stream indexes
+    unsigned int streams[nb_streams];
+    for (unsigned int i = 0; i < nb_streams; ++i) {
+        streams[i] = i;
+    }
+    memcpy(*output_stream_indexes, &streams, length);
+    return 0;
+}
+
+int process_frame(
+    Handler handler,
+    GetParameterValueCallback parameters_value_getter,
+    Logger logger,
+    const unsigned int job_id,
+    const unsigned int stream_index,
+    void* frame,
+    const char** message
+  ) {
+    // Cast to FFmpeg AVFrame pointer
+    AVFrame* av_frame = (AVFrame*) frame;
+
+    // Log process details
+    char* info_message = (char*)malloc(256);
+    if(av_frame->width != 0 && av_frame->height != 0) {
+        sprintf(info_message, "Job: %d - Process video stream %d frame - PTS: %ld, image size: %dx%d, data: %p",
+            job_id, stream_index, av_frame->pts, av_frame->width, av_frame->height, av_frame->data);
+    } else {
+        sprintf(info_message, "Job: %d - Process audio stream %d frame - PTS: %ld, sample_rate: %dHz, channels: %d, nb_samples: %d, data: %p",
+            job_id, stream_index, av_frame->pts, av_frame->sample_rate, av_frame->channels, av_frame->nb_samples, av_frame->data);
+    }
+    logger("debug", info_message);
+    free(info_message);
+
+    // Return process result as JSON
+    char* json_result = (char*)malloc(256);
+    sprintf(json_result, "{\"job_id\": %d, \"pts\": %ld, \"result\":\"OK\"}", job_id, av_frame->pts);
+    set_str_on_ptr(message, json_result);
+    free(json_result);
+
+    return 0;
+}
+
+void endingProcess(Logger logger) {
+    // Print message through the Rust Logger
+    logger("debug", "Ending C Worker media process...");
 }
 
 /**
