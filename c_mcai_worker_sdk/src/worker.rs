@@ -300,7 +300,11 @@ pub fn get_worker_parameters() -> Vec<Parameter> {
 
 pub fn call_optional_worker_init() -> Result<()> {
   let library = get_library_file_path();
-  debug!("Call worker process from library: {}", library);
+  debug!(
+    "Call worker {} from library: {}",
+    constants::INIT_FUNCTION,
+    library
+  );
 
   let worker_lib = libloading::Library::new(library).map_err(|error| {
     MessageError::RuntimeError(format!(
@@ -326,7 +330,11 @@ pub fn call_worker_init_process(
   format_context: Arc<Mutex<FormatContext>>,
 ) -> Result<Vec<usize>> {
   let library = get_library_file_path();
-  debug!("Call worker process from library: {}", library);
+  debug!(
+    "Call worker {} from library: {}",
+    constants::INIT_PROCESS_FUNCTION,
+    library
+  );
 
   let worker_lib = libloading::Library::new(library).map_err(|error| {
     MessageError::RuntimeError(format!(
@@ -409,7 +417,11 @@ pub fn call_worker_process_frame(
   frame: Frame,
 ) -> Result<ProcessResult> {
   let library = get_library_file_path();
-  debug!("Call worker process from library: {}", library);
+  debug!(
+    "Call worker {} from library: {}",
+    constants::PROCESS_FRAME_FUNCTION,
+    library
+  );
 
   let worker_lib = libloading::Library::new(library).map_err(|error| {
     MessageError::RuntimeError(format!(
@@ -428,12 +440,14 @@ pub fn call_worker_process_frame(
         ))
       })?;
 
-    let job_id = u64::from_str(&str_job_id).map_err(|error|MessageError::RuntimeError(format!(
-      "Could not parse job_id {} into '{}' function: {:?}",
-      str_job_id,
-      constants::PROCESS_FRAME_FUNCTION,
-      error
-    )))?;
+    let job_id = u64::from_str(&str_job_id).map_err(|error| {
+      MessageError::RuntimeError(format!(
+        "Could not parse job_id {} into '{}' function: {:?}",
+        str_job_id,
+        constants::PROCESS_FRAME_FUNCTION,
+        error
+      ))
+    })?;
 
     let handler = Handler {
       job_id: Some(job_id),
@@ -474,7 +488,11 @@ pub fn call_worker_process_frame(
 #[cfg(feature = "media")]
 pub fn call_worker_ending_process() -> Result<()> {
   let library = get_library_file_path();
-  debug!("Call worker process from library: {}", library);
+  debug!(
+    "Call worker {} from library: {}",
+    constants::ENDING_PROCESS_FUNCTION,
+    library
+  );
 
   let worker_lib = libloading::Library::new(library).map_err(|error| {
     MessageError::RuntimeError(format!(
@@ -505,7 +523,11 @@ pub fn call_worker_process(
   channel: Option<McaiChannel>,
 ) -> Result<ProcessReturn> {
   let library = get_library_file_path();
-  debug!("Call worker process from library: {}", library);
+  debug!(
+    "Call worker {} from library: {}",
+    constants::PROCESS_FUNCTION,
+    library
+  );
 
   let worker_lib = libloading::Library::new(library).map_err(|error| {
     MessageError::RuntimeError(format!(
