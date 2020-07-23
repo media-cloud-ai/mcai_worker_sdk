@@ -359,28 +359,28 @@ pub fn call_worker_init_process(
       &output_stream_indexes_ptr,
     );
 
-    if return_code == 0 {
-      let mut output_streams = vec![];
-      if !output_stream_indexes_ptr.is_null() {
-        let mut offset = 0;
-        loop {
-          let value_ptr = output_stream_indexes_ptr.offset(offset);
-          if value_ptr.is_null() {
-            break;
-          }
-          output_streams.push((*value_ptr) as usize);
-          offset += 1;
-        }
-      }
-
-      Ok(output_streams)
-    } else {
-      Err(MessageError::RuntimeError(format!(
+    if return_code != 0 {
+      return Err(MessageError::RuntimeError(format!(
         "{:?} function returned error code: {:?}",
         constants::INIT_PROCESS_FUNCTION,
         return_code
-      )))
+      )));
     }
+
+    let mut output_streams = vec![];
+    if !output_stream_indexes_ptr.is_null() {
+      let mut offset = 0;
+      loop {
+        let value_ptr = output_stream_indexes_ptr.offset(offset);
+        if value_ptr.is_null() {
+          break;
+        }
+        output_streams.push((*value_ptr) as usize);
+        offset += 1;
+      }
+    }
+
+    Ok(output_streams)
   }
 }
 
@@ -432,17 +432,18 @@ pub fn call_worker_process_frame(
       &json_ptr,
     );
 
-    if return_code == 0 {
-      let json = get_c_string!(json_ptr);
-      libc::free(json_ptr as *mut libc::c_void);
-      Ok(ProcessResult::new_json(&json))
-    } else {
-      Err(MessageError::RuntimeError(format!(
+    if return_code != 0 {
+      return Err(MessageError::RuntimeError(format!(
         "{:?} function returned error code: {:?}",
         constants::PROCESS_FRAME_FUNCTION,
         return_code
-      )))
+      )));
     }
+
+    let json = get_c_string!(json_ptr);
+    libc::free(json_ptr as *mut libc::c_void);
+
+    Ok(ProcessResult::new_json(&json))
   }
 }
 
@@ -525,41 +526,41 @@ pub fn call_worker_process(
 
     let mut output_paths = vec![];
 
-    if return_code == 0 {
-      if !ptr.is_null() {
-        let mut offset = 0;
-        loop {
-          let cur_ptr = *ptr.offset(offset);
-          if cur_ptr.is_null() {
-            break;
-          }
-
-          output_paths.push(get_c_string!(cur_ptr));
-
-          libc::free(cur_ptr as *mut libc::c_void);
-          offset += 1;
-        }
-
-        if offset > 0 {
-          libc::free(ptr as *mut libc::c_void);
-        }
-      }
-
-      // Retrieve message as string and free pointer
-      let mut message = "".to_string();
-      if !message_ptr.is_null() {
-        message = get_c_string!(message_ptr);
-        libc::free(message_ptr as *mut libc::c_void);
-      }
-
-      Ok(ProcessReturn::new(return_code, &message).with_output_paths(output_paths))
-    } else {
-      Ok(ProcessReturn::new_error(&format!(
+    if return_code != 0 {
+      return Ok(ProcessReturn::new_error(&format!(
         "{:?} function returned error code: {:?}",
         constants::PROCESS_FUNCTION,
         return_code
-      )))
+      )));
     }
+
+    if !ptr.is_null() {
+      let mut offset = 0;
+      loop {
+        let cur_ptr = *ptr.offset(offset);
+        if cur_ptr.is_null() {
+          break;
+        }
+
+        output_paths.push(get_c_string!(cur_ptr));
+
+        libc::free(cur_ptr as *mut libc::c_void);
+        offset += 1;
+      }
+
+      if offset > 0 {
+        libc::free(ptr as *mut libc::c_void);
+      }
+    }
+
+    // Retrieve message as string and free pointer
+    let mut message = "".to_string();
+    if !message_ptr.is_null() {
+      message = get_c_string!(message_ptr);
+      libc::free(message_ptr as *mut libc::c_void);
+    }
+
+    Ok(ProcessReturn::new(return_code, &message).with_output_paths(output_paths))
   }
 }
 
