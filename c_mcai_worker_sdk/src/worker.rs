@@ -26,8 +26,6 @@ use crate::parameters::CWorkerParameters;
 #[cfg(not(feature = "media"))]
 use crate::process_return::ProcessReturn;
 #[cfg(feature = "media")]
-use std::str::FromStr;
-#[cfg(feature = "media")]
 use std::sync::{Arc, Mutex};
 
 macro_rules! get_c_string {

@@ -10,7 +10,7 @@ extern crate serde_derive;
 use crate::parameters::CWorkerParameters;
 use crate::worker::*;
 #[cfg(not(feature = "media"))]
-use mcai_worker_sdk::{debug, job::*, McaiChannel};
+use mcai_worker_sdk::{debug, McaiChannel};
 use mcai_worker_sdk::{job::JobResult, start_worker, MessageEvent, Result, Version};
 #[cfg(feature = "media")]
 use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
