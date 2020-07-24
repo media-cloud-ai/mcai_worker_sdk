@@ -56,3 +56,18 @@ impl SrtStream {
       .block_on(async { socket.borrow_mut().try_next().await.unwrap() })
   }
 }
+
+#[test]
+pub fn test_is_srt_stream() {
+  let file_name = "file.txt";
+  assert!(!SrtStream::is_srt_stream(file_name));
+  let file_path = "/path/to/file";
+  assert!(!SrtStream::is_srt_stream(file_path));
+  let file_url = "file://path/to/file";
+  assert!(!SrtStream::is_srt_stream(file_url));
+  let http_url = "http://path/to/resource";
+  assert!(!SrtStream::is_srt_stream(http_url));
+
+  let srt_url = "srt://path/to/resource";
+  assert!(SrtStream::is_srt_stream(srt_url));
+}

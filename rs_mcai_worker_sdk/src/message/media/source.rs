@@ -45,8 +45,6 @@ impl Source {
   ) -> Result<Self> {
     info!(target: &job_result.get_str_job_id(), "Opening source: {}", source_url);
 
-    let mut decoders = HashMap::<usize, VideoDecoder>::new();
-
     if SrtStream::is_srt_stream(source_url) {
       let (tx, rx): AsyncChannelSenderReceiver = mpsc::channel();
       let cloned_source_url = source_url.to_string();
@@ -87,25 +85,12 @@ impl Source {
 
       let format_context = rx.recv().unwrap();
 
-      let selected_streams = message_event
-        .borrow_mut()
-        .init_process(parameters, format_context.clone())?;
-
-      info!(
-        target: &job_result.get_str_job_id(),
-        "Selected stream IDs: {:?}", selected_streams
-      );
-
-      for selected_stream in &selected_streams {
-        // VideoDecoder can decode any codec, not only video
-        let decoder = VideoDecoder::new(
-          format!("decoder_{}", selected_stream),
-          &format_context.clone().lock().unwrap(),
-          *selected_stream as isize,
-        )
-        .unwrap();
-        decoders.insert(*selected_stream, decoder);
-      }
+      let decoders = Self::get_decoders(
+        message_event,
+        &job_result.get_str_job_id(),
+        parameters,
+        format_context.clone(),
+      )?;
 
       Ok(Source {
         decoders,
@@ -118,25 +103,12 @@ impl Source {
 
       let format_context = Arc::new(Mutex::new(format_context));
 
-      let selected_streams = message_event
-        .borrow_mut()
-        .init_process(parameters, format_context.clone())?;
-
-      info!(
-        target: &job_result.get_str_job_id(),
-        "Selected stream IDs: {:?}", selected_streams
-      );
-
-      for selected_stream in &selected_streams {
-        // VideoDecoder can decode any codec, not only video
-        let decoder = VideoDecoder::new(
-          format!("decoder_{}", selected_stream),
-          &format_context.clone().lock().unwrap(),
-          *selected_stream as isize,
-        )
-        .unwrap();
-        decoders.insert(*selected_stream, decoder);
-      }
+      let decoders = Self::get_decoders(
+        message_event,
+        &job_result.get_str_job_id(),
+        parameters,
+        format_context.clone(),
+      )?;
 
       Ok(Source {
         decoders,
@@ -196,5 +168,34 @@ impl Source {
         }
       }
     }
+  }
+
+  fn get_decoders<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
+    message_event: Rc<RefCell<ME>>,
+    job_id: &str,
+    parameters: P,
+    format_context: Arc<Mutex<FormatContext>>,
+  ) -> Result<HashMap<usize, VideoDecoder>> {
+    let selected_streams = message_event
+      .borrow_mut()
+      .init_process(parameters, format_context.clone())?;
+
+    info!(
+      target: job_id,
+      "Selected stream IDs: {:?}", selected_streams
+    );
+
+    let mut decoders = HashMap::<usize, VideoDecoder>::new();
+    for selected_stream in &selected_streams {
+      // VideoDecoder can decode any codec, not only video
+      let decoder = VideoDecoder::new(
+        format!("decoder_{}", selected_stream),
+        &format_context.clone().lock().unwrap(),
+        *selected_stream as isize,
+      )
+      .map_err(RuntimeError)?;
+      decoders.insert(*selected_stream, decoder);
+    }
+    Ok(decoders)
   }
 }
