@@ -1,6 +1,5 @@
 mod constants;
 mod parameters;
-#[cfg(not(feature = "media"))]
 mod process_return;
 mod worker;
 
@@ -9,7 +8,6 @@ extern crate serde_derive;
 
 use crate::parameters::CWorkerParameters;
 use crate::worker::*;
-#[cfg(not(feature = "media"))]
 use mcai_worker_sdk::{debug, McaiChannel};
 use mcai_worker_sdk::{job::JobResult, start_worker, MessageEvent, Result, Version};
 #[cfg(feature = "media")]
@@ -71,7 +69,6 @@ impl MessageEvent<CWorkerParameters> for CWorkerEvent {
     call_worker_ending_process()
   }
 
-  #[cfg(not(feature = "media"))]
   fn process(
     &self,
     channel: Option<McaiChannel>,
@@ -145,8 +142,10 @@ pub fn test_c_binding_worker_info() {
   assert_eq!(expected_kind, parameter_kind);
 }
 
+#[cfg(test)]
+use mcai_worker_sdk::job::{Job, JobStatus};
+
 #[test]
-#[cfg(not(feature = "media"))]
 pub fn test_process() {
   let message = r#"{
     "job_id": 123,
@@ -175,7 +174,6 @@ pub fn test_process() {
 }
 
 #[test]
-#[cfg(not(feature = "media"))]
 pub fn test_failing_process() {
   let message = r#"{
     "job_id": 123,

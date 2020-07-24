@@ -1,5 +1,3 @@
-#[cfg(not(feature = "media"))]
-use crate::MessageError;
 use crate::{
   error::MessageError::RuntimeError,
   job::JobResult,

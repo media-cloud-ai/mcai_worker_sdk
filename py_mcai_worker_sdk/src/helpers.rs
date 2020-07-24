@@ -10,7 +10,6 @@ pub fn py_err_to_string(py: Python, error: PyErr) -> String {
     .to_string()
 }
 
-#[cfg(not(feature = "media"))]
 pub fn get_destination_paths(response: &PyAny) -> Option<Vec<String>> {
   if response.is_none() {
     return None;

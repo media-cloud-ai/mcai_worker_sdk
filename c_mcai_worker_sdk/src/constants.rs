@@ -9,7 +9,6 @@ pub static GET_PARAMETERS_FUNCTION: &str = "get_parameters";
 pub static INIT_FUNCTION: &str = "init";
 #[cfg(feature = "media")]
 pub static INIT_PROCESS_FUNCTION: &str = "init_process";
-#[cfg(not(feature = "media"))]
 pub static PROCESS_FUNCTION: &str = "process";
 #[cfg(feature = "media")]
 pub static PROCESS_FRAME_FUNCTION: &str = "process_frame";

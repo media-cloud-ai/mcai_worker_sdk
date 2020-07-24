@@ -197,7 +197,7 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
     Ok(())
   }
 
-  #[cfg(not(feature = "media"))]
+  /// Not called when the "media" feature is enabled
   fn process(
     &self,
     _channel: Option<McaiChannel>,
@@ -372,7 +372,6 @@ where
 }
 
 #[test]
-#[cfg(not(feature = "media"))]
 fn empty_message_event_impl() {
   #[derive(Debug)]
   struct CustomEvent {}

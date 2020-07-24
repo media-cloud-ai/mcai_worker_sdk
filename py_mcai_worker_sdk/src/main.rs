@@ -17,7 +17,6 @@ use mcai_worker_sdk::{
 #[cfg(feature = "media")]
 pub use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
 
-#[cfg(not(feature = "media"))]
 use crate::helpers::get_destination_paths;
 #[cfg(feature = "media")]
 use crate::helpers::get_stream_indexes;
@@ -271,7 +270,6 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
     Ok(())
   }
 
-  #[cfg(not(feature = "media"))]
   fn process(
     &self,
     channel: Option<McaiChannel>,

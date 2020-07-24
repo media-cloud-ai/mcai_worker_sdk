@@ -4,22 +4,15 @@ extern crate serde_derive;
 #[cfg(feature = "media")]
 use mcai_worker_sdk::{info, FormatContext, Frame, ProcessResult};
 use mcai_worker_sdk::{job::JobResult, MessageEvent, Result};
-#[cfg(not(feature = "media"))]
 use mcai_worker_sdk::{job::JobStatus, publish_job_progression, McaiChannel, MessageError};
 use schemars::JsonSchema;
 use semver::Version;
 #[cfg(feature = "media")]
 use std::sync::{Arc, Mutex};
 
-#[cfg(not(feature = "media"))]
 #[derive(Debug, Deserialize, JsonSchema)]
 struct WorkerParameters {
   action: Option<String>,
-}
-
-#[cfg(feature = "media")]
-#[derive(Debug, Deserialize, JsonSchema)]
-struct WorkerParameters {
   source_path: Option<String>,
   destination_path: Option<String>,
 }
@@ -100,7 +93,7 @@ Do no use in production, just for developments."#
     Ok(())
   }
 
-  #[cfg(not(feature = "media"))]
+  /// Not called when the "media" feature is enabled
   fn process(
     &self,
     channel: Option<McaiChannel>,

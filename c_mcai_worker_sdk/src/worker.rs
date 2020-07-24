@@ -2,14 +2,12 @@ use std::ffi::{CStr, CString};
 #[cfg(feature = "media")]
 use std::mem::size_of;
 use std::os::raw::{c_char, c_uint, c_void};
-#[cfg(not(feature = "media"))]
 use std::os::raw::{c_int, c_uchar};
 use std::ptr::null;
 
 use libloading::Library;
 use serde_json::Value;
 
-#[cfg(not(feature = "media"))]
 use mcai_worker_sdk::publish_job_progression;
 use mcai_worker_sdk::{
   debug, error, info,
@@ -23,7 +21,6 @@ use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
 
 use crate::constants;
 use crate::parameters::CWorkerParameters;
-#[cfg(not(feature = "media"))]
 use crate::process_return::ProcessReturn;
 #[cfg(feature = "media")]
 use std::sync::{Arc, Mutex};
@@ -88,7 +85,6 @@ type ProcessFrameFunc = unsafe fn(
 ) -> c_uint;
 #[cfg(feature = "media")]
 type EndingProcessFunc = unsafe fn(logger: LoggerCallback);
-#[cfg(not(feature = "media"))]
 type ProcessFunc = unsafe fn(
   handler: *mut c_void,
   callback: GetParameterValueCallback,
@@ -97,7 +93,6 @@ type ProcessFunc = unsafe fn(
   output_message: &*const c_char,
   output_paths: &*mut *const c_char,
 ) -> c_int;
-#[cfg(not(feature = "media"))]
 type ProgressCallback = extern "C" fn(*mut c_void, c_uchar);
 
 #[allow(unused_assignments)]
@@ -166,7 +161,6 @@ extern "C" fn logger(level: *const c_char, raw_value: *const c_char) {
   }
 }
 
-#[cfg(not(feature = "media"))]
 #[allow(unused_assignments)]
 extern "C" fn progress(mut c_handler: *mut c_void, progression: c_uchar) {
   if c_handler.is_null() {
@@ -507,7 +501,6 @@ pub fn call_worker_ending_process() -> Result<()> {
   Ok(())
 }
 
-#[cfg(not(feature = "media"))]
 pub fn call_worker_process(
   job_result: JobResult,
   parameters: CWorkerParameters,
@@ -613,7 +606,6 @@ pub fn call_worker_process(
 use mcai_worker_sdk::job::Job;
 
 #[test]
-#[cfg(not(feature = "media"))]
 pub fn test_c_binding_process() {
   let message = r#"{
     "job_id": 123,
@@ -640,7 +632,6 @@ pub fn test_c_binding_process() {
 }
 
 #[test]
-#[cfg(not(feature = "media"))]
 pub fn test_c_binding_failing_process() {
   let message = r#"{
     "job_id": 123,
@@ -664,7 +655,6 @@ pub fn test_c_binding_failing_process() {
 }
 
 #[test]
-#[cfg(not(feature = "media"))]
 pub fn test_c_progress_ptr() {
   let message = r#"{
     "job_id": 123,
@@ -694,7 +684,6 @@ pub fn test_c_progress_ptr() {
 }
 
 #[test]
-#[cfg(not(feature = "media"))]
 pub fn test_c_progress_with_null_ptr() {
   let null_handler = std::ptr::null_mut();
   progress(null_handler, 50);
