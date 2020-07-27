@@ -110,6 +110,17 @@ pub fn test_media_worker_configuration_new() {
 
   let message_event = CustomEvent {};
 
+  assert_eq!("worker name".to_string(), message_event.get_name());
+  assert_eq!(
+    "short description".to_string(),
+    message_event.get_short_description()
+  );
+  assert_eq!(
+    "long description".to_string(),
+    message_event.get_description()
+  );
+  assert_eq!(semver::Version::new(1, 2, 3), message_event.get_version());
+
   let result = WorkerConfiguration::new(&queue_name, &message_event, &instance_id);
   assert!(result.is_ok());
 
@@ -170,6 +181,17 @@ pub fn test_media_worker_configuration_new_missing_source_parameter() {
 
   let message_event = CustomEvent {};
 
+  assert_eq!("worker name".to_string(), message_event.get_name());
+  assert_eq!(
+    "short description".to_string(),
+    message_event.get_short_description()
+  );
+  assert_eq!(
+    "long description".to_string(),
+    message_event.get_description()
+  );
+  assert_eq!(semver::Version::new(1, 2, 3), message_event.get_version());
+
   let result = WorkerConfiguration::new(&queue_name, &message_event, &instance_id);
   let expected = MessageError::ParameterValueError(
     "Expected media parameter missing: 'source_path'".to_string(),
@@ -210,6 +232,17 @@ pub fn test_media_worker_configuration_new_missing_destination_parameter() {
 
   let message_event = CustomEvent {};
 
+  assert_eq!("worker name".to_string(), message_event.get_name());
+  assert_eq!(
+    "short description".to_string(),
+    message_event.get_short_description()
+  );
+  assert_eq!(
+    "long description".to_string(),
+    message_event.get_description()
+  );
+  assert_eq!(semver::Version::new(1, 2, 3), message_event.get_version());
+
   let result = WorkerConfiguration::new(&queue_name, &message_event, &instance_id);
   let expected = MessageError::ParameterValueError(
     "Expected media parameter missing: 'destination_path'".to_string(),
@@ -249,6 +282,17 @@ pub fn test_media_worker_configuration_new_missing_parameters() {
   }
 
   let message_event = CustomEvent {};
+
+  assert_eq!("worker name".to_string(), message_event.get_name());
+  assert_eq!(
+    "short description".to_string(),
+    message_event.get_short_description()
+  );
+  assert_eq!(
+    "long description".to_string(),
+    message_event.get_description()
+  );
+  assert_eq!(semver::Version::new(1, 2, 3), message_event.get_version());
 
   let result = WorkerConfiguration::new(&queue_name, &message_event, &instance_id);
   let expected = MessageError::ParameterValueError(
