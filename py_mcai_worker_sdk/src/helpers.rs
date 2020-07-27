@@ -1,6 +1,7 @@
+use pyo3::{prelude::*, types::*};
+
 #[cfg(feature = "media")]
 use mcai_worker_sdk::{MessageError, Result};
-use pyo3::{prelude::*, types::*};
 
 pub fn py_err_to_string(py: Python, error: PyErr) -> String {
   let locals = [("error", error)].into_py_dict(py);
@@ -62,4 +63,101 @@ pub fn get_stream_indexes(response: &PyAny) -> Result<Vec<usize>> {
         e
       ))
     })
+}
+
+#[test]
+pub fn test_py_err_to_string() {
+  let error_message = "Error message";
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  PyErr::new::<pyo3::exceptions::TypeError, _>(error_message.clone()).restore(py);
+  let py_err = PyErr::fetch(py);
+
+  let expected_message = format!("TypeError(\'{}\',)", error_message);
+  let string = py_err_to_string(py, py_err);
+  assert_eq!(expected_message, string);
+}
+
+#[test]
+pub fn test_get_destination_paths() {
+  let destination_paths = vec![
+    "/path/to/destination/file_1".to_string(),
+    "/path/to/destination/file_2".to_string(),
+    "/path/to/destination/file_3".to_string(),
+  ];
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  let py_list = PyList::new(py, destination_paths.clone());
+  let py_dict = PyDict::new(py);
+  let result = py_dict.set_item("destination_paths", py_list);
+  assert!(result.is_ok());
+
+  let py_any: &PyAny = py_dict.into();
+
+  let result = get_destination_paths(py_any);
+  assert!(result.is_some());
+  assert_eq!(destination_paths, result.unwrap());
+}
+
+#[test]
+pub fn test_get_destination_paths_without_key() {
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  let py_dict = PyDict::new(py);
+
+  let py_any: &PyAny = py_dict.into();
+
+  let result = get_destination_paths(py_any);
+  assert!(result.is_none());
+}
+
+#[test]
+pub fn test_get_destination_paths_without_list_value() {
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  let py_dict = PyDict::new(py);
+  let result = py_dict.set_item("destination_paths", "some_value");
+  assert!(result.is_ok());
+
+  let py_any: &PyAny = py_dict.into();
+
+  let result = get_destination_paths(py_any);
+  assert!(result.is_none());
+}
+
+#[test]
+#[cfg(feature = "media")]
+pub fn test_get_stream_indexes() {
+  let stream_indexes = vec![2, 3, 4];
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  let py_list = PyList::new(py, stream_indexes.clone());
+  let py_any: &PyAny = py_list.into();
+
+  let result = get_stream_indexes(py_any);
+  assert!(result.is_ok());
+  assert_eq!(stream_indexes, result.unwrap());
+}
+
+#[test]
+#[cfg(feature = "media")]
+pub fn test_get_stream_indexes_without_list() {
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  let py_string = PyString::new(py, "this_is_not_a_list!");
+  let py_any: &PyAny = py_string.into();
+
+  let expected_error = MessageError::RuntimeError(
+    "unable to access init_process(..) python response: PyDowncastError".to_string(),
+  );
+
+  let result = get_stream_indexes(py_any);
+  assert!(result.is_err());
+  assert_eq!(expected_error, result.unwrap_err());
 }

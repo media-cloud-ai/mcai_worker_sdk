@@ -172,3 +172,144 @@ fn get_parameters_array_values(values: Vec<Value>, py: Python) -> Result<&PyList
   }
   Ok(array)
 }
+
+#[test]
+pub fn test_get_instance_type_from_parameter() {
+  assert_eq!(
+    InstanceType::String,
+    get_instance_type_from_parameter_type(&ParameterType::String)
+  );
+  assert_eq!(
+    InstanceType::Array,
+    get_instance_type_from_parameter_type(&ParameterType::ArrayOfStrings)
+  );
+  assert_eq!(
+    InstanceType::Boolean,
+    get_instance_type_from_parameter_type(&ParameterType::Boolean)
+  );
+  assert_eq!(
+    InstanceType::String,
+    get_instance_type_from_parameter_type(&ParameterType::Credential)
+  );
+  assert_eq!(
+    InstanceType::Integer,
+    get_instance_type_from_parameter_type(&ParameterType::Integer)
+  );
+  assert_eq!(
+    InstanceType::Array,
+    get_instance_type_from_parameter_type(&ParameterType::Requirement)
+  );
+}
+
+#[test]
+pub fn test_build_parameters() {
+  let mut parameters = HashMap::<String, Value>::new();
+  parameters.insert(
+    "string_parameter".to_string(),
+    Value::String("string_value".to_string()),
+  );
+  parameters.insert("null_parameter".to_string(), Value::Null);
+  parameters.insert("boolean_parameter".to_string(), Value::Bool(true));
+  parameters.insert(
+    "number_parameter".to_string(),
+    Value::Number(serde_json::Number::from(123)),
+  );
+  parameters.insert(
+    "array_of_string_parameter".to_string(),
+    Value::Array(vec![Value::String("string_value".to_string())]),
+  );
+  parameters.insert(
+    "array_of_null_parameter".to_string(),
+    Value::Array(vec![Value::Null]),
+  );
+  parameters.insert(
+    "array_of_bool_parameter".to_string(),
+    Value::Array(vec![Value::Bool(true)]),
+  );
+  parameters.insert(
+    "array_of_number_parameter".to_string(),
+    Value::Array(vec![Value::Number(serde_json::Number::from(123))]),
+  );
+  let worker_parameters = PythonWorkerParameters { parameters };
+
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  let result = build_parameters(worker_parameters, py);
+  assert!(result.is_ok());
+  let py_parameters = result.unwrap();
+  assert!(py_parameters.get_item("string_parameter").is_some());
+  assert!(py_parameters.get_item("boolean_parameter").is_some());
+  assert!(py_parameters.get_item("number_parameter").is_some());
+  assert!(py_parameters
+    .get_item("array_of_string_parameter")
+    .is_some());
+  assert!(py_parameters.get_item("array_of_null_parameter").is_some());
+  assert!(py_parameters.get_item("array_of_bool_parameter").is_some());
+  assert!(py_parameters
+    .get_item("array_of_number_parameter")
+    .is_some());
+  assert!(py_parameters.get_item("null_parameter").is_none());
+}
+
+#[test]
+pub fn test_build_parameters_with_object_value() {
+  let mut parameters = HashMap::<String, Value>::new();
+  let parameter_key = "object_parameter".to_string();
+  parameters.insert(
+    parameter_key.clone(),
+    Value::Object(serde_json::Map::<String, Value>::new()),
+  );
+  let worker_parameters = PythonWorkerParameters { parameters };
+
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  let expected_error =
+    MessageError::ParameterValueError("Unsupported parameter object value: {}".to_string());
+  let result = build_parameters(worker_parameters, py);
+  assert!(result.is_err());
+  assert_eq!(expected_error, result.unwrap_err());
+}
+
+#[test]
+pub fn test_build_parameters_with_array_of_array_value() {
+  let mut parameters = HashMap::<String, Value>::new();
+  let parameter_key = "array_of_array_parameter".to_string();
+  parameters.insert(
+    parameter_key.clone(),
+    Value::Array(vec![Value::Array(vec![Value::Bool(true)])]),
+  );
+  let worker_parameters = PythonWorkerParameters { parameters };
+
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  let expected_error = MessageError::ParameterValueError(
+    "Unsupported parameter array of array value: Array([Bool(true)])".to_string(),
+  );
+  let result = build_parameters(worker_parameters, py);
+  assert!(result.is_err());
+  assert_eq!(expected_error, result.unwrap_err());
+}
+
+#[test]
+pub fn test_build_parameters_with_array_of_object_value() {
+  let mut parameters = HashMap::<String, Value>::new();
+  let parameter_key = "array_of_object_parameter".to_string();
+  parameters.insert(
+    parameter_key.clone(),
+    Value::Array(vec![Value::Object(serde_json::Map::<String, Value>::new())]),
+  );
+  let worker_parameters = PythonWorkerParameters { parameters };
+
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  let expected_error = MessageError::ParameterValueError(
+    "Unsupported parameter array of object value: Object({})".to_string(),
+  );
+  let result = build_parameters(worker_parameters, py);
+  assert!(result.is_err());
+  assert_eq!(expected_error, result.unwrap_err());
+}
