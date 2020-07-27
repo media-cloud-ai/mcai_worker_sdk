@@ -1,5 +1,6 @@
 use std::os::raw::c_uchar;
 
+use mcai_worker_sdk::{MessageError, Result};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyList};
 
@@ -60,12 +61,18 @@ impl Frame {
 }
 
 impl Frame {
-  pub fn from(frame: &mcai_worker_sdk::Frame) -> Frame {
+  pub fn from(frame: &mcai_worker_sdk::Frame) -> Result<Frame> {
+    if frame.frame.is_null() {
+      return Err(MessageError::RuntimeError(
+        "Cannot initialize frame struct from null AVFrame".to_string(),
+      ));
+    }
+
     let av_frame = unsafe { *frame.frame };
 
     // TODO complete frame struct
 
-    Frame {
+    Ok(Frame {
       name: frame.name.clone(),
       index: frame.index,
       data: av_frame.data,
@@ -83,6 +90,22 @@ impl Frame {
       pkt_size: av_frame.pkt_size,
       width: av_frame.width,
       height: av_frame.height,
-    }
+    })
   }
+}
+
+#[test]
+pub fn test_frame_from_null_avframe() {
+  let sdk_frame = mcai_worker_sdk::Frame {
+    name: None,
+    frame: std::ptr::null_mut(),
+    index: 0,
+  };
+
+  let frame = Frame::from(&sdk_frame);
+  assert!(frame.is_err());
+  assert_eq!(
+    MessageError::RuntimeError("Cannot initialize frame struct from null AVFrame".to_string()),
+    frame.unwrap_err()
+  );
 }

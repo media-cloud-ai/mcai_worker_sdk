@@ -241,7 +241,7 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
     let gil = Python::acquire_gil();
     let (py, python_module) = get_python_module(&gil)?;
 
-    let media_frame = media::Frame::from(&frame);
+    let media_frame = media::Frame::from(&frame)?;
 
     let response = call_module_function(
       py,
