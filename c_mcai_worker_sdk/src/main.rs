@@ -146,6 +146,21 @@ pub fn test_c_binding_worker_info() {
 use mcai_worker_sdk::job::{Job, JobStatus};
 
 #[test]
+pub fn test_init() {
+  let mut c_worker_event = C_WORKER_EVENT.clone();
+  let result = c_worker_event.init();
+  assert!(result.is_ok());
+}
+
+#[test]
+#[cfg(feature = "media")]
+pub fn test_ending_process() {
+  let mut c_worker_event = C_WORKER_EVENT.clone();
+  let result = c_worker_event.ending_process();
+  assert!(result.is_ok());
+}
+
+#[test]
 pub fn test_process() {
   let message = r#"{
     "job_id": 123,

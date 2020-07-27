@@ -141,7 +141,7 @@ int process_frame(
     return 0;
 }
 
-void endingProcess(Logger logger) {
+void ending_process(Logger logger) {
     // Print message through the Rust Logger
     logger("debug", "Ending C Worker media process...");
 }

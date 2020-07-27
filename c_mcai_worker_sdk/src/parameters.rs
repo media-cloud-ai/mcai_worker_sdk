@@ -64,3 +64,31 @@ impl JsonSchema for CWorkerParameters {
     schema.into()
   }
 }
+
+#[test]
+pub fn test_get_instance_type_from_parameter() {
+  assert_eq!(
+    InstanceType::String,
+    get_instance_type_from_parameter_type(&ParameterType::String)
+  );
+  assert_eq!(
+    InstanceType::Array,
+    get_instance_type_from_parameter_type(&ParameterType::ArrayOfStrings)
+  );
+  assert_eq!(
+    InstanceType::Boolean,
+    get_instance_type_from_parameter_type(&ParameterType::Boolean)
+  );
+  assert_eq!(
+    InstanceType::String,
+    get_instance_type_from_parameter_type(&ParameterType::Credential)
+  );
+  assert_eq!(
+    InstanceType::Integer,
+    get_instance_type_from_parameter_type(&ParameterType::Integer)
+  );
+  assert_eq!(
+    InstanceType::Array,
+    get_instance_type_from_parameter_type(&ParameterType::Requirement)
+  );
+}

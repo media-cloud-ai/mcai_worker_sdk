@@ -126,7 +126,7 @@ int process_frame(
  * (the "media" feature must be enabled)
  * @param logger  Rust Logger
  */
-void endingProcess(Logger logger);
+void ending_process(Logger logger);
 
 /**
  * Worker main process function
