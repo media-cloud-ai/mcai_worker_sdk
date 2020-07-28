@@ -72,6 +72,10 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
       DecodeResult::WaitMore => {}
       DecodeResult::Nothing => {}
       DecodeResult::EndOfStream => {
+        message_event
+          .borrow_mut()
+          .ending_process()?;
+
         output.to_destination_path()?;
         return Ok(job_result);
       }
