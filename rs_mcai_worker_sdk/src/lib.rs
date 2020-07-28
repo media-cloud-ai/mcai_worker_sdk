@@ -123,6 +123,7 @@ use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use serde::de::DeserializeOwned;
 #[cfg(feature = "media")]
 use serde::Serialize;
+use std::str::FromStr;
 #[cfg(feature = "media")]
 use std::sync::Mutex;
 use std::{cell::RefCell, fs, io::Write, rc::Rc, sync::Arc, thread, time};
@@ -251,6 +252,17 @@ where
     worker_configuration.get_worker_version(),
     worker_configuration.get_sdk_version(),
   );
+
+  if let Ok(enabled) = std::env::var("DESCRIBE") {
+    if enabled == "1" || bool::from_str(&enabled.to_lowercase()).unwrap_or(false) {
+      match serde_json::to_string_pretty(&worker_configuration) {
+        Ok(serialized_configuration) => {
+          info!("Worker configuration: \n{}", serialized_configuration)
+        }
+        Err(error) => error!("Could not serialize worker configuration: {:?}", error),
+      }
+    }
+  }
 
   if let Err(message) = message_event.init() {
     error!("{:?}", message);
