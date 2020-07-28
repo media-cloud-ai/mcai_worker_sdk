@@ -260,7 +260,7 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
   }
 
   #[cfg(feature = "media")]
-  fn ending_process(&self) -> Result<()> {
+  fn ending_process(&mut self) -> Result<()> {
     let gil = Python::acquire_gil();
     let (py, python_module) = get_python_module(&gil)?;
 

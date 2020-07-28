@@ -65,7 +65,7 @@ impl MessageEvent<CWorkerParameters> for CWorkerEvent {
   }
 
   #[cfg(feature = "media")]
-  fn ending_process(&self) -> Result<()> {
+  fn ending_process(&mut self) -> Result<()> {
     call_worker_ending_process()
   }
 

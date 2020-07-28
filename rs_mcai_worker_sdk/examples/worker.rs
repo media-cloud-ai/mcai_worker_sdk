@@ -89,7 +89,7 @@ Do no use in production, just for developments."#
   }
 
   #[cfg(feature = "media")]
-  fn ending_process(&self) -> Result<()> {
+  fn ending_process(&mut self) -> Result<()> {
     Ok(())
   }
 
