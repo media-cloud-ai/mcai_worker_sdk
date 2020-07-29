@@ -103,7 +103,10 @@ pub use semver::Version;
 
 pub use error::{MessageError, Result};
 #[cfg(feature = "media")]
-pub use message::media::ttml::{Body, Div, Head, Paragraph, Span, TimeExpression, TimeUnit, Ttml};
+pub use message::media::{
+  ttml::{Body, Div, Head, Paragraph, Span, TimeExpression, TimeUnit, Ttml},
+  StreamDescriptor,
+};
 pub use message::publish_job_progression;
 pub use parameter::container::ParametersContainer;
 #[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
@@ -161,8 +164,7 @@ impl ProcessResult {
   }
 }
 
-/// Trait to describe a worker
-///
+/// # Trait to describe a worker
 /// Implement this trait to implement a worker
 pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
   fn get_name(&self) -> String;
@@ -179,7 +181,7 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
     &mut self,
     _parameters: P,
     _format_context: Arc<Mutex<FormatContext>>,
-  ) -> Result<Vec<usize>> {
+  ) -> Result<Vec<StreamDescriptor>> {
     Ok(vec![])
   }
 
@@ -257,7 +259,8 @@ where
     if enabled == "1" || bool::from_str(&enabled.to_lowercase()).unwrap_or(false) {
       match serde_json::to_string_pretty(&worker_configuration) {
         Ok(serialized_configuration) => {
-          info!("Worker configuration: \n{}", serialized_configuration)
+          println!("{}", serialized_configuration);
+          return;
         }
         Err(error) => error!("Could not serialize worker configuration: {:?}", error),
       }

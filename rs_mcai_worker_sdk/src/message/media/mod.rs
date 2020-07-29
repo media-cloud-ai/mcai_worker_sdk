@@ -20,6 +20,45 @@ use source::DecodeResult;
 pub const SOURCE_PATH_PARAMETER: &str = "source_path";
 pub const DESTINATION_PATH_PARAMETER: &str = "destination_path";
 
+#[cfg(feature = "media")]
+#[derive(Debug)]
+pub struct StreamDescriptor {
+  index: usize,
+  audio_configuration: Option<AudioConfiguration>,
+  image_configuration: Option<ImageConfiguration>,
+}
+
+impl StreamDescriptor {
+  pub fn new_audio(
+    index: usize,
+    channel_layouts: Vec<String>,
+    sample_formats: Vec<String>,
+    sample_rates: Vec<usize>,
+  ) -> Self {
+    StreamDescriptor {
+      index,
+      audio_configuration: Some(AudioConfiguration {
+        channel_layouts,
+        sample_formats,
+        sample_rates,
+      }),
+      image_configuration: None,
+    }
+  }
+}
+
+#[cfg(feature = "media")]
+#[derive(Debug)]
+pub struct AudioConfiguration {
+  channel_layouts: Vec<String>,
+  sample_formats: Vec<String>,
+  sample_rates: Vec<usize>,
+}
+
+#[cfg(feature = "media")]
+#[derive(Debug)]
+pub struct ImageConfiguration {}
+
 pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   message_event: Rc<RefCell<ME>>,
   channel: Option<McaiChannel>,

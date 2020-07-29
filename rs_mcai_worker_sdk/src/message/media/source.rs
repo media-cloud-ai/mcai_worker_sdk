@@ -14,7 +14,18 @@ use std::sync::{
 };
 use std::{cell::RefCell, collections::HashMap, io::Cursor, rc::Rc, thread};
 
-use stainless_ffmpeg::{format_context::FormatContext, frame::Frame, video_decoder::VideoDecoder};
+use stainless_ffmpeg::{
+  audio_decoder::AudioDecoder,
+  filter_graph::FilterGraph,
+  format_context::FormatContext,
+  frame::Frame,
+  order::{filter::Filter, filter_output::FilterOutput, parameters::ParameterValue},
+  packet::Packet,
+  video_decoder::VideoDecoder,
+};
+use stainless_ffmpeg_sys::{
+  av_frame_alloc, av_frame_clone, avcodec_receive_frame, avcodec_send_packet,
+};
 
 pub enum DecodeResult {
   EndOfStream,
@@ -29,7 +40,7 @@ type AsyncChannelSenderReceiver = (
 );
 
 pub struct Source {
-  decoders: HashMap<usize, VideoDecoder>,
+  decoders: HashMap<usize, Decoder>,
   format_context: Arc<Mutex<FormatContext>>,
   thread: Option<thread::JoinHandle<()>>,
 }
@@ -173,7 +184,7 @@ impl Source {
     job_id: &str,
     parameters: P,
     format_context: Arc<Mutex<FormatContext>>,
-  ) -> Result<HashMap<usize, VideoDecoder>> {
+  ) -> Result<HashMap<usize, Decoder>> {
     let selected_streams = message_event
       .borrow_mut()
       .init_process(parameters, format_context.clone())?;
@@ -183,17 +194,135 @@ impl Source {
       "Selected stream IDs: {:?}", selected_streams
     );
 
-    let mut decoders = HashMap::<usize, VideoDecoder>::new();
+    let mut decoders = HashMap::<usize, Decoder>::new();
     for selected_stream in &selected_streams {
-      // VideoDecoder can decode any codec, not only video
-      let decoder = VideoDecoder::new(
-        format!("decoder_{}", selected_stream),
+      // AudioDecoder can decode any codec, not only video
+      let audio_decoder = AudioDecoder::new(
+        format!("decoder_{}", selected_stream.index),
         &format_context.clone().lock().unwrap(),
-        *selected_stream as isize,
+        selected_stream.index as isize,
       )
       .map_err(RuntimeError)?;
-      decoders.insert(*selected_stream, decoder);
+
+      let audio_graph = if let Some(audio_configuration) = &selected_stream.audio_configuration {
+        let mut graph = FilterGraph::new().unwrap();
+
+        graph
+          .add_input_from_audio_decoder("audio_input", &audio_decoder)
+          .unwrap();
+
+        graph.add_audio_output("audio_output").unwrap();
+
+        let mut parameters = HashMap::new();
+
+        if !audio_configuration.sample_rates.is_empty() {
+          let sample_rates = audio_configuration
+            .sample_rates
+            .iter()
+            .map(|i| i.to_string())
+            .collect::<Vec<String>>()
+            .join("|");
+
+          parameters.insert(
+            "sample_rates".to_string(),
+            ParameterValue::String(sample_rates),
+          );
+        }
+        if !audio_configuration.channel_layouts.is_empty() {
+          parameters.insert(
+            "channel_layouts".to_string(),
+            ParameterValue::String(audio_configuration.channel_layouts.join("|")),
+          );
+        }
+        if !audio_configuration.sample_formats.is_empty() {
+          parameters.insert(
+            "sample_fmts".to_string(),
+            ParameterValue::String(audio_configuration.sample_formats.join("|")),
+          );
+        }
+
+        let filter_definition = Filter {
+          name: "aformat".to_string(),
+          label: Some("aformat_filter".to_string()),
+          parameters,
+          inputs: None,
+          outputs: Some(vec![FilterOutput {
+            stream_label: "audio_output".to_string(),
+          }]),
+        };
+
+        let filter = graph.add_filter(&filter_definition).unwrap();
+        graph.connect_input("audio_input", 0, &filter, 0).unwrap();
+        graph.connect_output(&filter, 0, "audio_output", 0).unwrap();
+
+        graph.validate().unwrap();
+
+        Some(graph)
+      } else {
+        None
+      };
+
+      println!("{:?}", selected_stream);
+
+      let decoder = Decoder {
+        audio_decoder: Some(audio_decoder),
+        video_decoder: None,
+        graph: audio_graph,
+      };
+
+      decoders.insert(selected_stream.index, decoder);
     }
     Ok(decoders)
+  }
+}
+
+struct Decoder {
+  audio_decoder: Option<AudioDecoder>,
+  video_decoder: Option<VideoDecoder>,
+  graph: Option<FilterGraph>,
+}
+
+impl Decoder {
+  fn decode(&self, packet: &Packet) -> std::result::Result<Frame, String> {
+    if let Some(audio_decoder) = &self.audio_decoder {
+      trace!("[FFmpeg] Send packet to audio decoder");
+
+      let av_frame = unsafe {
+        avcodec_send_packet(audio_decoder.codec_context, packet.packet);
+
+        let av_frame = av_frame_alloc();
+        avcodec_receive_frame(audio_decoder.codec_context, av_frame);
+
+        let frame = Frame {
+          frame: av_frame,
+          name: Some("audio_source_1".to_string()),
+          index: 1,
+        };
+
+        if let Some(graph) = &self.graph {
+          if let Ok((audio_frames, _video_frames)) = graph.process(&[frame], &[]) {
+            trace!("[FFmpeg] Output graph count {} frames", audio_frames.len());
+            let frame = audio_frames.first().unwrap();
+            av_frame_clone((*frame).frame)
+          } else {
+            av_frame
+          }
+        } else {
+          av_frame
+        }
+      };
+
+      let frame = Frame {
+        frame: av_frame,
+        name: Some("audio".to_string()),
+        index: 1,
+      };
+
+      return Ok(frame);
+    }
+    if let Some(video_decoder) = &self.video_decoder {
+      return video_decoder.decode(packet);
+    }
+    unimplemented!();
   }
 }
