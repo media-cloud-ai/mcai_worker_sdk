@@ -12,6 +12,7 @@ default = []
 media = ["mcai_worker_sdk/media"]
 
 [dependencies]
+dict_derive = "0.2.0"
 mcai_worker_sdk = { path = "../rs_mcai_worker_sdk" }
 pyo3 = "0.10"
 schemars = "0.7.6"

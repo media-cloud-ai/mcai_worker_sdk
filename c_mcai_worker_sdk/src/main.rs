@@ -8,12 +8,13 @@ extern crate serde_derive;
 
 use crate::parameters::CWorkerParameters;
 use crate::worker::*;
-use mcai_worker_sdk::{debug, McaiChannel};
-use mcai_worker_sdk::{job::JobResult, start_worker, MessageEvent, Result, Version};
+use mcai_worker_sdk::{
+  debug, job::JobResult, start_worker, McaiChannel, MessageEvent, Result, Version,
+};
 #[cfg(feature = "media")]
-use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
+use mcai_worker_sdk::{FormatContext, Frame, ProcessResult, StreamDescriptor};
 #[cfg(feature = "media")]
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc::Sender, Arc, Mutex};
 
 #[derive(Debug, Clone)]
 struct CWorkerEvent {}
@@ -50,7 +51,8 @@ impl MessageEvent<CWorkerParameters> for CWorkerEvent {
     &mut self,
     parameters: CWorkerParameters,
     format_context: Arc<Mutex<FormatContext>>,
-  ) -> Result<Vec<usize>> {
+    _result: Arc<Mutex<Sender<ProcessResult>>>,
+  ) -> Result<Vec<StreamDescriptor>> {
     call_worker_init_process(parameters, format_context)
   }
 

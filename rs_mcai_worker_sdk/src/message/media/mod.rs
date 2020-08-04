@@ -4,6 +4,11 @@ use crate::{
   parameter::container::ParametersContainer,
   McaiChannel, MessageEvent, Result,
 };
+#[cfg(feature = "media")]
+use dict_derive::{FromPyObject, IntoPyObject};
+use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
+use source::DecodeResult;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,15 +18,11 @@ mod source;
 mod srt;
 pub mod ttml;
 
-use schemars::JsonSchema;
-use serde::de::DeserializeOwned;
-use source::DecodeResult;
-
 pub const SOURCE_PATH_PARAMETER: &str = "source_path";
 pub const DESTINATION_PATH_PARAMETER: &str = "destination_path";
 
 #[cfg(feature = "media")]
-#[derive(Debug)]
+#[derive(Debug, FromPyObject, IntoPyObject, PartialEq)]
 pub struct StreamDescriptor {
   index: usize,
   audio_configuration: Option<AudioConfiguration>,
@@ -48,7 +49,7 @@ impl StreamDescriptor {
 }
 
 #[cfg(feature = "media")]
-#[derive(Debug)]
+#[derive(Debug, FromPyObject, IntoPyObject, PartialEq)]
 pub struct AudioConfiguration {
   channel_layouts: Vec<String>,
   sample_formats: Vec<String>,
@@ -56,7 +57,7 @@ pub struct AudioConfiguration {
 }
 
 #[cfg(feature = "media")]
-#[derive(Debug)]
+#[derive(Debug, FromPyObject, IntoPyObject, PartialEq)]
 pub struct ImageConfiguration {}
 
 pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
@@ -71,16 +72,21 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   let source_url: String = job.get_parameter(SOURCE_PATH_PARAMETER)?;
   let output_url: String = job.get_parameter(DESTINATION_PATH_PARAMETER)?;
 
-  let mut source =
-    source::Source::new(message_event.clone(), &job_result, parameters, &source_url)?;
+  let mut output = output::Output::new(&output_url)?;
+
+  let mut source = source::Source::new(
+    message_event.clone(),
+    &job_result,
+    parameters,
+    &source_url,
+    output.get_sender(),
+  )?;
 
   info!(target: &str_job_id, "Start to process media");
 
   let total_duration = source.get_duration();
   let mut count = 0;
   let mut previous_progress = 0;
-
-  let mut output = output::Output::new(&output_url)?;
 
   loop {
     match source.next_frame()? {

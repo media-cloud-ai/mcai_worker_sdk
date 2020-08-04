@@ -17,7 +17,7 @@ use mcai_worker_sdk::{
   McaiChannel, MessageError, Result,
 };
 #[cfg(feature = "media")]
-use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
+use mcai_worker_sdk::{FormatContext, Frame, ProcessResult, StreamDescriptor};
 
 use crate::constants;
 use crate::parameters::CWorkerParameters;
@@ -322,7 +322,7 @@ pub fn call_optional_worker_init() -> Result<()> {
 pub fn call_worker_init_process(
   parameters: CWorkerParameters,
   format_context: Arc<Mutex<FormatContext>>,
-) -> Result<Vec<usize>> {
+) -> Result<Vec<StreamDescriptor>> {
   let library = get_library_file_path();
   debug!(
     "Call worker {} from library: {}",
@@ -391,16 +391,17 @@ pub fn call_worker_init_process(
       )));
     }
 
-    let mut output_streams = vec![];
-    for offset in 0..output_stream_indexes_size {
-      let value_ptr = output_stream_indexes_ptr.offset(offset as isize);
-      if value_ptr.is_null() {
-        break;
-      }
-      output_streams.push((*value_ptr) as usize);
-    }
+    // let mut output_streams = vec![];
+    // for offset in 0..output_stream_indexes_size {
+    //   let value_ptr = output_stream_indexes_ptr.offset(offset as isize);
+    //   if value_ptr.is_null() {
+    //     break;
+    //   }
+    //   output_streams.push((*value_ptr) as usize);
+    // }
 
-    Ok(output_streams)
+    // Ok(output_streams)
+    Ok(vec![])
   }
 }
 

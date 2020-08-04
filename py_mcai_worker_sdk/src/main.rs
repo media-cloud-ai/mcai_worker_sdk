@@ -2,7 +2,7 @@
 extern crate serde_derive;
 
 #[cfg(feature = "media")]
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc::Sender, Arc, Mutex};
 use std::{env, fs};
 
 use pyo3::{prelude::*, types::*};
@@ -15,7 +15,7 @@ use mcai_worker_sdk::{
   McaiChannel, MessageError, MessageEvent, Result, Version,
 };
 #[cfg(feature = "media")]
-pub use mcai_worker_sdk::{FormatContext, Frame, ProcessResult};
+pub use mcai_worker_sdk::{FormatContext, Frame, ProcessResult, StreamDescriptor};
 
 use crate::helpers::get_destination_paths;
 #[cfg(feature = "media")]
@@ -214,7 +214,8 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
     &mut self,
     parameters: PythonWorkerParameters,
     format_context: Arc<Mutex<FormatContext>>,
-  ) -> Result<Vec<usize>> {
+    _result: Arc<Mutex<Sender<ProcessResult>>>,
+  ) -> Result<Vec<StreamDescriptor>> {
     let gil = Python::acquire_gil();
     let (py, python_module) = get_python_module(&gil)?;
 

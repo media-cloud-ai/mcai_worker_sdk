@@ -1,5 +1,6 @@
 use crate::Result;
 use bytes::Bytes;
+// use futures::prelude::*;
 use futures_util::sink::SinkExt;
 use srt::tokio::SrtSocket;
 use srt::SrtSocketBuilder;
@@ -54,6 +55,13 @@ impl SrtStream {
     self
       .runtime
       .block_on(async { socket.borrow_mut().try_next().await.unwrap() })
+  }
+
+  pub fn close(&mut self) {
+    let socket = self.socket.clone();
+    self.runtime.block_on(async {
+      socket.borrow_mut().close().await.unwrap();
+    });
   }
 }
 

@@ -2,13 +2,15 @@
 extern crate serde_derive;
 
 #[cfg(feature = "media")]
-use mcai_worker_sdk::{info, FormatContext, Frame, ProcessResult};
-use mcai_worker_sdk::{job::JobResult, MessageEvent, Result};
-use mcai_worker_sdk::{job::JobStatus, publish_job_progression, McaiChannel, MessageError};
+use mcai_worker_sdk::{info, FormatContext, Frame, ProcessResult, StreamDescriptor};
+use mcai_worker_sdk::{
+  job::{JobResult, JobStatus},
+  publish_job_progression, McaiChannel, MessageError, MessageEvent, Result,
+};
 use schemars::JsonSchema;
 use semver::Version;
 #[cfg(feature = "media")]
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc::Sender, Arc, Mutex};
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct WorkerParameters {
@@ -17,8 +19,11 @@ struct WorkerParameters {
   destination_path: Option<String>,
 }
 
-#[derive(Debug)]
-struct WorkerContext {}
+#[derive(Debug, Default)]
+struct WorkerContext {
+  #[cfg(feature = "media")]
+  result: Option<Arc<Mutex<Sender<ProcessResult>>>>,
+}
 
 impl MessageEvent<WorkerParameters> for WorkerContext {
   fn get_name(&self) -> String {
@@ -48,8 +53,19 @@ Do no use in production, just for developments."#
     &mut self,
     _parameters: WorkerParameters,
     _format_context: Arc<Mutex<FormatContext>>,
-  ) -> Result<Vec<usize>> {
-    Ok(vec![0])
+    result: Arc<Mutex<Sender<ProcessResult>>>,
+  ) -> Result<Vec<StreamDescriptor>> {
+    self.result = Some(result);
+
+    let index = 0;
+    let channel_layouts = vec!["mono".to_string()];
+    let sample_formats = vec!["s16".to_string()];
+    let sample_rates = vec![16000];
+
+    let audio_stream =
+      StreamDescriptor::new_audio(index, channel_layouts, sample_formats, sample_rates);
+
+    Ok(vec![audio_stream])
   }
 
   #[cfg(feature = "media")]
@@ -90,6 +106,13 @@ Do no use in production, just for developments."#
 
   #[cfg(feature = "media")]
   fn ending_process(&mut self) -> Result<()> {
+    if let Some(result) = &self.result {
+      result
+        .lock()
+        .unwrap()
+        .send(ProcessResult::end_of_process())
+        .unwrap();
+    }
     Ok(())
   }
 
@@ -122,6 +145,6 @@ Do no use in production, just for developments."#
 }
 
 fn main() {
-  let worker_context = WorkerContext {};
+  let worker_context = WorkerContext::default();
   mcai_worker_sdk::start_worker(worker_context);
 }

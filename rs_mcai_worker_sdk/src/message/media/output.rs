@@ -1,44 +1,126 @@
 use crate::message::media::srt::SrtStream;
 use crate::{MessageError, ProcessResult, Result};
 use bytes::Bytes;
+use std::{
+  sync::{
+    mpsc::{channel, Sender},
+    Arc, Mutex,
+  },
+  thread::JoinHandle,
+};
 
 pub struct Output {
-  srt_stream: Option<SrtStream>,
-  results: Vec<ProcessResult>,
+  results: Arc<Mutex<Vec<ProcessResult>>>,
   url: String,
+  thread: Option<JoinHandle<()>>,
+  sender: Arc<Mutex<Sender<ProcessResult>>>,
 }
 
 impl Output {
   pub fn new(output: &str) -> Result<Self> {
-    if SrtStream::is_srt_stream(output) {
-      let srt_stream = Some(SrtStream::open_connection(output)?);
+    let (sender, receiver) = channel::<ProcessResult>();
+    let output = output.to_string();
+    let url = output.clone();
 
-      Ok(Output {
-        srt_stream,
-        results: vec![],
-        url: output.to_string(),
-      })
-    } else {
-      Ok(Output {
-        srt_stream: None,
-        results: vec![],
-        url: output.to_string(),
-      })
-    }
+    let results = Arc::new(Mutex::new(vec![]));
+    let cloned_results = results.clone();
+
+    let thread = Some(std::thread::spawn(move || {
+      let mut srt_stream = if SrtStream::is_srt_stream(&output) {
+        Some(SrtStream::open_connection(&output).unwrap())
+      } else {
+        None
+      };
+
+      loop {
+        if let Ok(message) = receiver.recv() {
+          match message {
+            ProcessResult {
+              end_of_process: true,
+              ..
+            } => break,
+            ProcessResult {
+              json_content: Some(content),
+              ..
+            } => {
+              info!("[Output] Json message {}", content);
+              if let Some(srt_stream) = &mut srt_stream {
+                let data = Bytes::from(content);
+                srt_stream.send(data);
+              } else {
+                let message = ProcessResult {
+                  json_content: Some(content),
+                  xml_content: None,
+                  end_of_process: false,
+                };
+
+                cloned_results.lock().unwrap().push(message);
+              }
+            }
+            ProcessResult {
+              xml_content: Some(content),
+              ..
+            } => {
+              info!("[Output] XML message {}", content);
+              if let Some(srt_stream) = &mut srt_stream {
+                let data = Bytes::from(content);
+                srt_stream.send(data);
+              } else {
+                let message = ProcessResult {
+                  json_content: None,
+                  xml_content: Some(content),
+                  end_of_process: false,
+                };
+
+                cloned_results.lock().unwrap().push(message);
+              }
+            }
+            ProcessResult {
+              end_of_process: false,
+              json_content: None,
+              xml_content: None,
+            } => {}
+          }
+        } else {
+          break;
+        }
+      }
+
+      if let Some(mut srt_stream) = srt_stream {
+        srt_stream.close();
+      }
+
+      info!("End of output thread");
+    }));
+    let sender = Arc::new(Mutex::new(sender));
+
+    Ok(Output {
+      results,
+      url,
+      thread,
+      sender,
+    })
   }
 
   pub fn push(&mut self, content: ProcessResult) {
-    if let Some(srt_stream) = &mut self.srt_stream {
-      let data = Bytes::from(content.json_content.unwrap_or_else(|| "{}".to_string()));
-      srt_stream.send(data);
-    } else {
-      self.results.push(content);
-    }
+    self.sender.lock().unwrap().send(content).unwrap();
   }
 
-  pub fn to_destination_path(&self) -> Result<()> {
+  pub fn get_sender(&self) -> Arc<Mutex<Sender<ProcessResult>>> {
+    self.sender.clone()
+  }
+
+  pub fn to_destination_path(&mut self) -> Result<()> {
+    self.thread.take().map(JoinHandle::join);
+
+    if SrtStream::is_srt_stream(&self.url) {
+      return Ok(());
+    }
+
     let json_results: Vec<serde_json::Value> = self
       .results
+      .lock()
+      .unwrap()
       .iter()
       .filter(|result| result.json_content.is_some())
       .map(|result| serde_json::from_str(&result.json_content.as_ref().unwrap()).unwrap())
@@ -52,6 +134,8 @@ impl Output {
     } else {
       self
         .results
+        .lock()
+        .unwrap()
         .iter()
         .filter(|result| result.xml_content.is_some())
         .map(|result| result.xml_content.as_ref().unwrap().clone())
@@ -76,13 +160,16 @@ pub fn test_output() {
   let url = "/path/to/somewhere";
   let mut output = Output::new(url).unwrap();
 
-  assert!(output.srt_stream.is_none());
-  assert_eq!(0, output.results.len());
+  assert_eq!(0, output.results.lock().unwrap().len());
   assert_eq!(url, output.url);
 
-  let process_result = ProcessResult::new_json("{\"status\": \"OK\"}");
+  let process_result = ProcessResult::new_json(r#"{"status": "OK"}"#);
   output.push(process_result);
-  assert_eq!(1, output.results.len());
+
+  let process_result = ProcessResult::end_of_process();
+  output.push(process_result);
+
+  assert_eq!(1, output.results.lock().unwrap().len());
 
   let result = output.to_destination_path();
   assert!(result.is_err());

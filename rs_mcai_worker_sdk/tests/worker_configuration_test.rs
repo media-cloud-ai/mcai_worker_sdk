@@ -89,7 +89,9 @@ pub fn test_media_worker_configuration_new() {
 
   #[derive(JsonSchema, Deserialize)]
   struct CustomParameters {
+    #[allow(dead_code)]
     source_path: String,
+    #[allow(dead_code)]
     destination_path: String,
   }
 
@@ -160,9 +162,7 @@ pub fn test_media_worker_configuration_new_missing_source_parameter() {
   struct CustomEvent {}
 
   #[derive(JsonSchema, Deserialize)]
-  struct CustomParameters {
-    destination_path: String,
-  }
+  struct CustomParameters {}
 
   impl MessageEvent<CustomParameters> for CustomEvent {
     fn get_name(&self) -> String {
@@ -212,6 +212,7 @@ pub fn test_media_worker_configuration_new_missing_destination_parameter() {
 
   #[derive(JsonSchema, Deserialize)]
   struct CustomParameters {
+    #[allow(dead_code)]
     source_path: String,
   }
 
@@ -263,6 +264,7 @@ pub fn test_media_worker_configuration_new_missing_parameters() {
 
   #[derive(JsonSchema, Deserialize)]
   struct CustomParameters {
+    #[allow(dead_code)]
     other: String,
   }
 

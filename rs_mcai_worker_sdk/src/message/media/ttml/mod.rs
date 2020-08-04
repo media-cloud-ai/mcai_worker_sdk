@@ -28,7 +28,7 @@ pub struct Ttml {
   #[yaserde(rename = "clockMode", prefix = "ttp", attribute)]
   pub clock_mode: Option<String>,
   #[yaserde(rename = "timeBase", prefix = "ttp", attribute)]
-  pub timbe_base: Option<String>,
+  pub time_base: Option<String>,
   pub head: Head,
   pub body: Body,
 }

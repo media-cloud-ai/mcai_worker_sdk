@@ -2,7 +2,7 @@ use crate::{
   error::MessageError::RuntimeError,
   job::JobResult,
   message::media::{media_stream::MediaStream, srt::SrtStream},
-  MessageEvent, Result,
+  MessageEvent, ProcessResult, Result,
 };
 use ringbuf::RingBuffer;
 use schemars::JsonSchema;
@@ -51,6 +51,7 @@ impl Source {
     job_result: &JobResult,
     parameters: P,
     source_url: &str,
+    sender: Arc<Mutex<Sender<ProcessResult>>>,
   ) -> Result<Self> {
     info!(target: &job_result.get_str_job_id(), "Opening source: {}", source_url);
 
@@ -99,6 +100,7 @@ impl Source {
         &job_result.get_str_job_id(),
         parameters,
         format_context.clone(),
+        sender,
       )?;
 
       Ok(Source {
@@ -117,6 +119,7 @@ impl Source {
         &job_result.get_str_job_id(),
         parameters,
         format_context.clone(),
+        sender,
       )?;
 
       Ok(Source {
@@ -184,10 +187,12 @@ impl Source {
     job_id: &str,
     parameters: P,
     format_context: Arc<Mutex<FormatContext>>,
+    sender: Arc<Mutex<Sender<ProcessResult>>>,
   ) -> Result<HashMap<usize, Decoder>> {
-    let selected_streams = message_event
-      .borrow_mut()
-      .init_process(parameters, format_context.clone())?;
+    let selected_streams =
+      message_event
+        .borrow_mut()
+        .init_process(parameters, format_context.clone(), sender)?;
 
     info!(
       target: job_id,

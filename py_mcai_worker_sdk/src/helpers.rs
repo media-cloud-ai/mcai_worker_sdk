@@ -1,7 +1,7 @@
 use pyo3::{prelude::*, types::*};
 
 #[cfg(feature = "media")]
-use mcai_worker_sdk::{MessageError, Result};
+use mcai_worker_sdk::{MessageError, Result, StreamDescriptor};
 
 pub fn py_err_to_string(py: Python, error: PyErr) -> String {
   let locals = [("error", error)].into_py_dict(py);
@@ -44,17 +44,15 @@ pub fn get_destination_paths(response: &PyAny) -> Option<Vec<String>> {
 }
 
 #[cfg(feature = "media")]
-pub fn get_stream_indexes(response: &PyAny) -> Result<Vec<usize>> {
+pub fn get_stream_indexes(response: &PyAny) -> Result<Vec<StreamDescriptor>> {
   response
     .downcast::<PyList>()
     .map(|py_list| {
       py_list
         .iter()
-        .map(|item| item.downcast::<PyLong>())
-        .filter(|downcast| downcast.is_ok())
-        .map(|value| value.unwrap().extract::<usize>())
-        .filter(|extract| extract.is_ok())
-        .map(|int_value| int_value.unwrap())
+        .map(|value| value.extract::<StreamDescriptor>())
+        .filter(|extracted| extracted.is_ok())
+        .map(|extracted| extracted.unwrap())
         .collect()
     })
     .map_err(|e| {
@@ -74,9 +72,8 @@ pub fn test_py_err_to_string() {
   PyErr::new::<pyo3::exceptions::TypeError, _>(error_message.clone()).restore(py);
   let py_err = PyErr::fetch(py);
 
-  let expected_message = format!("TypeError(\'{}\',)", error_message);
-  let string = py_err_to_string(py, py_err);
-  assert_eq!(expected_message, string);
+  let expected_message = format!("TypeError(\'{}\'", error_message);
+  assert!(py_err_to_string(py, py_err).contains(&expected_message));
 }
 
 #[test]
@@ -132,16 +129,17 @@ pub fn test_get_destination_paths_without_list_value() {
 #[test]
 #[cfg(feature = "media")]
 pub fn test_get_stream_indexes() {
-  let stream_indexes = vec![2, 3, 4];
+  let stream_indexes = vec![StreamDescriptor::new_audio(0, vec![], vec![], vec![])];
   let gil = Python::acquire_gil();
   let py = gil.python();
 
-  let py_list = PyList::new(py, stream_indexes.clone());
-  let py_any: &PyAny = py_list.into();
+  let py_list: PyObject = stream_indexes.into_py(py);
+  let py_any: &PyAny = py_list.cast_as(py).unwrap();
 
-  let result = get_stream_indexes(py_any);
+  let result = get_stream_indexes(&py_any);
   assert!(result.is_ok());
-  assert_eq!(stream_indexes, result.unwrap());
+  let result = result.unwrap();
+  assert_eq!(1, result.len());
 }
 
 #[test]

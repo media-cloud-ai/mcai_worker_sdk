@@ -128,7 +128,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::str::FromStr;
 #[cfg(feature = "media")]
-use std::sync::Mutex;
+use std::sync::{mpsc::Sender, Mutex};
 use std::{cell::RefCell, fs, io::Write, rc::Rc, sync::Arc, thread, time};
 #[cfg(feature = "media")]
 use yaserde::YaSerialize;
@@ -139,16 +139,34 @@ pub type McaiChannel = Arc<Channel>;
 #[cfg(feature = "media")]
 #[derive(Debug)]
 pub struct ProcessResult {
+  end_of_process: bool,
   json_content: Option<String>,
   xml_content: Option<String>,
 }
 
 #[cfg(feature = "media")]
 impl ProcessResult {
+  pub fn empty() -> Self {
+    ProcessResult {
+      end_of_process: false,
+      json_content: None,
+      xml_content: None,
+    }
+  }
+
+  pub fn end_of_process() -> Self {
+    ProcessResult {
+      end_of_process: true,
+      json_content: None,
+      xml_content: None,
+    }
+  }
+
   pub fn new_json<S: Serialize>(content: S) -> Self {
     let content = serde_json::to_string(&content).unwrap();
 
     ProcessResult {
+      end_of_process: false,
       json_content: Some(content),
       xml_content: None,
     }
@@ -158,6 +176,7 @@ impl ProcessResult {
     let content = yaserde::ser::to_string(&content).unwrap();
 
     ProcessResult {
+      end_of_process: false,
       json_content: None,
       xml_content: Some(content),
     }
@@ -181,6 +200,7 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
     &mut self,
     _parameters: P,
     _format_context: Arc<Mutex<FormatContext>>,
+    _response_sender: Arc<Mutex<Sender<ProcessResult>>>,
   ) -> Result<Vec<StreamDescriptor>> {
     Ok(vec![])
   }
@@ -294,7 +314,8 @@ where
       );
 
       match result {
-        Ok(job_result) => {
+        Ok(mut job_result) => {
+          job_result.update_execution_duration();
           info!(target: &job_result.get_job_id().to_string(), "Process succeeded: {:?}", job_result)
         }
         Err(message) => {
