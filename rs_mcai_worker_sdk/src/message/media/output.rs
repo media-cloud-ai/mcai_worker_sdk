@@ -32,57 +32,53 @@ impl Output {
         None
       };
 
-      loop {
-        if let Ok(message) = receiver.recv() {
-          match message {
-            ProcessResult {
-              end_of_process: true,
-              ..
-            } => break,
-            ProcessResult {
-              json_content: Some(content),
-              ..
-            } => {
-              info!("[Output] Json message {}", content);
-              if let Some(srt_stream) = &mut srt_stream {
-                let data = Bytes::from(content);
-                srt_stream.send(data);
-              } else {
-                let message = ProcessResult {
-                  json_content: Some(content),
-                  xml_content: None,
-                  end_of_process: false,
-                };
+      while let Ok(message) = receiver.recv() {
+        match message {
+          ProcessResult {
+            end_of_process: true,
+            ..
+          } => break,
+          ProcessResult {
+            json_content: Some(content),
+            ..
+          } => {
+            info!("[Output] Json message {}", content);
+            if let Some(srt_stream) = &mut srt_stream {
+              let data = Bytes::from(content);
+              srt_stream.send(data);
+            } else {
+              let message = ProcessResult {
+                json_content: Some(content),
+                xml_content: None,
+                end_of_process: false,
+              };
 
-                cloned_results.lock().unwrap().push(message);
-              }
+              cloned_results.lock().unwrap().push(message);
             }
-            ProcessResult {
-              xml_content: Some(content),
-              ..
-            } => {
-              info!("[Output] XML message {}", content);
-              if let Some(srt_stream) = &mut srt_stream {
-                let data = Bytes::from(content);
-                srt_stream.send(data);
-              } else {
-                let message = ProcessResult {
-                  json_content: None,
-                  xml_content: Some(content),
-                  end_of_process: false,
-                };
-
-                cloned_results.lock().unwrap().push(message);
-              }
-            }
-            ProcessResult {
-              end_of_process: false,
-              json_content: None,
-              xml_content: None,
-            } => {}
           }
-        } else {
-          break;
+          ProcessResult {
+            xml_content: Some(content),
+            ..
+          } => {
+            info!("[Output] XML message {}", content);
+            if let Some(srt_stream) = &mut srt_stream {
+              let data = Bytes::from(content);
+              srt_stream.send(data);
+            } else {
+              let message = ProcessResult {
+                json_content: None,
+                xml_content: Some(content),
+                end_of_process: false,
+              };
+
+              cloned_results.lock().unwrap().push(message);
+            }
+          }
+          ProcessResult {
+            end_of_process: false,
+            json_content: None,
+            xml_content: None,
+          } => {}
         }
       }
 
@@ -110,7 +106,7 @@ impl Output {
     self.sender.clone()
   }
 
-  pub fn to_destination_path(&mut self) -> Result<()> {
+  pub fn complete(&mut self) -> Result<()> {
     self.thread.take().map(JoinHandle::join);
 
     if SrtStream::is_srt_stream(&self.url) {
@@ -171,7 +167,7 @@ pub fn test_output() {
 
   assert_eq!(1, output.results.lock().unwrap().len());
 
-  let result = output.to_destination_path();
+  let result = output.complete();
   assert!(result.is_err());
 
   let expected_error = MessageError::RuntimeError(format!("Could not write to '/path/to/somewhere' destination: Os {{ code: 2, kind: NotFound, message: \"No such file or directory\" }}"));
