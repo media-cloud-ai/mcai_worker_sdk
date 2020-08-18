@@ -1,6 +1,6 @@
 [package]
 name = "py_mcai_worker_sdk"
-version = "0.10.4"
+version = "0.11.0-alpha"
 authors = [
   "Valentin NOEL <valentin.noel@media-io.com>",
   "Marc-Antoine Arnaud <maarnaud@media-io.com>",
