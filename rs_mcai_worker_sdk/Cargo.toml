@@ -54,13 +54,9 @@ yaserde_derive = "^0.4"
 regex = "1"
 ## dependencies for media feature
 ringbuf = {version = "0.2.1", optional = true }
-stainless_ffmpeg = { git = "https://github.com/nomalab/stainless-ffmpeg", branch = "add_some_trait_implementations", optional = true }
-stainless-ffmpeg-sys = {version = "4.2.2-update.1", optional = true }
-
-[dependencies.secure-reliable-transport]
-git = "https://github.com/russelltg/srt-rs.git"
-rev = "e546742"
-optional = true
+stainless_ffmpeg = { version = "0.2.2", optional = true }
+stainless-ffmpeg-sys = { version = "4.2.3", optional = true }
+secure-reliable-transport = { version = "0.2.1", optional = true }
 
 [dev-dependencies]
 assert_matches = "1.3.0"
