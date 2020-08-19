@@ -4,7 +4,7 @@ use crate::{
   parameter::container::ParametersContainer,
   McaiChannel, MessageEvent, Result,
 };
-#[cfg(feature = "media")]
+#[cfg(all(feature = "media", feature = "python"))]
 use dict_derive::{FromPyObject, IntoPyObject};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
@@ -21,8 +21,9 @@ pub mod ttml;
 pub const SOURCE_PATH_PARAMETER: &str = "source_path";
 pub const DESTINATION_PATH_PARAMETER: &str = "destination_path";
 
-#[cfg(feature = "media")]
-#[derive(Debug, FromPyObject, IntoPyObject, PartialEq)]
+#[cfg(all(feature = "media"))]
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 pub struct StreamDescriptor {
   index: usize,
   audio_configuration: Option<AudioConfiguration>,
@@ -49,7 +50,8 @@ impl StreamDescriptor {
 }
 
 #[cfg(feature = "media")]
-#[derive(Debug, FromPyObject, IntoPyObject, PartialEq)]
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 pub struct AudioConfiguration {
   channel_layouts: Vec<String>,
   sample_formats: Vec<String>,
@@ -57,7 +59,8 @@ pub struct AudioConfiguration {
 }
 
 #[cfg(feature = "media")]
-#[derive(Debug, FromPyObject, IntoPyObject, PartialEq)]
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 pub struct ImageConfiguration {}
 
 pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(

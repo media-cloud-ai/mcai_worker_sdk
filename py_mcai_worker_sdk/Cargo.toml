@@ -9,7 +9,10 @@ edition = "2018"
 
 [features]
 default = []
-media = ["mcai_worker_sdk/media"]
+media = [
+  "mcai_worker_sdk/media",
+  "mcai_worker_sdk/python"
+]
 
 [dependencies]
 dict_derive = "0.2.0"
