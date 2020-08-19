@@ -37,7 +37,7 @@ jobs:
         - rustup component add clippy-preview
       script:
         # Fail if clippy output contains "error:" or "warning:"
-        - cargo clippy --all-features --package mcai_worker_sdk --package c_mcai_worker_sdk 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+        - cargo clippy --features=media --package mcai_worker_sdk --package c_mcai_worker_sdk 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
       env:
         - CHECK_SYNTAX=TRUE
         - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
