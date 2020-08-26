@@ -176,7 +176,10 @@ pub fn test_output() {
 
     let process_result = results_ref.get(0).unwrap();
     let expected_result = ProcessResult::new_json(ok_content);
-    assert_eq!(process_result.end_of_process, expected_result.end_of_process);
+    assert_eq!(
+      process_result.end_of_process,
+      expected_result.end_of_process
+    );
     assert_eq!(process_result.json_content, expected_result.json_content);
     assert_eq!(process_result.xml_content, expected_result.xml_content);
   }
