@@ -87,8 +87,8 @@ jobs:
 
 script:
   - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
-  - cd rs_mcai_worker_sdk && cargo test --features=media
-  - cd c_mcai_worker_sdk && cargo test --features=media
+  - cd $TRAVIS_BUILD_DIR/rs_mcai_worker_sdk && cargo test --features=media
+  - cd $TRAVIS_BUILD_DIR/c_mcai_worker_sdk && cargo test --features=media
 
 before_script:
   - sudo add-apt-repository ppa:jonathonf/ffmpeg-4 -y
