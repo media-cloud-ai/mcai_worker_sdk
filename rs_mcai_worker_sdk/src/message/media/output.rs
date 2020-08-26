@@ -159,13 +159,27 @@ pub fn test_output() {
   assert_eq!(0, output.results.lock().unwrap().len());
   assert_eq!(url, output.url);
 
-  let process_result = ProcessResult::new_json(r#"{"status": "OK"}"#);
+  let ok_content = r#"{"status": "OK"}"#;
+  let process_result = ProcessResult::new_json(ok_content);
   output.push(process_result);
 
   let process_result = ProcessResult::end_of_process();
   output.push(process_result);
 
-  assert_eq!(1, output.results.lock().unwrap().len());
+  // wait a bit for the result to be received...
+  std::thread::sleep(std::time::Duration::from_millis(10));
+
+  {
+    // check results
+    let results_ref = output.results.lock().unwrap();
+    assert_eq!(1, results_ref.len());
+
+    let process_result = results_ref.get(0).unwrap();
+    let expected_result = ProcessResult::new_json(ok_content);
+    assert_eq!(process_result.end_of_process, expected_result.end_of_process);
+    assert_eq!(process_result.json_content, expected_result.json_content);
+    assert_eq!(process_result.xml_content, expected_result.xml_content);
+  }
 
   let result = output.complete();
   assert!(result.is_err());
