@@ -4,7 +4,7 @@ use mcai_worker_sdk::{MessageError, Result};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyList};
 
-#[pyclass]
+#[pyclass(unsendable)] // Warning: this could introduce thread unsafe behaviour
 #[derive(Debug, PartialEq)]
 pub struct Frame {
   #[pyo3(get)]
