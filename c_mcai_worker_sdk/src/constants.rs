@@ -1,7 +1,14 @@
+#[cfg(feature = "media")]
+pub static ENDING_PROCESS_FUNCTION: &str = "ending_process";
 pub static GET_NAME_FUNCTION: &str = "get_name";
 pub static GET_SHORT_DESCRIPTION_FUNCTION: &str = "get_short_description";
 pub static GET_DESCRIPTION_FUNCTION: &str = "get_description";
 pub static GET_VERSION_FUNCTION: &str = "get_version";
 pub static GET_PARAMETERS_SIZE_FUNCTION: &str = "get_parameters_size";
 pub static GET_PARAMETERS_FUNCTION: &str = "get_parameters";
+pub static INIT_FUNCTION: &str = "init";
+#[cfg(feature = "media")]
+pub static INIT_PROCESS_FUNCTION: &str = "init_process";
 pub static PROCESS_FUNCTION: &str = "process";
+#[cfg(feature = "media")]
+pub static PROCESS_FRAME_FUNCTION: &str = "process_frame";

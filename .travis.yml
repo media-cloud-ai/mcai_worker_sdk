@@ -2,6 +2,8 @@ language: rust
 
 rust:
   - 1.43.0
+  - 1.44.1
+  - 1.45.1
   - stable
   - beta
   - nightly
@@ -14,7 +16,7 @@ jobs:
     # Test Python SDK on nighlty
     - rust: nightly
       script:
-        - cargo test --package py_mcai_worker_sdk
+        - cargo test --all-features --package py_mcai_worker_sdk
       env:
         - TEST_PYTHON_SDK=TRUE
         - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
@@ -37,7 +39,8 @@ jobs:
         - rustup component add clippy-preview
       script:
         # Fail if clippy output contains "error:" or "warning:"
-        - cargo clippy --package mcai_worker_sdk --package c_mcai_worker_sdk 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+        - cd $TRAVIS_BUILD_DIR/rs_mcai_worker_sdk && cargo clippy --features media 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+        - cd $TRAVIS_BUILD_DIR/c_mcai_worker_sdk && cargo clippy --features media 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
       env:
         - CHECK_SYNTAX=TRUE
         - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
@@ -59,7 +62,7 @@ jobs:
         - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
         - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
-        - travis_wait cargo tarpaulin --verbose --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+        - travis_wait cargo tarpaulin --verbose --all-features --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
       env:
         - COVERAGE_CHECK=TRUE
         - TRAVIS_RUST_VERSION=nightly-2020-01-21
@@ -71,11 +74,13 @@ jobs:
         - cargo test
       env:
         - ALLOW_FAILURE=TRUE
-        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so  
+        - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
+
   allow_failures:
     - env:
       - ALLOW_FAILURE=TRUE
-      - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so  
+      - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so
+
   allow_failures:
     - env:
       - ALLOW_FAILURE=TRUE
@@ -85,7 +90,13 @@ jobs:
 
 script:
   - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
-  - cargo test --package mcai_worker_sdk --package c_mcai_worker_sdk
+  - cd $TRAVIS_BUILD_DIR/rs_mcai_worker_sdk && cargo test --features=media
+  - cd $TRAVIS_BUILD_DIR/c_mcai_worker_sdk && cargo test --features=media
+
+before_script:
+  - sudo add-apt-repository ppa:jonathonf/ffmpeg-4 -y
+  - sudo apt-get update -q
+  - sudo apt-get install ffmpeg libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libavfilter-dev libavresample-dev libpostproc-dev libswscale-dev -y
 
 # Need to cache the whole `.cargo` directory to keep .crates.toml for
 # cargo-update to work

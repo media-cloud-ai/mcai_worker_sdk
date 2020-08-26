@@ -1,16 +1,25 @@
 mod constants;
+mod parameters;
 mod process_return;
 mod worker;
 
+#[macro_use]
+extern crate serde_derive;
+
+use crate::parameters::CWorkerParameters;
 use crate::worker::*;
 use mcai_worker_sdk::{
-  debug, job::*, start_worker, worker::Parameter, McaiChannel, MessageError, MessageEvent, Version,
+  debug, job::JobResult, start_worker, McaiChannel, MessageEvent, Result, Version,
 };
+#[cfg(feature = "media")]
+use mcai_worker_sdk::{FormatContext, Frame, ProcessResult, StreamDescriptor};
+#[cfg(feature = "media")]
+use std::sync::{mpsc::Sender, Arc, Mutex};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct CWorkerEvent {}
 
-impl MessageEvent for CWorkerEvent {
+impl MessageEvent<CWorkerParameters> for CWorkerEvent {
   fn get_name(&self) -> String {
     get_worker_function_string_value(constants::GET_NAME_FUNCTION)
   }
@@ -33,18 +42,43 @@ impl MessageEvent for CWorkerEvent {
     })
   }
 
-  fn get_parameters(&self) -> Vec<Parameter> {
-    get_worker_parameters()
+  fn init(&mut self) -> Result<()> {
+    call_optional_worker_init()
+  }
+
+  #[cfg(feature = "media")]
+  fn init_process(
+    &mut self,
+    parameters: CWorkerParameters,
+    format_context: Arc<Mutex<FormatContext>>,
+    _result: Arc<Mutex<Sender<ProcessResult>>>,
+  ) -> Result<Vec<StreamDescriptor>> {
+    call_worker_init_process(parameters, format_context)
+  }
+
+  #[cfg(feature = "media")]
+  fn process_frame(
+    &mut self,
+    job_result: JobResult,
+    stream_index: usize,
+    frame: Frame,
+  ) -> Result<ProcessResult> {
+    call_worker_process_frame(job_result, stream_index, frame)
+  }
+
+  #[cfg(feature = "media")]
+  fn ending_process(&mut self) -> Result<()> {
+    call_worker_ending_process()
   }
 
   fn process(
     &self,
     channel: Option<McaiChannel>,
-    job: &Job,
+    parameters: CWorkerParameters,
     job_result: JobResult,
-  ) -> Result<JobResult, MessageError> {
-    debug!("Process job: {:?}", job.job_id);
-    let process_return = call_worker_process(job, channel);
+  ) -> Result<JobResult> {
+    debug!("Process job: {}", job_result.get_job_id());
+    let process_return = call_worker_process(job_result.clone(), parameters, channel)?;
     debug!("Returned: {:?}", process_return);
     process_return.as_result(job_result)
   }
@@ -53,7 +87,7 @@ impl MessageEvent for CWorkerEvent {
 static C_WORKER_EVENT: CWorkerEvent = CWorkerEvent {};
 
 fn main() {
-  start_worker(&C_WORKER_EVENT);
+  start_worker(C_WORKER_EVENT.clone());
 }
 
 #[test]
@@ -73,24 +107,59 @@ pub fn test_c_binding_worker_info() {
   );
   assert_eq!(version, "0.1.0".to_string());
 
-  let parameters = C_WORKER_EVENT.get_parameters();
-  assert_eq!(1, parameters.len());
-  let expected_parameter = Parameter {
-    identifier: "my_parameter".to_string(),
-    label: "My parameter".to_string(),
-    kind: vec![ParameterType::String],
-    required: true,
-  };
-  assert_eq!(expected_parameter.identifier, parameters[0].identifier);
-  assert_eq!(expected_parameter.label, parameters[0].label);
-  assert_eq!(expected_parameter.kind.len(), parameters[0].kind.len());
+  let parameters = get_worker_parameters();
+  assert_eq!(3, parameters.len());
+
+  assert_eq!("my_parameter".to_string(), parameters[0].identifier);
+  assert_eq!("My parameter".to_string(), parameters[0].label);
+  assert_eq!(1, parameters[0].kind.len());
+  assert!(!parameters[0].required);
 
   let parameter_kind =
     serde_json::to_string(&parameters[0].kind[0]).expect("cannot serialize parameter kind");
   let expected_kind =
-    serde_json::to_string(&expected_parameter.kind[0]).expect("cannot serialize parameter kind");
+    serde_json::to_string(&ParameterType::String).expect("cannot serialize parameter kind");
   assert_eq!(expected_kind, parameter_kind);
-  assert_eq!(expected_parameter.required, parameters[0].required);
+
+  assert_eq!("source_path".to_string(), parameters[1].identifier);
+  assert_eq!("Source path".to_string(), parameters[1].label);
+  assert_eq!(1, parameters[1].kind.len());
+  assert!(parameters[1].required);
+
+  let parameter_kind =
+    serde_json::to_string(&parameters[1].kind[0]).expect("cannot serialize parameter kind");
+  let expected_kind =
+    serde_json::to_string(&ParameterType::String).expect("cannot serialize parameter kind");
+  assert_eq!(expected_kind, parameter_kind);
+
+  assert_eq!("destination_path".to_string(), parameters[2].identifier);
+  assert_eq!("Destination path".to_string(), parameters[2].label);
+  assert_eq!(1, parameters[2].kind.len());
+  assert!(parameters[2].required);
+
+  let parameter_kind =
+    serde_json::to_string(&parameters[2].kind[0]).expect("cannot serialize parameter kind");
+  let expected_kind =
+    serde_json::to_string(&ParameterType::String).expect("cannot serialize parameter kind");
+  assert_eq!(expected_kind, parameter_kind);
+}
+
+#[cfg(test)]
+use mcai_worker_sdk::job::{Job, JobStatus};
+
+#[test]
+pub fn test_init() {
+  let mut c_worker_event = C_WORKER_EVENT.clone();
+  let result = c_worker_event.init();
+  assert!(result.is_ok());
+}
+
+#[test]
+#[cfg(feature = "media")]
+pub fn test_ending_process() {
+  let mut c_worker_event = C_WORKER_EVENT.clone();
+  let result = c_worker_event.ending_process();
+  assert!(result.is_ok());
 }
 
 #[test]
@@ -108,8 +177,9 @@ pub fn test_process() {
 
   let job = Job::new(message).unwrap();
   let job_result = JobResult::new(job.job_id);
+  let parameters = job.get_parameters().unwrap();
 
-  let result = C_WORKER_EVENT.process(None, &job, job_result);
+  let result = C_WORKER_EVENT.process(None, parameters, job_result);
   assert!(result.is_ok());
   let job_result = result.unwrap();
   assert_eq!(job_result.get_job_id(), 123);
@@ -135,8 +205,9 @@ pub fn test_failing_process() {
 
   let job = Job::new(message).unwrap();
   let job_result = JobResult::new(job.job_id);
+  let parameters = job.get_parameters().unwrap();
 
-  let result = C_WORKER_EVENT.process(None, &job, job_result);
+  let result = C_WORKER_EVENT.process(None, parameters, job_result);
   assert!(result.is_err());
   let _message_error = result.unwrap_err();
 }

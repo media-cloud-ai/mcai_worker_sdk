@@ -1,5 +1,7 @@
 extern crate assert_matches;
 extern crate mcai_worker_sdk;
+#[macro_use]
+extern crate serde_derive;
 
 use assert_matches::assert_matches;
 
@@ -8,9 +10,10 @@ use mcai_worker_sdk::job::*;
 use mcai_worker_sdk::parameter::media_segment::MediaSegment;
 use mcai_worker_sdk::MessageError;
 
-use mcai_worker_sdk::parameter::ParameterValueError;
 use mcai_worker_sdk::Credential;
 use std::collections::HashMap;
+
+use schemars::JsonSchema;
 
 #[test]
 fn test_new_job_empty_message() {
@@ -109,7 +112,10 @@ fn test_new_job() {
   let part_1 = "error sending request for url (http://127.0.0.1:4000/api/sessions): ";
   let part_2 = "error trying to connect: tcp connect error: Connection refused (os error";
   let error_message = format!(r#""{}{} {})""#, part_1, part_2, code);
-  assert_eq!(ParameterValueError::new(&error_message), credential_value);
+  assert_eq!(
+    MessageError::ParameterValueError(error_message),
+    credential_value
+  );
 
   let option_array = job.get_parameter::<Vec<String>>("array_of_string_parameter");
   assert!(option_array.is_ok());
@@ -225,4 +231,194 @@ fn test_check_invalid_requirements() {
   } else {
     assert!(false);
   }
+}
+
+#[test]
+fn test_get_job_parameters() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id":"key",
+        "type":"string",
+        "value":"value"
+      }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  assert_eq!(123, job.job_id);
+
+  #[derive(JsonSchema, Deserialize)]
+  struct WorkerJobParameters {
+    key: String,
+    other: Option<String>,
+  }
+
+  let job_parameters = job.get_parameters::<WorkerJobParameters>();
+  assert!(job_parameters.is_ok());
+  let job_parameters = job_parameters.unwrap();
+
+  assert_eq!("value".to_string(), job_parameters.key);
+  assert_eq!(None, job_parameters.other);
+}
+
+#[test]
+fn test_get_missing_job_parameters() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id":"key",
+        "type":"string",
+        "value":"value"
+      }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  assert_eq!(123, job.job_id);
+
+  #[derive(JsonSchema, Deserialize, Debug)]
+  struct WorkerJobParameters {
+    other: String,
+  }
+
+  let job_parameters = job.get_parameters::<WorkerJobParameters>();
+  let expected = MessageError::ParameterValueError("Cannot get parameters from Object({\"key\": String(\"value\")}): Error(\"missing field `other`\", line: 0, column: 0)".to_string());
+
+  assert!(job_parameters.is_err());
+  assert_eq!(expected, job_parameters.unwrap_err());
+}
+
+#[test]
+fn test_get_job_parameters_with_environment_credential_1() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id":"key",
+        "type":"string",
+        "value": "credential_key_1",
+        "store": "env"
+      }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  assert_eq!(123, job.job_id);
+
+  #[derive(JsonSchema, Deserialize, Debug)]
+  struct WorkerJobParameters {
+    key: String,
+  }
+
+  std::env::set_var("credential_key_1", "credential_value_1");
+
+  let job_parameters = job.get_parameters::<WorkerJobParameters>().unwrap();
+  assert_eq!("credential_value_1", &job_parameters.key);
+
+  std::env::remove_var("credential_key_1");
+}
+
+#[test]
+fn test_get_job_parameters_with_environment_credential_2() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id":"key",
+        "type":"string",
+        "value": "credential_key_2",
+        "store": "ENV"
+      }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  assert_eq!(123, job.job_id);
+
+  #[derive(JsonSchema, Deserialize, Debug)]
+  struct WorkerJobParameters {
+    key: String,
+  }
+
+  std::env::set_var("credential_key_2", "credential_value_2");
+
+  let job_parameters = job.get_parameters::<WorkerJobParameters>().unwrap();
+  assert_eq!("credential_value_2", &job_parameters.key);
+
+  std::env::remove_var("credential_key_2");
+}
+
+#[test]
+fn test_get_job_parameters_with_environment_credential_3() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id":"key",
+        "type":"string",
+        "value": "credential_key_3",
+        "store": "environment"
+      }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  assert_eq!(123, job.job_id);
+
+  #[derive(JsonSchema, Deserialize, Debug)]
+  struct WorkerJobParameters {
+    key: String,
+  }
+
+  std::env::set_var("credential_key_3", "credential_value_3");
+
+  let job_parameters = job.get_parameters::<WorkerJobParameters>().unwrap();
+  assert_eq!("credential_value_3", &job_parameters.key);
+
+  std::env::remove_var("credential_key_3");
+}
+
+#[test]
+fn test_get_job_parameters_with_unsupported_integer_credential_type() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id":"key",
+        "type":"integer",
+        "value": 123,
+        "store": "some_store"
+      }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  assert_eq!(123, job.job_id);
+
+  #[derive(JsonSchema, Deserialize, Debug)]
+  struct WorkerJobParameters {
+    key: u32,
+  }
+
+  let job_parameters = job.get_parameters::<WorkerJobParameters>();
+  let expected =
+    MessageError::ParameterValueError("Cannot handle credential type for Number(123)".to_string());
+
+  assert!(job_parameters.is_err());
+  assert_eq!(expected, job_parameters.unwrap_err());
 }

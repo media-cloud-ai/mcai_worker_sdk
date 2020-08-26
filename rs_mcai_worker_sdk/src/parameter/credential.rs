@@ -10,11 +10,12 @@ use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
 use serde_json::Value;
+use std::env::var;
 
-#[deprecated(
-  since = "0.10.4",
-  note = "Please use the `store` field in Parameter instead"
-)]
+// #[deprecated(
+//   since = "0.10.4",
+//   note = "Please use the `store` field in Parameter instead"
+// )]
 #[derive(Debug, PartialEq)]
 pub struct Credential {
   pub value: String,
@@ -68,6 +69,12 @@ impl<'de> Deserialize<'de> for Credential {
 }
 
 pub fn request_value(credential_key: &str, store_code: &str) -> Result<Value, String> {
+  if vec!["env", "ENV", "environment"].contains(&store_code) {
+    return var(credential_key)
+      .map(Value::String)
+      .map_err(|error| error.to_string());
+  }
+
   let backend_endpoint = get_store_hostname(store_code);
   let backend_username = get_store_username(store_code);
   let backend_password = get_store_password(store_code);

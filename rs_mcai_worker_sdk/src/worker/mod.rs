@@ -1,9 +1,21 @@
 //! Module to manage the worker
 
+use schemars::schema::RootSchema;
+use schemars::schema_for;
+use schemars::JsonSchema;
+use semver::Version;
+use serde::Deserialize;
+
+#[cfg(feature = "media")]
+use crate::{
+  message::{DESTINATION_PATH_PARAMETER, SOURCE_PATH_PARAMETER},
+  MessageError,
+};
+use crate::{MessageEvent, Result};
+use serde::de::DeserializeOwned;
+
 pub mod docker;
 pub mod system_information;
-use crate::MessageEvent;
-use semver::Version;
 
 pub mod built_info {
   include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -43,28 +55,63 @@ pub struct WorkerConfiguration {
   description: String,
   version: Version,
   sdk_version: Version,
-  parameters: Vec<Parameter>,
+  parameters: RootSchema,
 }
 
 impl WorkerConfiguration {
-  pub fn new<ME: MessageEvent>(queue_name: &str, message_event: &'static ME) -> Self {
+  pub fn new<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
+    queue_name: &str,
+    message_event: &ME,
+    instance_id: &str,
+  ) -> Result<Self> {
     let sdk_version =
       Version::parse(built_info::PKG_VERSION).unwrap_or_else(|_| Version::new(0, 0, 0));
 
-    WorkerConfiguration {
-      instance_id: docker::get_instance_id("/proc/self/cgroup"),
+    let parameters = WorkerConfiguration::get_parameter_schema::<P>()?;
+
+    Ok(WorkerConfiguration {
+      instance_id: instance_id.to_string(),
       queue_name: queue_name.to_string(),
       label: message_event.get_name(),
       sdk_version,
       version: message_event.get_version(),
       short_description: message_event.get_short_description(),
       description: message_event.get_description(),
-      parameters: message_event.get_parameters(),
-    }
+      parameters,
+    })
   }
 
-  pub fn add_parameter(&mut self, parameter: Parameter) {
-    self.parameters.push(parameter);
+  #[cfg(feature = "media")]
+  fn get_parameter_schema<P: JsonSchema>() -> Result<RootSchema> {
+    let mut parameters: RootSchema = schema_for!(P);
+    if !parameters
+      .schema
+      .object()
+      .properties
+      .contains_key(SOURCE_PATH_PARAMETER)
+    {
+      return Err(MessageError::ParameterValueError(format!(
+        "Expected media parameter missing: '{}'",
+        SOURCE_PATH_PARAMETER
+      )));
+    }
+    if !parameters
+      .schema
+      .object()
+      .properties
+      .contains_key(DESTINATION_PATH_PARAMETER)
+    {
+      return Err(MessageError::ParameterValueError(format!(
+        "Expected media parameter missing: '{}'",
+        DESTINATION_PATH_PARAMETER
+      )));
+    }
+    Ok(parameters)
+  }
+
+  #[cfg(not(feature = "media"))]
+  fn get_parameter_schema<P: JsonSchema>() -> Result<RootSchema> {
+    Ok(schema_for!(P))
   }
 
   pub fn get_instance_id(&self) -> String {

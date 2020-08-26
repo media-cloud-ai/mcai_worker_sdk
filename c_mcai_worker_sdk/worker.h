@@ -77,6 +77,58 @@ unsigned int get_parameters_size();
 void get_parameters(Parameter* parameters);
 
 /**
+ * Initialize worker
+ * (This fonction is optional)
+ * @param logger  Rust Logger
+ */
+void init(Logger logger);
+
+/**
+ * Initialize worker media process
+ * (the "media" feature must be enabled)
+ * @param handler                  Handler
+ * @param parameters_value_getter  Get job parameter value callback
+ * @param logger                   Rust Logger
+ * @param format_context           Format context pointer
+ * @param output_stream_indexes    Pointer of indexes of the output streams
+ */
+int init_process(
+    Handler handler,
+    GetParameterValueCallback parameters_value_getter,
+    Logger logger,
+    void* format_context,
+    unsigned int** output_stream_indexes,
+    unsigned int* output_stream_indexes_size
+  );
+
+/**
+ * Process the media frame
+ * (the "media" feature must be enabled)
+ * @param handler                  Handler
+ * @param parameters_value_getter  Get job parameter value callback
+ * @param logger                   Rust Logger
+ * @param stream_index             Frame stream index
+ * @param frame                    Frame pointer
+ * @param message                  Output message pointer
+ */
+int process_frame(
+    Handler handler,
+    GetParameterValueCallback parameters_value_getter,
+    Logger logger,
+    const unsigned int job_id,
+    const unsigned int stream_index,
+    void* frame,
+    const char** message
+  );
+
+/**
+ * End the media process
+ * (the "media" feature must be enabled)
+ * @param logger  Rust Logger
+ */
+void ending_process(Logger logger);
+
+/**
  * Worker main process function
  * @param handler                  Handler
  * @param parameters_value_getter  Get job parameter value callback
