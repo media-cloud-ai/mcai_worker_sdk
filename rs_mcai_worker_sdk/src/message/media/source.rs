@@ -201,22 +201,24 @@ impl Source {
 
     let mut decoders = HashMap::<usize, Decoder>::new();
     for selected_stream in &selected_streams {
-      // AudioDecoder can decode any codec, not only video
-      let audio_decoder = AudioDecoder::new(
-        format!("decoder_{}", selected_stream.index),
-        &format_context.clone().lock().unwrap(),
-        selected_stream.index as isize,
-      )
-      .map_err(RuntimeError)?;
+      if let Some(audio_configuration) = &selected_stream.audio_configuration {
+        // AudioDecoder can decode any codec, not only video
+        let audio_decoder = AudioDecoder::new(
+          format!("decoder_{}", selected_stream.index),
+          &format_context.clone().lock().unwrap(),
+          selected_stream.index as isize,
+        )
+        .map_err(RuntimeError)?;
 
-      let audio_graph = if let Some(audio_configuration) = &selected_stream.audio_configuration {
-        let mut graph = FilterGraph::new().unwrap();
+        let mut audio_graph = FilterGraph::new().map_err(RuntimeError)?;
 
-        graph
+        audio_graph
           .add_input_from_audio_decoder("audio_input", &audio_decoder)
-          .unwrap();
+          .map_err(RuntimeError)?;
 
-        graph.add_audio_output("audio_output").unwrap();
+        audio_graph
+          .add_audio_output("audio_output")
+          .map_err(RuntimeError)?;
 
         let mut parameters = HashMap::new();
 
@@ -256,26 +258,137 @@ impl Source {
           }]),
         };
 
-        let filter = graph.add_filter(&filter_definition).unwrap();
-        graph.connect_input("audio_input", 0, &filter, 0).unwrap();
-        graph.connect_output(&filter, 0, "audio_output", 0).unwrap();
+        let filter = audio_graph
+          .add_filter(&filter_definition)
+          .map_err(RuntimeError)?;
+        audio_graph
+          .connect_input("audio_input", 0, &filter, 0)
+          .map_err(RuntimeError)?;
+        audio_graph
+          .connect_output(&filter, 0, "audio_output", 0)
+          .map_err(RuntimeError)?;
 
-        graph.validate().unwrap();
+        audio_graph.validate().map_err(RuntimeError)?;
 
-        Some(graph)
-      } else {
-        None
-      };
+        let decoder = Decoder {
+          audio_decoder: Some(audio_decoder),
+          video_decoder: None,
+          graph: Some(audio_graph),
+        };
 
-      println!("{:?}", selected_stream);
+        decoders.insert(selected_stream.index, decoder);
+      } else if let Some(image_configuration) = &selected_stream.image_configuration {
+        let video_decoder = VideoDecoder::new(
+          format!("decoder_{}", selected_stream.index),
+          &format_context.clone().lock().unwrap(),
+          selected_stream.index as isize,
+        )
+        .map_err(RuntimeError)?;
 
-      let decoder = Decoder {
-        audio_decoder: Some(audio_decoder),
-        video_decoder: None,
-        graph: audio_graph,
-      };
+        let mut graph = FilterGraph::new().map_err(RuntimeError)?;
 
-      decoders.insert(selected_stream.index, decoder);
+        let mut filters = vec![];
+
+        if let Some(region_of_interest) = &image_configuration.region_of_interest {
+          let image_width = video_decoder.get_width() as u32;
+          let image_height = video_decoder.get_height() as u32;
+          if let Ok(coordinates) = region_of_interest.get_coordinates(image_width, image_height) {
+            let crop_filter_parameters: HashMap<String, ParameterValue> = [
+              ("out_w", coordinates.width.to_string()),
+              ("out_h", coordinates.height.to_string()),
+              ("x", coordinates.left.to_string()),
+              ("y", coordinates.top.to_string()),
+            ]
+            .iter()
+            .cloned()
+            .map(|(key, value)| (key.to_string(), ParameterValue::String(value)))
+            .collect();
+
+            let crop_filter_definition = Filter {
+              name: "crop".to_string(),
+              label: Some("crop_filter".to_string()),
+              parameters: crop_filter_parameters,
+              inputs: None,
+              outputs: None,
+            };
+            debug!("crop_filter_definition: {:?}", crop_filter_definition);
+
+            let crop_filter = graph
+              .add_filter(&crop_filter_definition)
+              .map_err(RuntimeError)?;
+            filters.push(crop_filter);
+          }
+        }
+
+        if let Some(format_filter_parameters) = &image_configuration.format_filter_parameters {
+          let format_filter_parameters: HashMap<String, ParameterValue> = format_filter_parameters
+            .iter()
+            .map(|(key, value)| (key.to_string(), ParameterValue::String(value.clone())))
+            .collect();
+
+          let format_filter_definition = Filter {
+            name: "format".to_string(),
+            label: Some("format_filter".to_string()),
+            parameters: format_filter_parameters,
+            inputs: None,
+            outputs: Some(vec![FilterOutput {
+              stream_label: "video_output".to_string(),
+            }]),
+          };
+          debug!("format_filter_definition: {:?}", format_filter_definition);
+
+          let format_filter = graph
+            .add_filter(&format_filter_definition)
+            .map_err(RuntimeError)?;
+          filters.push(format_filter);
+        }
+
+        debug!("Set up video graph from filters: {:?}...", filters);
+        let video_graph = if !filters.is_empty() {
+          debug!("Set video graph input...");
+          graph
+            .add_input_from_video_decoder("video_input", &video_decoder)
+            .map_err(RuntimeError)?;
+          debug!("Set video graph output...");
+          graph
+            .add_video_output("video_output")
+            .map_err(RuntimeError)?;
+
+          let mut filter = filters.remove(0);
+          debug!("Connect video graph input to filter {:?}...", filter);
+          graph
+            .connect_input("video_input", 0, &filter, 0)
+            .map_err(RuntimeError)?;
+
+          while !filters.is_empty() {
+            let next_filter = filters.remove(0);
+            debug!("Connect filter {:?} to filter {:?}...", filter, next_filter);
+            graph
+              .connect(&filter, 0, &next_filter, 0)
+              .map_err(RuntimeError)?;
+            filter = next_filter;
+          }
+
+          debug!("Connect filter {:?} to video graph output...", filter);
+          graph
+            .connect_output(&filter, 0, "video_output", 0)
+            .map_err(RuntimeError)?;
+
+          debug!("Validate filter graph...");
+          graph.validate().map_err(RuntimeError)?;
+          Some(graph)
+        } else {
+          None
+        };
+
+        let decoder = Decoder {
+          audio_decoder: None,
+          video_decoder: Some(video_decoder),
+          graph: video_graph,
+        };
+
+        decoders.insert(selected_stream.index, decoder);
+      }
     }
     Ok(decoders)
   }
@@ -325,9 +438,44 @@ impl Decoder {
 
       return Ok(frame);
     }
+
     if let Some(video_decoder) = &self.video_decoder {
-      return video_decoder.decode(packet);
+      trace!("[FFmpeg] Send packet to video decoder");
+
+      let av_frame = unsafe {
+        avcodec_send_packet(video_decoder.codec_context, packet.packet);
+
+        let av_frame = av_frame_alloc();
+        avcodec_receive_frame(video_decoder.codec_context, av_frame);
+
+        let frame = Frame {
+          frame: av_frame,
+          name: Some("video_source_1".to_string()),
+          index: 1,
+        };
+
+        if let Some(graph) = &self.graph {
+          if let Ok((_audio_frames, video_frames)) = graph.process(&[], &[frame]) {
+            trace!("[FFmpeg] Output graph count {} frames", video_frames.len());
+            let frame = video_frames.first().unwrap();
+            av_frame_clone((*frame).frame)
+          } else {
+            av_frame
+          }
+        } else {
+          av_frame
+        }
+      };
+
+      let frame = Frame {
+        frame: av_frame,
+        name: Some("video".to_string()),
+        index: 1,
+      };
+
+      return Ok(frame);
     }
+
     unimplemented!();
   }
 }

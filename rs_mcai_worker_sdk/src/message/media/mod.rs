@@ -1,5 +1,6 @@
 use crate::{
   job::{Job, JobResult},
+  message::media::video::RegionOfInterest,
   message::publish_job_progression,
   parameter::container::ParametersContainer,
   McaiChannel, MessageEvent, Result,
@@ -10,6 +11,7 @@ use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use source::DecodeResult;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 mod media_stream;
@@ -17,6 +19,7 @@ mod output;
 mod source;
 mod srt;
 pub mod ttml;
+pub mod video;
 
 pub const SOURCE_PATH_PARAMETER: &str = "source_path";
 pub const DESTINATION_PATH_PARAMETER: &str = "destination_path";
@@ -47,6 +50,25 @@ impl StreamDescriptor {
       image_configuration: None,
     }
   }
+
+  pub fn new_video(
+    index: usize,
+    height: Option<usize>,
+    width: Option<usize>,
+    region_of_interest: Option<RegionOfInterest>,
+    format_filter_parameters: Option<HashMap<String, String>>,
+  ) -> Self {
+    StreamDescriptor {
+      index,
+      audio_configuration: None,
+      image_configuration: Some(ImageConfiguration {
+        height,
+        width,
+        region_of_interest,
+        format_filter_parameters,
+      }),
+    }
+  }
 }
 
 #[cfg(feature = "media")]
@@ -61,7 +83,12 @@ pub struct AudioConfiguration {
 #[cfg(feature = "media")]
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
-pub struct ImageConfiguration {}
+pub struct ImageConfiguration {
+  height: Option<usize>,
+  width: Option<usize>,
+  region_of_interest: Option<RegionOfInterest>,
+  format_filter_parameters: Option<HashMap<String, String>>,
+}
 
 pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   message_event: Rc<RefCell<ME>>,
