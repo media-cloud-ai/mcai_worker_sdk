@@ -1,9 +1,8 @@
-
+use crate::message::media::video::CropCoordinates;
 #[cfg(all(feature = "media", feature = "python"))]
 use dict_derive::{FromPyObject, IntoPyObject};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use crate::message::media::video::CropCoordinates;
 
 #[cfg(feature = "media")]
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]

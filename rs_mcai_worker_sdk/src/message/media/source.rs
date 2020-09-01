@@ -14,6 +14,7 @@ use std::sync::{
 };
 use std::{cell::RefCell, collections::HashMap, io::Cursor, rc::Rc, thread};
 
+use crate::message::media::video::FilterParameters;
 use stainless_ffmpeg::{
   audio_decoder::AudioDecoder,
   filter_graph::FilterGraph,
@@ -26,7 +27,6 @@ use stainless_ffmpeg::{
 use stainless_ffmpeg_sys::{
   av_frame_alloc, av_frame_clone, avcodec_receive_frame, avcodec_send_packet,
 };
-use crate::message::media::video::FilterParameters;
 
 pub enum DecodeResult {
   EndOfStream,
@@ -293,7 +293,9 @@ impl Source {
         if let Some(region_of_interest) = &image_configuration.region_of_interest {
           let image_width = video_decoder.get_width() as u32;
           let image_height = video_decoder.get_height() as u32;
-          if let Ok(coordinates) = region_of_interest.get_crop_coordinates(image_width, image_height) {
+          if let Ok(coordinates) =
+            region_of_interest.get_crop_coordinates(image_width, image_height)
+          {
             let parameters = coordinates.get_filter_parameters();
             trace!("Crop filter parameters: {:?}", parameters);
             let crop_filter_definition = Filter {
@@ -356,21 +358,31 @@ impl Source {
             .map_err(RuntimeError)?;
 
           let mut filter = filters.remove(0);
-          trace!("Connect video graph input to filter {}...", filter.get_label());
+          trace!(
+            "Connect video graph input to filter {}...",
+            filter.get_label()
+          );
           graph
             .connect_input("video_input", 0, &filter, 0)
             .map_err(RuntimeError)?;
 
           while !filters.is_empty() {
             let next_filter = filters.remove(0);
-            trace!("Connect filter {} to filter {}...", filter.get_label(), next_filter.get_label());
+            trace!(
+              "Connect filter {} to filter {}...",
+              filter.get_label(),
+              next_filter.get_label()
+            );
             graph
               .connect(&filter, 0, &next_filter, 0)
               .map_err(RuntimeError)?;
             filter = next_filter;
           }
 
-          trace!("Connect filter {} to video graph output...", filter.get_label());
+          trace!(
+            "Connect filter {} to video graph output...",
+            filter.get_label()
+          );
           graph
             .connect_output(&filter, 0, "video_output", 0)
             .map_err(RuntimeError)?;
