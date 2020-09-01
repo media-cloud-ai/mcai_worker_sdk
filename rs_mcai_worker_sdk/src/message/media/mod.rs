@@ -54,8 +54,6 @@ impl StreamDescriptor {
 
   pub fn new_video(
     index: usize,
-    height: Option<usize>,
-    width: Option<usize>,
     region_of_interest: Option<RegionOfInterest>,
     resize: Option<Scaling>,
     format_filter_parameters: Option<HashMap<String, String>>,
@@ -64,8 +62,6 @@ impl StreamDescriptor {
       index,
       audio_configuration: None,
       image_configuration: Some(ImageConfiguration {
-        height,
-        width,
         region_of_interest,
         resize,
         format_filter_parameters,
@@ -87,8 +83,6 @@ pub struct AudioConfiguration {
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 pub struct ImageConfiguration {
-  height: Option<usize>,
-  width: Option<usize>,
   region_of_interest: Option<RegionOfInterest>,
   resize: Option<Scaling>,
   format_filter_parameters: Option<HashMap<String, String>>,
