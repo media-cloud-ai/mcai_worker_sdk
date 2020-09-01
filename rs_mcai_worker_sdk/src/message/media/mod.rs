@@ -1,3 +1,4 @@
+use crate::message::media::video::Scaling;
 use crate::{
   job::{Job, JobResult},
   message::media::video::RegionOfInterest,
@@ -56,6 +57,7 @@ impl StreamDescriptor {
     height: Option<usize>,
     width: Option<usize>,
     region_of_interest: Option<RegionOfInterest>,
+    resize: Option<Scaling>,
     format_filter_parameters: Option<HashMap<String, String>>,
   ) -> Self {
     StreamDescriptor {
@@ -65,6 +67,7 @@ impl StreamDescriptor {
         height,
         width,
         region_of_interest,
+        resize,
         format_filter_parameters,
       }),
     }
@@ -87,6 +90,7 @@ pub struct ImageConfiguration {
   height: Option<usize>,
   width: Option<usize>,
   region_of_interest: Option<RegionOfInterest>,
+  resize: Option<Scaling>,
   format_filter_parameters: Option<HashMap<String, String>>,
 }
 

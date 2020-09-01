@@ -129,7 +129,10 @@ pub fn test_get_destination_paths_without_list_value() {
 #[test]
 #[cfg(feature = "media")]
 pub fn test_get_stream_indexes() {
-  let stream_indexes = vec![StreamDescriptor::new_audio(0, vec![], vec![], vec![])];
+  let stream_indexes = vec![
+    StreamDescriptor::new_video(0, None, None, None, None, None),
+    StreamDescriptor::new_audio(1, vec![], vec![], vec![]),
+  ];
   let gil = Python::acquire_gil();
   let py = gil.python();
 
@@ -139,7 +142,7 @@ pub fn test_get_stream_indexes() {
   let result = get_stream_indexes(&py_any);
   assert!(result.is_ok());
   let result = result.unwrap();
-  assert_eq!(1, result.len());
+  assert_eq!(2, result.len());
 }
 
 #[test]

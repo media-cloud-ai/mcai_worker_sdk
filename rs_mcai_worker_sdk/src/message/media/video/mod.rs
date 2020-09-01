@@ -1,265 +1,130 @@
+use std::collections::HashMap;
+
 #[cfg(all(feature = "media", feature = "python"))]
 use dict_derive::{FromPyObject, IntoPyObject};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use stainless_ffmpeg::order::ParameterValue;
+
+pub use region_of_interest::RegionOfInterest;
+
+mod region_of_interest;
+
+pub trait FilterParameters {
+  fn get_filter_parameters(&self) -> HashMap<String, ParameterValue>;
+}
 
 #[cfg(feature = "media")]
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
-pub struct RegionOfInterest {
-  top: Option<u32>,
-  left: Option<u32>,
-  right: Option<u32>,
-  bottom: Option<u32>,
-  width: Option<u32>,
-  height: Option<u32>,
+pub struct Scaling {
+  pub width: Option<u32>,
+  pub height: Option<u32>,
+}
+
+impl FilterParameters for Scaling {
+  fn get_filter_parameters(&self) -> HashMap<String, ParameterValue> {
+    let width = self.width.map_or((-1).to_string(), |w| w.to_string());
+    let height = self.height.map_or((-1).to_string(), |h| h.to_string());
+
+    [("width", width), ("height", height)]
+      .iter()
+      .map(|(key, value)| (key.to_string(), ParameterValue::String(value.clone())))
+      .collect()
+  }
 }
 
 #[cfg(feature = "media")]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
-pub struct Coordinates {
+pub struct CropCoordinates {
   pub top: u32,
   pub left: u32,
   pub width: u32,
   pub height: u32,
 }
 
-impl RegionOfInterest {
-  pub fn get_coordinates(
-    &self,
-    image_width: u32,
-    image_height: u32,
-  ) -> Result<Coordinates, String> {
-    match self.clone() {
-      RegionOfInterest {
-        top: Some(top),
-        left: Some(left),
-        right: Some(right),
-        bottom: Some(bottom),
-        width: None,
-        height: None,
-      } => Ok(Coordinates {
-        top,
-        left,
-        width: (image_width - right) - left,
-        height: (image_height - bottom) - top,
-      }),
-      RegionOfInterest {
-        top: Some(top),
-        left: Some(left),
-        right: None,
-        bottom: None,
-        width: Some(width),
-        height: Some(height),
-      } => Ok(Coordinates {
-        top,
-        left,
-        width,
-        height,
-      }),
-      RegionOfInterest {
-        top: Some(top),
-        left: Some(left),
-        right: None,
-        bottom: Some(bottom),
-        width: Some(width),
-        height: None,
-      } => Ok(Coordinates {
-        top,
-        left,
-        width,
-        height: (image_height - bottom) - top,
-      }),
-      RegionOfInterest {
-        top: Some(top),
-        left: Some(left),
-        right: Some(right),
-        bottom: None,
-        width: None,
-        height: Some(height),
-      } => Ok(Coordinates {
-        top,
-        left,
-        width: (image_width - right) - left,
-        height,
-      }),
-      RegionOfInterest {
-        top: None,
-        left: Some(left),
-        right: None,
-        bottom: Some(bottom),
-        width: Some(width),
-        height: Some(height),
-      } => Ok(Coordinates {
-        top: (image_height - bottom) - height,
-        left,
-        width,
-        height,
-      }),
-      RegionOfInterest {
-        top: Some(top),
-        left: None,
-        right: Some(right),
-        bottom: None,
-        width: Some(width),
-        height: Some(height),
-      } => Ok(Coordinates {
-        top,
-        left: (image_width - right) - width,
-        width,
-        height,
-      }),
-      RegionOfInterest {
-        top: None,
-        left: None,
-        right: Some(right),
-        bottom: Some(bottom),
-        width: Some(width),
-        height: Some(height),
-      } => Ok(Coordinates {
-        top: (image_height - bottom) - height,
-        left: (image_width - right) - width,
-        width,
-        height,
-      }),
-      _ => Err(format!(
-        "Cannot compute coordinates from such a region of interest: {:?}",
-        self
-      )),
-    }
+impl FilterParameters for CropCoordinates {
+  fn get_filter_parameters(&self) -> HashMap<String, ParameterValue> {
+    [
+      ("out_w", self.width.to_string()),
+      ("out_h", self.height.to_string()),
+      ("x", self.left.to_string()),
+      ("y", self.top.to_string()),
+    ]
+      .iter()
+      .cloned()
+      .map(|(key, value)| (key.to_string(), ParameterValue::String(value)))
+      .collect()
+  }
+}
+
+impl FilterParameters for HashMap<String, String> {
+  fn get_filter_parameters(&self) -> HashMap<String, ParameterValue> {
+    self.iter()
+      .map(|(key, value)| (key.to_string(), ParameterValue::String(value.clone())))
+      .collect()
   }
 }
 
 #[test]
-pub fn region_of_interest_to_coordinates_top_left_right_bottom() {
-  let region_of_interest = RegionOfInterest {
-    top: Some(0),
-    left: Some(0),
-    right: Some(200),
-    bottom: Some(100),
+pub fn test_get_scale_filter_parameters() {
+  let scaling = Scaling {
     width: None,
-    height: None,
+    height: None
   };
+  let parameters = scaling.get_filter_parameters();
+  assert_eq!(&ParameterValue::String((-1).to_string()), parameters.get("width").unwrap());
+  assert_eq!(&ParameterValue::String((-1).to_string()), parameters.get("height").unwrap());
 
-  let coordinates = region_of_interest.get_coordinates(600, 400).unwrap();
-
-  assert_eq!(0, coordinates.top);
-  assert_eq!(0, coordinates.left);
-  assert_eq!(400, coordinates.width);
-  assert_eq!(300, coordinates.height);
-}
-
-#[test]
-pub fn region_of_interest_to_coordinates_top_left_width_height() {
-  let region_of_interest = RegionOfInterest {
-    top: Some(0),
-    left: Some(0),
-    right: None,
-    bottom: None,
-    width: Some(200),
-    height: Some(100),
+  let scaling = Scaling {
+    width: Some(1234),
+    height: None
   };
+  let parameters = scaling.get_filter_parameters();
+  assert_eq!(&ParameterValue::String(1234.to_string()), parameters.get("width").unwrap());
+  assert_eq!(&ParameterValue::String((-1).to_string()), parameters.get("height").unwrap());
 
-  let coordinates = region_of_interest.get_coordinates(600, 400).unwrap();
-
-  assert_eq!(0, coordinates.top);
-  assert_eq!(0, coordinates.left);
-  assert_eq!(200, coordinates.width);
-  assert_eq!(100, coordinates.height);
-}
-
-#[test]
-pub fn region_of_interest_to_coordinates_top_left_bottom_width() {
-  let region_of_interest = RegionOfInterest {
-    top: Some(0),
-    left: Some(0),
-    right: None,
-    bottom: Some(100),
-    width: Some(200),
-    height: None,
-  };
-
-  let coordinates = region_of_interest.get_coordinates(600, 400).unwrap();
-
-  assert_eq!(0, coordinates.top);
-  assert_eq!(0, coordinates.left);
-  assert_eq!(200, coordinates.width);
-  assert_eq!(300, coordinates.height);
-}
-
-#[test]
-pub fn region_of_interest_to_coordinates_top_left_right_height() {
-  let region_of_interest = RegionOfInterest {
-    top: Some(0),
-    left: Some(0),
-    right: Some(200),
-    bottom: None,
+  let scaling = Scaling {
     width: None,
-    height: Some(100),
+    height: Some(1234)
   };
+  let parameters = scaling.get_filter_parameters();
+  assert_eq!(&ParameterValue::String((-1).to_string()), parameters.get("width").unwrap());
+  assert_eq!(&ParameterValue::String(1234.to_string()), parameters.get("height").unwrap());
 
-  let coordinates = region_of_interest.get_coordinates(600, 400).unwrap();
-
-  assert_eq!(0, coordinates.top);
-  assert_eq!(0, coordinates.left);
-  assert_eq!(400, coordinates.width);
-  assert_eq!(100, coordinates.height);
+  let scaling = Scaling {
+    width: Some(1234),
+    height: Some(5678)
+  };
+  let parameters = scaling.get_filter_parameters();
+  assert_eq!(&ParameterValue::String(1234.to_string()), parameters.get("width").unwrap());
+  assert_eq!(&ParameterValue::String(5678.to_string()), parameters.get("height").unwrap());
 }
 
 #[test]
-pub fn region_of_interest_to_coordinates_left_bottom_width_height() {
-  let region_of_interest = RegionOfInterest {
-    top: None,
-    left: Some(0),
-    right: None,
-    bottom: Some(100),
-    width: Some(200),
-    height: Some(100),
+pub fn test_get_crop_filter_parameters() {
+  let crop_coordinates = CropCoordinates {
+    top: 147,
+    left: 258,
+    width: 123,
+    height: 456
   };
-
-  let coordinates = region_of_interest.get_coordinates(600, 400).unwrap();
-
-  assert_eq!(200, coordinates.top);
-  assert_eq!(0, coordinates.left);
-  assert_eq!(200, coordinates.width);
-  assert_eq!(100, coordinates.height);
+  let parameters = crop_coordinates.get_filter_parameters();
+  assert_eq!(&ParameterValue::String(147.to_string()), parameters.get("y").unwrap());
+  assert_eq!(&ParameterValue::String(258.to_string()), parameters.get("x").unwrap());
+  assert_eq!(&ParameterValue::String(123.to_string()), parameters.get("out_w").unwrap());
+  assert_eq!(&ParameterValue::String(456.to_string()), parameters.get("out_h").unwrap());
 }
 
 #[test]
-pub fn region_of_interest_to_coordinates_top_right_width_height() {
-  let region_of_interest = RegionOfInterest {
-    top: Some(0),
-    left: None,
-    right: Some(200),
-    bottom: None,
-    width: Some(200),
-    height: Some(100),
-  };
+pub fn test_get_map_filter_parameters() {
+  let mut map = HashMap::<String, String>::new();
+  map.insert("key_1".to_string(), "value_1".to_string());
+  map.insert("key_2".to_string(), "value_2".to_string());
 
-  let coordinates = region_of_interest.get_coordinates(600, 400).unwrap();
+  let parameters = map.get_filter_parameters();
 
-  assert_eq!(0, coordinates.top);
-  assert_eq!(200, coordinates.left);
-  assert_eq!(200, coordinates.width);
-  assert_eq!(100, coordinates.height);
-}
-
-#[test]
-pub fn region_of_interest_to_coordinates_right_bottom_width_height() {
-  let region_of_interest = RegionOfInterest {
-    top: None,
-    left: None,
-    right: Some(200),
-    bottom: Some(100),
-    width: Some(200),
-    height: Some(100),
-  };
-
-  let coordinates = region_of_interest.get_coordinates(600, 400).unwrap();
-
-  assert_eq!(200, coordinates.top);
-  assert_eq!(200, coordinates.left);
-  assert_eq!(200, coordinates.width);
-  assert_eq!(100, coordinates.height);
+  assert_eq!(&ParameterValue::String("value_1".to_string()), parameters.get("key_1").unwrap());
+  assert_eq!(&ParameterValue::String("value_2".to_string()), parameters.get("key_2").unwrap());
 }

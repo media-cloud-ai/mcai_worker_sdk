@@ -105,7 +105,7 @@ pub use error::{MessageError, Result};
 #[cfg(feature = "media")]
 pub use message::media::{
   ttml::{Body, Div, Head, Paragraph, Span, TimeExpression, TimeUnit, Ttml},
-  video::RegionOfInterest,
+  video::{RegionOfInterest, Scaling},
   StreamDescriptor,
 };
 pub use message::publish_job_progression;

@@ -26,6 +26,7 @@ use stainless_ffmpeg::{
 use stainless_ffmpeg_sys::{
   av_frame_alloc, av_frame_clone, avcodec_receive_frame, avcodec_send_packet,
 };
+use crate::message::media::video::FilterParameters;
 
 pub enum DecodeResult {
   EndOfStream,
@@ -292,26 +293,16 @@ impl Source {
         if let Some(region_of_interest) = &image_configuration.region_of_interest {
           let image_width = video_decoder.get_width() as u32;
           let image_height = video_decoder.get_height() as u32;
-          if let Ok(coordinates) = region_of_interest.get_coordinates(image_width, image_height) {
-            let crop_filter_parameters: HashMap<String, ParameterValue> = [
-              ("out_w", coordinates.width.to_string()),
-              ("out_h", coordinates.height.to_string()),
-              ("x", coordinates.left.to_string()),
-              ("y", coordinates.top.to_string()),
-            ]
-            .iter()
-            .cloned()
-            .map(|(key, value)| (key.to_string(), ParameterValue::String(value)))
-            .collect();
-
+          if let Ok(coordinates) = region_of_interest.get_crop_coordinates(image_width, image_height) {
+            let parameters = coordinates.get_filter_parameters();
+            trace!("Crop filter parameters: {:?}", parameters);
             let crop_filter_definition = Filter {
               name: "crop".to_string(),
               label: Some("crop_filter".to_string()),
-              parameters: crop_filter_parameters,
+              parameters,
               inputs: None,
               outputs: None,
             };
-            debug!("crop_filter_definition: {:?}", crop_filter_definition);
 
             let crop_filter = graph
               .add_filter(&crop_filter_definition)
@@ -320,22 +311,35 @@ impl Source {
           }
         }
 
-        if let Some(format_filter_parameters) = &image_configuration.format_filter_parameters {
-          let format_filter_parameters: HashMap<String, ParameterValue> = format_filter_parameters
-            .iter()
-            .map(|(key, value)| (key.to_string(), ParameterValue::String(value.clone())))
-            .collect();
+        if let Some(scaling) = &image_configuration.resize {
+          let parameters = scaling.get_filter_parameters();
+          trace!("Scale filter parameters: {:?}", parameters);
+          let scale_filter_definition = Filter {
+            name: "scale".to_string(),
+            label: Some("scale_filter".to_string()),
+            parameters,
+            inputs: None,
+            outputs: None,
+          };
 
+          let scale_filter = graph
+            .add_filter(&scale_filter_definition)
+            .map_err(RuntimeError)?;
+          filters.push(scale_filter);
+        }
+
+        if let Some(format_filter_parameters) = &image_configuration.format_filter_parameters {
+          let parameters = format_filter_parameters.get_filter_parameters();
+          trace!("Format filter parameters: {:?}", parameters);
           let format_filter_definition = Filter {
             name: "format".to_string(),
             label: Some("format_filter".to_string()),
-            parameters: format_filter_parameters,
+            parameters,
             inputs: None,
             outputs: Some(vec![FilterOutput {
               stream_label: "video_output".to_string(),
             }]),
           };
-          debug!("format_filter_definition: {:?}", format_filter_definition);
 
           let format_filter = graph
             .add_filter(&format_filter_definition)
@@ -343,38 +347,34 @@ impl Source {
           filters.push(format_filter);
         }
 
-        debug!("Set up video graph from filters: {:?}...", filters);
         let video_graph = if !filters.is_empty() {
-          debug!("Set video graph input...");
           graph
             .add_input_from_video_decoder("video_input", &video_decoder)
             .map_err(RuntimeError)?;
-          debug!("Set video graph output...");
           graph
             .add_video_output("video_output")
             .map_err(RuntimeError)?;
 
           let mut filter = filters.remove(0);
-          debug!("Connect video graph input to filter {:?}...", filter);
+          trace!("Connect video graph input to filter {}...", filter.get_label());
           graph
             .connect_input("video_input", 0, &filter, 0)
             .map_err(RuntimeError)?;
 
           while !filters.is_empty() {
             let next_filter = filters.remove(0);
-            debug!("Connect filter {:?} to filter {:?}...", filter, next_filter);
+            trace!("Connect filter {} to filter {}...", filter.get_label(), next_filter.get_label());
             graph
               .connect(&filter, 0, &next_filter, 0)
               .map_err(RuntimeError)?;
             filter = next_filter;
           }
 
-          debug!("Connect filter {:?} to video graph output...", filter);
+          trace!("Connect filter {} to video graph output...", filter.get_label());
           graph
             .connect_output(&filter, 0, "video_output", 0)
             .map_err(RuntimeError)?;
 
-          debug!("Validate filter graph...");
           graph.validate().map_err(RuntimeError)?;
           Some(graph)
         } else {
@@ -436,10 +436,8 @@ impl Decoder {
         index: 1,
       };
 
-      return Ok(frame);
-    }
-
-    if let Some(video_decoder) = &self.video_decoder {
+      Ok(frame)
+    } else if let Some(video_decoder) = &self.video_decoder {
       trace!("[FFmpeg] Send packet to video decoder");
 
       let av_frame = unsafe {
@@ -473,9 +471,9 @@ impl Decoder {
         index: 1,
       };
 
-      return Ok(frame);
+      Ok(frame)
+    } else {
+      Err("No audio/video decoder found".to_string())
     }
-
-    unimplemented!();
   }
 }
