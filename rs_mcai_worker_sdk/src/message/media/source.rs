@@ -14,15 +14,9 @@ use std::sync::{
 };
 use std::{cell::RefCell, collections::HashMap, io::Cursor, rc::Rc, thread};
 
-use crate::message::media::video::FilterParameters;
 use stainless_ffmpeg::{
-  audio_decoder::AudioDecoder,
-  filter_graph::FilterGraph,
-  format_context::FormatContext,
-  frame::Frame,
-  order::{filter::Filter, filter_output::FilterOutput, parameters::ParameterValue},
-  packet::Packet,
-  video_decoder::VideoDecoder,
+  audio_decoder::AudioDecoder, filter_graph::FilterGraph, format_context::FormatContext,
+  frame::Frame, packet::Packet, video_decoder::VideoDecoder,
 };
 use stainless_ffmpeg_sys::{
   av_frame_alloc, av_frame_clone, avcodec_receive_frame, avcodec_send_packet,
@@ -211,70 +205,67 @@ impl Source {
         )
         .map_err(RuntimeError)?;
 
-        let mut audio_graph = FilterGraph::new().map_err(RuntimeError)?;
+        let mut graph = FilterGraph::new().map_err(RuntimeError)?;
 
-        audio_graph
-          .add_input_from_audio_decoder("audio_input", &audio_decoder)
-          .map_err(RuntimeError)?;
-
-        audio_graph
-          .add_audio_output("audio_output")
-          .map_err(RuntimeError)?;
-
-        let mut parameters = HashMap::new();
-
-        if !audio_configuration.sample_rates.is_empty() {
-          let sample_rates = audio_configuration
-            .sample_rates
-            .iter()
-            .map(|i| i.to_string())
-            .collect::<Vec<String>>()
-            .join("|");
-
-          parameters.insert(
-            "sample_rates".to_string(),
-            ParameterValue::String(sample_rates),
-          );
-        }
-        if !audio_configuration.channel_layouts.is_empty() {
-          parameters.insert(
-            "channel_layouts".to_string(),
-            ParameterValue::String(audio_configuration.channel_layouts.join("|")),
-          );
-        }
-        if !audio_configuration.sample_formats.is_empty() {
-          parameters.insert(
-            "sample_fmts".to_string(),
-            ParameterValue::String(audio_configuration.sample_formats.join("|")),
-          );
+        let mut filters = vec![];
+        for audio_filter in &audio_configuration.filters {
+          let filter = audio_filter
+            .as_generic_filter()
+            .map_err(RuntimeError)?
+            .as_filter()
+            .map_err(RuntimeError)?;
+          filters.push(graph.add_filter(&filter).map_err(RuntimeError)?);
         }
 
-        let filter_definition = Filter {
-          name: "aformat".to_string(),
-          label: Some("aformat_filter".to_string()),
-          parameters,
-          inputs: None,
-          outputs: Some(vec![FilterOutput {
-            stream_label: "audio_output".to_string(),
-          }]),
+        let audio_graph = if !filters.is_empty() {
+          graph
+            .add_input_from_audio_decoder("audio_input", &audio_decoder)
+            .map_err(RuntimeError)?;
+
+          graph
+            .add_audio_output("audio_output")
+            .map_err(RuntimeError)?;
+
+          let mut filter = filters.remove(0);
+          trace!(
+            "Connect audio graph input to filter {}...",
+            filter.get_label()
+          );
+          graph
+            .connect_input("audio_input", 0, &filter, 0)
+            .map_err(RuntimeError)?;
+
+          while !filters.is_empty() {
+            let next_filter = filters.remove(0);
+            trace!(
+              "Connect filter {} to filter {}...",
+              filter.get_label(),
+              next_filter.get_label()
+            );
+            graph
+              .connect(&filter, 0, &next_filter, 0)
+              .map_err(RuntimeError)?;
+            filter = next_filter;
+          }
+
+          trace!(
+            "Connect filter {} to audio graph output...",
+            filter.get_label()
+          );
+          graph
+            .connect_output(&filter, 0, "audio_output", 0)
+            .map_err(RuntimeError)?;
+
+          graph.validate().map_err(RuntimeError)?;
+          Some(graph)
+        } else {
+          None
         };
-
-        let filter = audio_graph
-          .add_filter(&filter_definition)
-          .map_err(RuntimeError)?;
-        audio_graph
-          .connect_input("audio_input", 0, &filter, 0)
-          .map_err(RuntimeError)?;
-        audio_graph
-          .connect_output(&filter, 0, "audio_output", 0)
-          .map_err(RuntimeError)?;
-
-        audio_graph.validate().map_err(RuntimeError)?;
 
         let decoder = Decoder {
           audio_decoder: Some(audio_decoder),
           video_decoder: None,
-          graph: Some(audio_graph),
+          graph: audio_graph,
         };
 
         decoders.insert(selected_stream.index, decoder);
@@ -289,64 +280,13 @@ impl Source {
         let mut graph = FilterGraph::new().map_err(RuntimeError)?;
 
         let mut filters = vec![];
-
-        if let Some(region_of_interest) = &image_configuration.region_of_interest {
-          let image_width = video_decoder.get_width() as u32;
-          let image_height = video_decoder.get_height() as u32;
-          if let Ok(coordinates) =
-            region_of_interest.get_crop_coordinates(image_width, image_height)
-          {
-            let parameters = coordinates.get_filter_parameters();
-            trace!("Crop filter parameters: {:?}", parameters);
-            let crop_filter_definition = Filter {
-              name: "crop".to_string(),
-              label: Some("crop_filter".to_string()),
-              parameters,
-              inputs: None,
-              outputs: None,
-            };
-
-            let crop_filter = graph
-              .add_filter(&crop_filter_definition)
-              .map_err(RuntimeError)?;
-            filters.push(crop_filter);
-          }
-        }
-
-        if let Some(scaling) = &image_configuration.resize {
-          let parameters = scaling.get_filter_parameters();
-          trace!("Scale filter parameters: {:?}", parameters);
-          let scale_filter_definition = Filter {
-            name: "scale".to_string(),
-            label: Some("scale_filter".to_string()),
-            parameters,
-            inputs: None,
-            outputs: None,
-          };
-
-          let scale_filter = graph
-            .add_filter(&scale_filter_definition)
+        for video_filter in &image_configuration.filters {
+          let filter = video_filter
+            .as_generic_filter(&video_decoder)
+            .map_err(RuntimeError)?
+            .as_filter()
             .map_err(RuntimeError)?;
-          filters.push(scale_filter);
-        }
-
-        if let Some(format_filter_parameters) = &image_configuration.format_filter_parameters {
-          let parameters = format_filter_parameters.get_filter_parameters();
-          trace!("Format filter parameters: {:?}", parameters);
-          let format_filter_definition = Filter {
-            name: "format".to_string(),
-            label: Some("format_filter".to_string()),
-            parameters,
-            inputs: None,
-            outputs: Some(vec![FilterOutput {
-              stream_label: "video_output".to_string(),
-            }]),
-          };
-
-          let format_filter = graph
-            .add_filter(&format_filter_definition)
-            .map_err(RuntimeError)?;
-          filters.push(format_filter);
+          filters.push(graph.add_filter(&filter).map_err(RuntimeError)?);
         }
 
         let video_graph = if !filters.is_empty() {

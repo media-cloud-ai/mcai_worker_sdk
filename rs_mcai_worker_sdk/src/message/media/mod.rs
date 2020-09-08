@@ -1,20 +1,18 @@
-use crate::message::media::video::Scaling;
 use crate::{
   job::{Job, JobResult},
-  message::media::video::RegionOfInterest,
   message::publish_job_progression,
   parameter::container::ParametersContainer,
-  McaiChannel, MessageEvent, Result,
+  AudioFilter, McaiChannel, MessageEvent, Result,
 };
-#[cfg(all(feature = "media", feature = "python"))]
-use dict_derive::{FromPyObject, IntoPyObject};
+use filters::VideoFilter;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use source::DecodeResult;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
+pub mod audio;
+pub mod filters;
 mod media_stream;
 mod output;
 mod source;
@@ -27,7 +25,6 @@ pub const DESTINATION_PATH_PARAMETER: &str = "destination_path";
 
 #[cfg(all(feature = "media"))]
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 pub struct StreamDescriptor {
   index: usize,
   audio_configuration: Option<AudioConfiguration>,
@@ -35,57 +32,41 @@ pub struct StreamDescriptor {
 }
 
 impl StreamDescriptor {
-  pub fn new_audio(
-    index: usize,
-    channel_layouts: Vec<String>,
-    sample_formats: Vec<String>,
-    sample_rates: Vec<usize>,
-  ) -> Self {
+  pub fn new_audio(index: usize, filters: Vec<AudioFilter>) -> Self {
     StreamDescriptor {
       index,
-      audio_configuration: Some(AudioConfiguration {
-        channel_layouts,
-        sample_formats,
-        sample_rates,
-      }),
+      audio_configuration: Some(AudioConfiguration { filters }),
       image_configuration: None,
     }
   }
 
-  pub fn new_video(
-    index: usize,
-    region_of_interest: Option<RegionOfInterest>,
-    resize: Option<Scaling>,
-    format_filter_parameters: Option<HashMap<String, String>>,
-  ) -> Self {
+  pub fn new_video(index: usize, filters: Vec<VideoFilter>) -> Self {
     StreamDescriptor {
       index,
       audio_configuration: None,
-      image_configuration: Some(ImageConfiguration {
-        region_of_interest,
-        resize,
-        format_filter_parameters,
-      }),
+      image_configuration: Some(ImageConfiguration { filters }),
+    }
+  }
+
+  pub fn new_data(index: usize) -> Self {
+    StreamDescriptor {
+      index,
+      audio_configuration: None,
+      image_configuration: None,
     }
   }
 }
 
 #[cfg(feature = "media")]
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 pub struct AudioConfiguration {
-  channel_layouts: Vec<String>,
-  sample_formats: Vec<String>,
-  sample_rates: Vec<usize>,
+  filters: Vec<AudioFilter>,
 }
 
 #[cfg(feature = "media")]
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 pub struct ImageConfiguration {
-  region_of_interest: Option<RegionOfInterest>,
-  resize: Option<Scaling>,
-  format_filter_parameters: Option<HashMap<String, String>>,
+  filters: Vec<VideoFilter>,
 }
 
 pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
