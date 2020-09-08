@@ -1,12 +1,3 @@
-use crate::{
-  error::MessageError::RuntimeError,
-  job::JobResult,
-  message::media::{media_stream::MediaStream, srt::SrtStream},
-  MessageEvent, ProcessResult, Result,
-};
-use ringbuf::RingBuffer;
-use schemars::JsonSchema;
-use serde::de::DeserializeOwned;
 use std::sync::{
   mpsc,
   mpsc::{Receiver, Sender},
@@ -14,12 +5,22 @@ use std::sync::{
 };
 use std::{cell::RefCell, collections::HashMap, io::Cursor, rc::Rc, thread};
 
+use ringbuf::RingBuffer;
+use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
 use stainless_ffmpeg::{
   audio_decoder::AudioDecoder, filter_graph::FilterGraph, format_context::FormatContext,
   frame::Frame, packet::Packet, video_decoder::VideoDecoder,
 };
 use stainless_ffmpeg_sys::{
   av_frame_alloc, av_frame_clone, avcodec_receive_frame, avcodec_send_packet,
+};
+
+use crate::{
+  error::MessageError::RuntimeError,
+  job::JobResult,
+  message::media::{media_stream::MediaStream, srt::SrtStream},
+  AudioFilter, MessageEvent, ProcessResult, Result, VideoFilter,
 };
 
 pub enum DecodeResult {
@@ -205,62 +206,8 @@ impl Source {
         )
         .map_err(RuntimeError)?;
 
-        let mut graph = FilterGraph::new().map_err(RuntimeError)?;
-
-        let mut filters = vec![];
-        for audio_filter in &audio_configuration.filters {
-          let filter = audio_filter
-            .as_generic_filter()
-            .map_err(RuntimeError)?
-            .as_filter()
-            .map_err(RuntimeError)?;
-          filters.push(graph.add_filter(&filter).map_err(RuntimeError)?);
-        }
-
-        let audio_graph = if !filters.is_empty() {
-          graph
-            .add_input_from_audio_decoder("audio_input", &audio_decoder)
-            .map_err(RuntimeError)?;
-
-          graph
-            .add_audio_output("audio_output")
-            .map_err(RuntimeError)?;
-
-          let mut filter = filters.remove(0);
-          trace!(
-            "Connect audio graph input to filter {}...",
-            filter.get_label()
-          );
-          graph
-            .connect_input("audio_input", 0, &filter, 0)
-            .map_err(RuntimeError)?;
-
-          while !filters.is_empty() {
-            let next_filter = filters.remove(0);
-            trace!(
-              "Connect filter {} to filter {}...",
-              filter.get_label(),
-              next_filter.get_label()
-            );
-            graph
-              .connect(&filter, 0, &next_filter, 0)
-              .map_err(RuntimeError)?;
-            filter = next_filter;
-          }
-
-          trace!(
-            "Connect filter {} to audio graph output...",
-            filter.get_label()
-          );
-          graph
-            .connect_output(&filter, 0, "audio_output", 0)
-            .map_err(RuntimeError)?;
-
-          graph.validate().map_err(RuntimeError)?;
-          Some(graph)
-        } else {
-          None
-        };
+        let audio_graph =
+          Source::get_audio_filter_graph(&audio_configuration.filters, &audio_decoder)?;
 
         let decoder = Decoder {
           audio_decoder: Some(audio_decoder),
@@ -277,61 +224,8 @@ impl Source {
         )
         .map_err(RuntimeError)?;
 
-        let mut graph = FilterGraph::new().map_err(RuntimeError)?;
-
-        let mut filters = vec![];
-        for video_filter in &image_configuration.filters {
-          let filter = video_filter
-            .as_generic_filter(&video_decoder)
-            .map_err(RuntimeError)?
-            .as_filter()
-            .map_err(RuntimeError)?;
-          filters.push(graph.add_filter(&filter).map_err(RuntimeError)?);
-        }
-
-        let video_graph = if !filters.is_empty() {
-          graph
-            .add_input_from_video_decoder("video_input", &video_decoder)
-            .map_err(RuntimeError)?;
-          graph
-            .add_video_output("video_output")
-            .map_err(RuntimeError)?;
-
-          let mut filter = filters.remove(0);
-          trace!(
-            "Connect video graph input to filter {}...",
-            filter.get_label()
-          );
-          graph
-            .connect_input("video_input", 0, &filter, 0)
-            .map_err(RuntimeError)?;
-
-          while !filters.is_empty() {
-            let next_filter = filters.remove(0);
-            trace!(
-              "Connect filter {} to filter {}...",
-              filter.get_label(),
-              next_filter.get_label()
-            );
-            graph
-              .connect(&filter, 0, &next_filter, 0)
-              .map_err(RuntimeError)?;
-            filter = next_filter;
-          }
-
-          trace!(
-            "Connect filter {} to video graph output...",
-            filter.get_label()
-          );
-          graph
-            .connect_output(&filter, 0, "video_output", 0)
-            .map_err(RuntimeError)?;
-
-          graph.validate().map_err(RuntimeError)?;
-          Some(graph)
-        } else {
-          None
-        };
+        let video_graph =
+          Source::get_video_filter_graph(&image_configuration.filters, &video_decoder)?;
 
         let decoder = Decoder {
           audio_decoder: None,
@@ -343,6 +237,128 @@ impl Source {
       }
     }
     Ok(decoders)
+  }
+
+  fn get_video_filter_graph(
+    video_filters: &Vec<VideoFilter>,
+    video_decoder: &VideoDecoder,
+  ) -> Result<Option<FilterGraph>> {
+    let mut graph = FilterGraph::new().map_err(RuntimeError)?;
+
+    let mut filters = vec![];
+    for video_filter in video_filters {
+      let filter = video_filter
+        .as_generic_filter(video_decoder)
+        .map_err(RuntimeError)?
+        .as_filter()
+        .map_err(RuntimeError)?;
+      filters.push(graph.add_filter(&filter).map_err(RuntimeError)?);
+    }
+
+    if !filters.is_empty() {
+      graph
+        .add_input_from_video_decoder("video_input", video_decoder)
+        .map_err(RuntimeError)?;
+      graph
+        .add_video_output("video_output")
+        .map_err(RuntimeError)?;
+
+      let mut filter = filters.remove(0);
+      trace!(
+        "Connect video graph input to filter {}...",
+        filter.get_label()
+      );
+      graph
+        .connect_input("video_input", 0, &filter, 0)
+        .map_err(RuntimeError)?;
+
+      while !filters.is_empty() {
+        let next_filter = filters.remove(0);
+        trace!(
+          "Connect filter {} to filter {}...",
+          filter.get_label(),
+          next_filter.get_label()
+        );
+        graph
+          .connect(&filter, 0, &next_filter, 0)
+          .map_err(RuntimeError)?;
+        filter = next_filter;
+      }
+
+      trace!(
+        "Connect filter {} to video graph output...",
+        filter.get_label()
+      );
+      graph
+        .connect_output(&filter, 0, "video_output", 0)
+        .map_err(RuntimeError)?;
+
+      graph.validate().map_err(RuntimeError)?;
+      Ok(Some(graph))
+    } else {
+      Ok(None)
+    }
+  }
+  fn get_audio_filter_graph(
+    audio_filters: &Vec<AudioFilter>,
+    audio_decoder: &AudioDecoder,
+  ) -> Result<Option<FilterGraph>> {
+    let mut graph = FilterGraph::new().map_err(RuntimeError)?;
+    let mut filters = vec![];
+
+    for audio_filter in audio_filters {
+      let filter = audio_filter
+        .as_generic_filter()
+        .map_err(RuntimeError)?
+        .as_filter()
+        .map_err(RuntimeError)?;
+      filters.push(graph.add_filter(&filter).map_err(RuntimeError)?);
+    }
+
+    if !filters.is_empty() {
+      graph
+        .add_input_from_audio_decoder("audio_input", audio_decoder)
+        .map_err(RuntimeError)?;
+
+      graph
+        .add_audio_output("audio_output")
+        .map_err(RuntimeError)?;
+
+      let mut filter = filters.remove(0);
+      trace!(
+        "Connect audio graph input to filter {}...",
+        filter.get_label()
+      );
+      graph
+        .connect_input("audio_input", 0, &filter, 0)
+        .map_err(RuntimeError)?;
+
+      while !filters.is_empty() {
+        let next_filter = filters.remove(0);
+        trace!(
+          "Connect filter {} to filter {}...",
+          filter.get_label(),
+          next_filter.get_label()
+        );
+        graph
+          .connect(&filter, 0, &next_filter, 0)
+          .map_err(RuntimeError)?;
+        filter = next_filter;
+      }
+
+      trace!(
+        "Connect filter {} to audio graph output...",
+        filter.get_label()
+      );
+      graph
+        .connect_output(&filter, 0, "audio_output", 0)
+        .map_err(RuntimeError)?;
+
+      graph.validate().map_err(RuntimeError)?;
+      Ok(Some(graph))
+    } else {
+      Ok(None)
+    }
   }
 }
 
