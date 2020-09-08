@@ -1,7 +1,8 @@
-use pyo3::{prelude::*, types::*};
-
 #[cfg(feature = "media")]
-use mcai_worker_sdk::{MessageError, Result, StreamDescriptor};
+use crate::GenericStreamDescriptor;
+#[cfg(feature = "media")]
+use mcai_worker_sdk::{AudioFilter, MessageError, StreamDescriptor, VideoFilter};
+use pyo3::{prelude::*, types::*};
 
 pub fn py_err_to_string(py: Python, error: PyErr) -> String {
   let locals = [("error", error)].into_py_dict(py);
@@ -44,15 +45,15 @@ pub fn get_destination_paths(response: &PyAny) -> Option<Vec<String>> {
 }
 
 #[cfg(feature = "media")]
-pub fn get_stream_indexes(response: &PyAny) -> Result<Vec<StreamDescriptor>> {
+pub fn get_stream_descriptors(response: &PyAny) -> Result<Vec<StreamDescriptor>, MessageError> {
   response
     .downcast::<PyList>()
     .map(|py_list| {
       py_list
         .iter()
-        .map(|value| value.extract::<StreamDescriptor>())
+        .map(|value| value.extract::<GenericStreamDescriptor>())
         .filter(|extracted| extracted.is_ok())
-        .map(|extracted| extracted.unwrap())
+        .map(|extracted| get_stream_descriptor(extracted.unwrap()))
         .collect()
     })
     .map_err(|e| {
@@ -61,6 +62,29 @@ pub fn get_stream_indexes(response: &PyAny) -> Result<Vec<StreamDescriptor>> {
         e
       ))
     })
+}
+
+#[cfg(feature = "media")]
+fn get_stream_descriptor(generic_stream_descriptor: GenericStreamDescriptor) -> StreamDescriptor {
+  if generic_stream_descriptor.stream_type.is_video() {
+    let filters = generic_stream_descriptor
+      .filters
+      .iter()
+      .cloned()
+      .map(VideoFilter::Generic)
+      .collect();
+    StreamDescriptor::new_video(generic_stream_descriptor.index as usize, filters)
+  } else if generic_stream_descriptor.stream_type.is_audio() {
+    let filters = generic_stream_descriptor
+      .filters
+      .iter()
+      .cloned()
+      .map(AudioFilter::Generic)
+      .collect();
+    StreamDescriptor::new_audio(generic_stream_descriptor.index as usize, filters)
+  } else {
+    StreamDescriptor::new_data(generic_stream_descriptor.index as usize)
+  }
 }
 
 #[test]
@@ -129,17 +153,22 @@ pub fn test_get_destination_paths_without_list_value() {
 #[test]
 #[cfg(feature = "media")]
 pub fn test_get_stream_indexes() {
-  let stream_indexes = vec![
-    StreamDescriptor::new_video(0, None, None, None),
-    StreamDescriptor::new_audio(1, vec![], vec![], vec![]),
-  ];
+  use crate::StreamDescriptorHandler;
+
   let gil = Python::acquire_gil();
   let py = gil.python();
+
+  // whatever the type, since the vec is empty...
+  let filter_list = PyList::new(py, Vec::<String>::new());
+  let stream_indexes = vec![
+    StreamDescriptorHandler::new_video_stream(0, filter_list),
+    StreamDescriptorHandler::new_audio_stream(1, filter_list),
+  ];
 
   let py_list: PyObject = stream_indexes.into_py(py);
   let py_any: &PyAny = py_list.cast_as(py).unwrap();
 
-  let result = get_stream_indexes(&py_any);
+  let result = get_stream_descriptors(&py_any);
   assert!(result.is_ok());
   let result = result.unwrap();
   assert_eq!(2, result.len());
@@ -158,7 +187,7 @@ pub fn test_get_stream_indexes_without_list() {
     "unable to access init_process(..) python response: PyDowncastError".to_string(),
   );
 
-  let result = get_stream_indexes(py_any);
+  let result = get_stream_descriptors(py_any);
   assert!(result.is_err());
   assert_eq!(expected_error, result.unwrap_err());
 }

@@ -60,14 +60,28 @@ def process(handle_callback, parameters):
     }
 
 
-def init_process(format_context, parameters):
+def init_process(stream_handler, format_context, parameters):
     '''
     Function called before the media process (the "media" feature must be activated).
     '''
     print("format_context: ", format_context)
     print("parameters: ", parameters)
 
-    return [0]
+    audio_filters = [
+        {
+            "name": "aformat",
+            "parameters": {
+                "sample_rates": "16000",
+                "channel_layouts": "mono",
+                "sample_fmts": "s16"
+            }
+        }
+    ]
+
+    audio_stream = stream_handler.new_audio_stream(1, audio_filters)
+    print("audio_stream: ", audio_stream)
+
+    return [audio_stream]
 
 
 def process_frame(job_id, stream_index, frame):
