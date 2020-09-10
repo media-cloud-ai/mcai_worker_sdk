@@ -17,9 +17,7 @@ use mcai_worker_sdk::{
   McaiChannel, MessageError, Result,
 };
 #[cfg(feature = "media")]
-use mcai_worker_sdk::{
-  AudioFilter, FormatContext, Frame, ProcessResult, StreamDescriptor, VideoFilter,
-};
+use mcai_worker_sdk::{FormatContext, Frame, ProcessResult, StreamDescriptor};
 
 use crate::constants;
 #[cfg(feature = "media")]
@@ -32,7 +30,7 @@ use crate::get_c_string;
 use crate::parameters::{get_parameter_from_worker_parameter, CWorkerParameters};
 use crate::process_return::ProcessReturn;
 #[cfg(feature = "media")]
-use crate::stream_descriptors::{CStreamDescriptor, StreamType};
+use crate::stream_descriptors::CStreamDescriptor;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -355,31 +353,11 @@ pub fn call_worker_init_process(
     let mut output_stream_descriptors = vec![];
 
     for i in 0..output_stream_descriptors_size {
-      let value_ptr = c_stream_descriptors[i as usize];
-      if !value_ptr.is_null() {
-        let c_stream_descriptor = Box::from_raw(value_ptr as *mut CStreamDescriptor);
-        let descriptor = match &c_stream_descriptor.stream_type {
-          StreamType::Audio => {
-            let audio_filters = c_stream_descriptor
-              .filters
-              .iter()
-              .cloned()
-              .map(AudioFilter::Generic)
-              .collect();
-            StreamDescriptor::new_audio(c_stream_descriptor.index as usize, audio_filters)
-          }
-          StreamType::Video => {
-            let video_filters = c_stream_descriptor
-              .filters
-              .iter()
-              .cloned()
-              .map(VideoFilter::Generic)
-              .collect();
-            StreamDescriptor::new_video(c_stream_descriptor.index as usize, video_filters)
-          }
-          StreamType::Data => StreamDescriptor::new_data(c_stream_descriptor.index as usize),
-        };
-        output_stream_descriptors.push(descriptor);
+      let c_stream_descriptor_ptr = c_stream_descriptors[i as usize];
+
+      if !c_stream_descriptor_ptr.is_null() {
+        let c_stream_descriptor = Box::from_raw(c_stream_descriptor_ptr as *mut CStreamDescriptor);
+        output_stream_descriptors.push(c_stream_descriptor.into());
       } else {
         break;
       }
