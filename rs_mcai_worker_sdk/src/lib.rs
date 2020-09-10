@@ -107,7 +107,7 @@ pub use message::media::{
   audio::AudioFormat,
   filters::{AudioFilter, GenericFilter, VideoFilter},
   ttml::{Body, Div, Head, Paragraph, Span, TimeExpression, TimeUnit, Ttml},
-  video::{RegionOfInterest, Scaling},
+  video::{RegionOfInterest, Scaling, VideoFormat},
   StreamDescriptor,
 };
 pub use message::publish_job_progression;
