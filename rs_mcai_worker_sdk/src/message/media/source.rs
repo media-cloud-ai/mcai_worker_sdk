@@ -240,7 +240,7 @@ impl Source {
   }
 
   fn get_video_filter_graph(
-    video_filters: &Vec<VideoFilter>,
+    video_filters: &[VideoFilter],
     video_decoder: &VideoDecoder,
   ) -> Result<Option<FilterGraph>> {
     let mut graph = FilterGraph::new().map_err(RuntimeError)?;
@@ -300,7 +300,7 @@ impl Source {
     }
   }
   fn get_audio_filter_graph(
-    audio_filters: &Vec<AudioFilter>,
+    audio_filters: &[AudioFilter],
     audio_decoder: &AudioDecoder,
   ) -> Result<Option<FilterGraph>> {
     let mut graph = FilterGraph::new().map_err(RuntimeError)?;

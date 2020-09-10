@@ -1,6 +1,10 @@
 mod constants;
+#[cfg(feature = "media")]
+mod filters;
 mod parameters;
 mod process_return;
+#[cfg(feature = "media")]
+mod stream_descriptors;
 mod worker;
 
 #[macro_use]
@@ -16,8 +20,22 @@ use mcai_worker_sdk::{FormatContext, Frame, ProcessResult, StreamDescriptor};
 #[cfg(feature = "media")]
 use std::sync::{mpsc::Sender, Arc, Mutex};
 
-#[derive(Debug, Clone)]
-struct CWorkerEvent {}
+#[macro_export]
+macro_rules! get_c_string {
+  ($name:expr) => {
+    if $name.is_null() {
+      "".to_string()
+    } else {
+      std::str::from_utf8_unchecked(std::ffi::CStr::from_ptr($name).to_bytes()).to_string()
+    }
+  };
+}
+
+#[derive(Clone, Debug, Default)]
+struct CWorkerEvent {
+  #[cfg(feature = "media")]
+  result: Option<Arc<Mutex<Sender<ProcessResult>>>>,
+}
 
 impl MessageEvent<CWorkerParameters> for CWorkerEvent {
   fn get_name(&self) -> String {
@@ -51,8 +69,9 @@ impl MessageEvent<CWorkerParameters> for CWorkerEvent {
     &mut self,
     parameters: CWorkerParameters,
     format_context: Arc<Mutex<FormatContext>>,
-    _result: Arc<Mutex<Sender<ProcessResult>>>,
+    result: Arc<Mutex<Sender<ProcessResult>>>,
   ) -> Result<Vec<StreamDescriptor>> {
+    self.result = Some(result);
     call_worker_init_process(parameters, format_context)
   }
 
@@ -68,7 +87,17 @@ impl MessageEvent<CWorkerParameters> for CWorkerEvent {
 
   #[cfg(feature = "media")]
   fn ending_process(&mut self) -> Result<()> {
-    call_worker_ending_process()
+    let ending_process_result = call_worker_ending_process();
+
+    if let Some(result) = &self.result {
+      result
+        .lock()
+        .unwrap()
+        .send(ProcessResult::end_of_process())
+        .unwrap();
+    }
+
+    ending_process_result
   }
 
   fn process(
@@ -84,20 +113,19 @@ impl MessageEvent<CWorkerParameters> for CWorkerEvent {
   }
 }
 
-static C_WORKER_EVENT: CWorkerEvent = CWorkerEvent {};
-
 fn main() {
-  start_worker(C_WORKER_EVENT.clone());
+  start_worker(CWorkerEvent::default());
 }
 
 #[test]
 pub fn test_c_binding_worker_info() {
   use mcai_worker_sdk::worker::ParameterType;
 
-  let name = C_WORKER_EVENT.get_name();
-  let short_description = C_WORKER_EVENT.get_short_description();
-  let description = C_WORKER_EVENT.get_description();
-  let version = C_WORKER_EVENT.get_version().to_string();
+  let worker_event = CWorkerEvent::default();
+  let name = worker_event.get_name();
+  let short_description = worker_event.get_short_description();
+  let description = worker_event.get_description();
+  let version = worker_event.get_version().to_string();
 
   assert_eq!(name, "my_c_worker".to_string());
   assert_eq!(short_description, "My C Worker".to_string());
@@ -149,7 +177,7 @@ use mcai_worker_sdk::job::{Job, JobStatus};
 
 #[test]
 pub fn test_init() {
-  let mut c_worker_event = C_WORKER_EVENT.clone();
+  let mut c_worker_event = CWorkerEvent::default();
   let result = c_worker_event.init();
   assert!(result.is_ok());
 }
@@ -157,7 +185,7 @@ pub fn test_init() {
 #[test]
 #[cfg(feature = "media")]
 pub fn test_ending_process() {
-  let mut c_worker_event = C_WORKER_EVENT.clone();
+  let mut c_worker_event = CWorkerEvent::default();
   let result = c_worker_event.ending_process();
   assert!(result.is_ok());
 }
@@ -179,7 +207,7 @@ pub fn test_process() {
   let job_result = JobResult::new(job.job_id);
   let parameters = job.get_parameters().unwrap();
 
-  let result = C_WORKER_EVENT.process(None, parameters, job_result);
+  let result = CWorkerEvent::default().process(None, parameters, job_result);
   assert!(result.is_ok());
   let job_result = result.unwrap();
   assert_eq!(job_result.get_job_id(), 123);
@@ -207,7 +235,7 @@ pub fn test_failing_process() {
   let job_result = JobResult::new(job.job_id);
   let parameters = job.get_parameters().unwrap();
 
-  let result = C_WORKER_EVENT.process(None, parameters, job_result);
+  let result = CWorkerEvent::default().process(None, parameters, job_result);
   assert!(result.is_err());
   let _message_error = result.unwrap_err();
 }

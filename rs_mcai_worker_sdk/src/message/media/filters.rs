@@ -18,9 +18,9 @@ pub trait FilterParameters {
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 pub struct GenericFilter {
-  name: String,
-  label: Option<String>,
-  parameters: HashMap<String, String>,
+  pub name: String,
+  pub label: Option<String>,
+  pub parameters: HashMap<String, String>,
 }
 
 impl GenericFilter {
