@@ -1,0 +1,35 @@
+{
+  "job_id": 1234,
+  "parameters": [
+    {
+      "id": "action",
+      "type": "string",
+      "value": "completed"
+    },
+    {
+      "id": "number",
+      "type": "integer",
+      "value": 123
+    },
+    {
+      "id": "array of strings",
+      "type": "array_of_strings",
+      "value": ["value_1", "value_2"]
+    },
+    {
+      "id": "array of integers",
+      "type": "array_of_integers",
+      "value": [0,1,2,3,4,5,6]
+    },
+    {
+      "id": "source_path",
+      "type": "string",
+      "value": "/path/to/audio_video/file.ext"
+    },
+    {
+      "id": "destination_path",
+      "type": "string",
+      "value": "/path/to/output/file.ext"
+    }
+  ]
+}
