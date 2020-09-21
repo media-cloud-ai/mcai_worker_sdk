@@ -10,15 +10,15 @@ pub fn default_lang() -> String {
 
 #[derive(Debug, Default, Clone, PartialEq, YaDeserialize, YaSerialize)]
 #[yaserde(
-  rename="tt",
-  prefix="tt",
-  namespace="tt: http://www.w3.org/ns/ttml"
-  namespace="xml: http://www.w3.org/XML/1998/namespace"
-  namespace="ttm: http://www.w3.org/ns/ttml#metadata"
-  namespace="ttp: http://www.w3.org/ns/ttml#parameter"
-  namespace="ebuttp: urn:ebu:tt:parameters"
+  rename = "tt",
+  prefix = "tt",
+  namespace = "tt: http://www.w3.org/ns/ttml",
+  namespace = "xml: http://www.w3.org/XML/1998/namespace",
+  namespace = "ttm: http://www.w3.org/ns/ttml#metadata",
+  namespace = "ttp: http://www.w3.org/ns/ttml#parameter",
+  namespace = "ebuttp: urn:ebu:tt:parameters"
 )]
-pub struct Ttml {
+pub struct EbuTtmlLive {
   #[yaserde(rename = "lang", prefix = "xml", attribute)]
   pub language: Option<String>,
   #[yaserde(rename = "sequenceIdentifier", prefix = "ebuttp", attribute)]
@@ -37,7 +37,7 @@ pub struct Ttml {
 #[yaserde(
   rename = "head",
   prefix = "tt",
-  namespace = "tt: http://www.w3.org/ns/ttml"
+  namespace = "tt: http://www.w3.org/ns/ebu_ttml_live"
 )]
 pub struct Head {
   #[yaserde(prefix = "tt")]
@@ -52,7 +52,7 @@ pub struct Head {
 #[yaserde(
   rename = "metadata",
   prefix = "tt",
-  namespace = "tt: http://www.w3.org/ns/ttml"
+  namespace = "tt: http://www.w3.org/ns/ttml",
   namespace = "ttm: http://www.w3.org/ns/ttml#metadata"
 )]
 pub struct Metadata {
@@ -160,3 +160,10 @@ pub struct Span {
   namespace = "tt: http://www.w3.org/ns/ttml"
 )]
 pub struct BreakLine {}
+
+// #[test]
+// pub fn test_deser() {
+//   let content = "<?xml version=\"1.0\" encoding=\"utf-8\"?><tt:tt xmlns:ebuttp=\"urn:ebu:tt:parameters\" xmlns:tt=\"http://www.w3.org/ns/ttml\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\" xmlns:ttp=\"http://www.w3.org/ns/ttml#parameter\" xml:lang=\"fr-FR\" ebuttp:sequenceIdentifier=\"LiveSubtitle\" ebuttp:sequenceNumber=\"0\" ttp:clockMode=\"local\" ttp:timeBase=\"clock\"><head><tt:metadata /><tt:styling /><tt:layout /></head><body dur=\"00:00:10:00\" begin=\"0ms\"><div><p begin=\"0ms\" end=\"10ms\"><span>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore disputandum putant. Sed ut perspiciatis, unde omnis iste.</span></p></div></body></tt:tt>";
+//   let result = yaserde::de::from_str::<EbuTtmlLive>(content);
+//   println!("result: {:?}", result);
+// }
