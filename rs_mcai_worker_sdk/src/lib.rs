@@ -186,6 +186,13 @@ impl ProcessResult {
   }
 }
 
+#[cfg(feature = "media")]
+pub enum ProcessFrame {
+  AudioVideo(Frame),
+  EbuTtmlLive(Box<EbuTtmlLive>),
+  Data(Vec<u8>),
+}
+
 /// # Trait to describe a worker
 /// Implement this trait to implement a worker
 pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
@@ -213,7 +220,7 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
     &mut self,
     _job_result: JobResult,
     _stream_index: usize,
-    _frame: Frame,
+    _frame: ProcessFrame,
   ) -> Result<ProcessResult> {
     Err(MessageError::NotImplemented())
   }

@@ -1,5 +1,7 @@
+pub mod decoder;
 mod time_expression;
 
+pub use decoder::EbuTtmlLiveDecoder;
 use std::io::{Read, Write};
 pub use time_expression::{Frames, TimeExpression, TimeUnit};
 use yaserde::{YaDeserialize, YaSerialize};

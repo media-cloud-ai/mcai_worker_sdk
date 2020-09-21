@@ -19,13 +19,17 @@ use stainless_ffmpeg_sys::{
 use crate::{
   error::MessageError::RuntimeError,
   job::JobResult,
-  message::media::{media_stream::MediaStream, srt::SrtStream},
-  AudioFilter, MessageEvent, ProcessResult, Result, VideoFilter,
+  message::media::{ebu_ttml_live::EbuTtmlLiveDecoder, media_stream::MediaStream, srt::SrtStream},
+  AudioFilter, MessageEvent, ProcessFrame, ProcessResult, Result, VideoFilter,
 };
+use bytes::Buf;
 
 pub enum DecodeResult {
   EndOfStream,
-  Frame { stream_index: usize, frame: Frame },
+  Frame {
+    stream_index: usize,
+    frame: ProcessFrame,
+  },
   Nothing,
   WaitMore,
 }
@@ -57,11 +61,34 @@ impl Source {
       let source_thread = thread::spawn(move || {
         let mut srt_stream = SrtStream::open_connection(&cloned_source_url).unwrap();
 
-        let format = "mpegts";
-
         let ring_buffer = RingBuffer::<u8>::new(100 * 1024 * 1024);
         let (mut producer, consumer) = ring_buffer.split();
+
+        let (_instant, bytes) = srt_stream
+          .receive()
+          .expect("Could not get the first bytes from SRT stream.");
+
+        let size = bytes.len();
+        debug!("Get first {} bytes to define stream format.", size);
+
+        trace!("First {} bytes of the SRT stream: {:?}", size, bytes);
+        let mut cursor = Cursor::new(bytes);
+        let first_byte = cursor.get_u8();
+
+        cursor.set_position(0);
+        producer.read_from(&mut cursor, Some(size)).unwrap();
+
+        let (format, threshold) = if first_byte == 0x47 {
+          ("mpegts", 1024 * 1024)
+        } else {
+          ("data", 0)
+        };
+
         let media_stream = MediaStream::new(format, consumer).unwrap();
+        debug!(
+          "Initializing media stream with format {:?}: {:?}",
+          format, media_stream
+        );
 
         let mut got_stream_info = false;
 
@@ -73,7 +100,7 @@ impl Source {
 
             producer.read_from(&mut cursor, Some(size)).unwrap();
 
-            if !got_stream_info && producer.len() > 1024 * 1024 {
+            if !got_stream_info && producer.len() > threshold {
               match media_stream.stream_info() {
                 Err(error) => error!("{}", error),
                 Ok(()) => {
@@ -158,12 +185,15 @@ impl Source {
       }
       Ok(packet) => {
         let stream_index = packet.get_stream_index() as usize;
-        if let Some(decoder) = self.decoders.get(&stream_index) {
+        if let Some(decoder) = self.decoders.get_mut(&stream_index) {
           match decoder.decode(&packet) {
-            Ok(frame) => Ok(DecodeResult::Frame {
-              stream_index,
-              frame,
-            }),
+            Ok(process_frame) => match process_frame {
+              Some(process_frame) => Ok(DecodeResult::Frame {
+                stream_index,
+                frame: process_frame,
+              }),
+              None => Ok(DecodeResult::WaitMore),
+            },
             Err(message) => {
               if message == "Resource temporarily unavailable" {
                 return Ok(DecodeResult::Nothing);
@@ -212,6 +242,7 @@ impl Source {
         let decoder = Decoder {
           audio_decoder: Some(audio_decoder),
           video_decoder: None,
+          ebu_ttml_live_decoder: None,
           graph: audio_graph,
         };
 
@@ -230,7 +261,18 @@ impl Source {
         let decoder = Decoder {
           audio_decoder: None,
           video_decoder: Some(video_decoder),
+          ebu_ttml_live_decoder: None,
           graph: video_graph,
+        };
+
+        decoders.insert(selected_stream.index, decoder);
+      } else {
+        let ebu_ttml_live_decoder = EbuTtmlLiveDecoder::new();
+        let decoder = Decoder {
+          audio_decoder: None,
+          video_decoder: None,
+          ebu_ttml_live_decoder: Some(ebu_ttml_live_decoder),
+          graph: None,
         };
 
         decoders.insert(selected_stream.index, decoder);
@@ -249,10 +291,22 @@ impl Source {
     for video_filter in video_filters {
       let filter = video_filter
         .as_generic_filter(video_decoder)
-        .map_err(RuntimeError)?
+        .map_err(|error| {
+          RuntimeError(format!(
+            "Cannot convert video filter to generic filter: {}",
+            error
+          ))
+        })?
         .as_filter()
-        .map_err(RuntimeError)?;
-      filters.push(graph.add_filter(&filter).map_err(RuntimeError)?);
+        .map_err(|error| {
+          RuntimeError(format!(
+            "Cannot convert generic filter to stainless ffmpeg filter: {}",
+            error
+          ))
+        })?;
+      filters.push(graph.add_filter(&filter).map_err(|error| {
+        RuntimeError(format!("Cannot add filter {:?} to list: {}", filter, error))
+      })?);
     }
 
     if !filters.is_empty() {
@@ -293,7 +347,9 @@ impl Source {
         .connect_output(&filter, 0, "video_output", 0)
         .map_err(RuntimeError)?;
 
-      graph.validate().map_err(RuntimeError)?;
+      graph.validate().map_err(|error| {
+        RuntimeError(format!("Video filter graph validation failed: {}", error))
+      })?;
       Ok(Some(graph))
     } else {
       Ok(None)
@@ -309,10 +365,22 @@ impl Source {
     for audio_filter in audio_filters {
       let filter = audio_filter
         .as_generic_filter()
-        .map_err(RuntimeError)?
+        .map_err(|error| {
+          RuntimeError(format!(
+            "Cannot convert audio filter to generic filter: {}",
+            error
+          ))
+        })?
         .as_filter()
-        .map_err(RuntimeError)?;
-      filters.push(graph.add_filter(&filter).map_err(RuntimeError)?);
+        .map_err(|error| {
+          RuntimeError(format!(
+            "Cannot convert generic filter to stainless ffmpeg filter: {}",
+            error
+          ))
+        })?;
+      filters.push(graph.add_filter(&filter).map_err(|error| {
+        RuntimeError(format!("Cannot add filter {:?} to list: {}", filter, error))
+      })?);
     }
 
     if !filters.is_empty() {
@@ -354,7 +422,9 @@ impl Source {
         .connect_output(&filter, 0, "audio_output", 0)
         .map_err(RuntimeError)?;
 
-      graph.validate().map_err(RuntimeError)?;
+      graph.validate().map_err(|error| {
+        RuntimeError(format!("Audio filter graph validation failed: {}", error))
+      })?;
       Ok(Some(graph))
     } else {
       Ok(None)
@@ -365,11 +435,12 @@ impl Source {
 struct Decoder {
   audio_decoder: Option<AudioDecoder>,
   video_decoder: Option<VideoDecoder>,
+  ebu_ttml_live_decoder: Option<EbuTtmlLiveDecoder>,
   graph: Option<FilterGraph>,
 }
 
 impl Decoder {
-  fn decode(&self, packet: &Packet) -> std::result::Result<Frame, String> {
+  fn decode(&mut self, packet: &Packet) -> std::result::Result<Option<ProcessFrame>, String> {
     if let Some(audio_decoder) = &self.audio_decoder {
       trace!("[FFmpeg] Send packet to audio decoder");
 
@@ -404,7 +475,7 @@ impl Decoder {
         index: 1,
       };
 
-      Ok(frame)
+      Ok(Some(ProcessFrame::AudioVideo(frame)))
     } else if let Some(video_decoder) = &self.video_decoder {
       trace!("[FFmpeg] Send packet to video decoder");
 
@@ -439,7 +510,13 @@ impl Decoder {
         index: 1,
       };
 
-      Ok(frame)
+      Ok(Some(ProcessFrame::AudioVideo(frame)))
+    } else if let Some(ebu_ttml_live_decoder) = &mut self.ebu_ttml_live_decoder {
+      let result = match ebu_ttml_live_decoder.decode(packet)? {
+        Some(ttml_content) => Some(ProcessFrame::EbuTtmlLive(Box::new(ttml_content))),
+        None => None,
+      };
+      Ok(result)
     } else {
       Err("No audio/video decoder found".to_string())
     }

@@ -3,14 +3,18 @@ extern crate serde_derive;
 
 #[cfg(feature = "media")]
 use mcai_worker_sdk::{
-  info, AudioFilter, AudioFormat, FormatContext, Frame, ProcessResult, StreamDescriptor,
+  info, AudioFilter, AudioFormat, FormatContext, ProcessResult, StreamDescriptor,
 };
 use mcai_worker_sdk::{
   job::{JobResult, JobStatus},
-  publish_job_progression, McaiChannel, MessageError, MessageEvent, Result,
+  publish_job_progression, McaiChannel, MessageError, MessageEvent, ProcessFrame, Result, Scaling,
+  VideoFilter,
 };
 use schemars::JsonSchema;
 use semver::Version;
+#[cfg(feature = "media")]
+use stainless_ffmpeg_sys::AVMediaType;
+use std::ops::Deref;
 #[cfg(feature = "media")]
 use std::sync::{mpsc::Sender, Arc, Mutex};
 
@@ -54,24 +58,51 @@ Do no use in production, just for developments."#
   fn init_process(
     &mut self,
     _parameters: WorkerParameters,
-    _format_context: Arc<Mutex<FormatContext>>,
+    format_context: Arc<Mutex<FormatContext>>,
     result: Arc<Mutex<Sender<ProcessResult>>>,
   ) -> Result<Vec<StreamDescriptor>> {
     self.result = Some(result);
 
-    let index = 0;
-    let channel_layouts = vec!["mono".to_string()];
-    let sample_formats = vec!["s16".to_string()];
-    let sample_rates = vec![16000];
+    let mut stream_descriptors = vec![];
 
-    let filters = vec![AudioFilter::Format(AudioFormat {
-      sample_rates,
-      channel_layouts,
-      sample_formats,
-    })];
-    let audio_stream = StreamDescriptor::new_audio(index, filters);
+    let format_context = format_context.lock().unwrap();
+    for stream_index in 0..format_context.get_nb_streams() {
+      let stream_type = format_context.get_stream_type(stream_index as isize);
+      info!(
+        "Handle stream #{} with type: {:?}",
+        stream_index, stream_type
+      );
 
-    Ok(vec![audio_stream])
+      match stream_type {
+        AVMediaType::AVMEDIA_TYPE_VIDEO => {
+          let filters = vec![VideoFilter::Resize(Scaling {
+            width: Some(200),
+            height: Some(70),
+          })];
+          stream_descriptors.push(StreamDescriptor::new_video(stream_index as usize, filters))
+        }
+        AVMediaType::AVMEDIA_TYPE_AUDIO => {
+          let channel_layouts = vec!["mono".to_string()];
+          let sample_formats = vec!["s16".to_string()];
+          let sample_rates = vec![16000];
+
+          let filters = vec![AudioFilter::Format(AudioFormat {
+            sample_rates,
+            channel_layouts,
+            sample_formats,
+          })];
+          stream_descriptors.push(StreamDescriptor::new_audio(stream_index as usize, filters))
+        }
+        AVMediaType::AVMEDIA_TYPE_SUBTITLE => {
+          stream_descriptors.push(StreamDescriptor::new_data(stream_index as usize))
+        }
+        AVMediaType::AVMEDIA_TYPE_DATA => {
+          stream_descriptors.push(StreamDescriptor::new_data(stream_index as usize))
+        }
+        _ => info!("Skip stream #{}", stream_index),
+      };
+    }
+    Ok(stream_descriptors)
   }
 
   #[cfg(feature = "media")]
@@ -79,35 +110,43 @@ Do no use in production, just for developments."#
     &mut self,
     job_result: JobResult,
     _stream_index: usize,
-    frame: Frame,
+    frame: ProcessFrame,
   ) -> Result<ProcessResult> {
-    unsafe {
-      let width = (*frame.frame).width;
-      let height = (*frame.frame).height;
-      let sample_rate = (*frame.frame).sample_rate;
-      let channels = (*frame.frame).channels;
-      let nb_samples = (*frame.frame).nb_samples;
+    match frame {
+      ProcessFrame::AudioVideo(frame) => {
+        unsafe {
+          let width = (*frame.frame).width;
+          let height = (*frame.frame).height;
+          let sample_rate = (*frame.frame).sample_rate;
+          let channels = (*frame.frame).channels;
+          let nb_samples = (*frame.frame).nb_samples;
 
-      if width != 0 && height != 0 {
-        info!(
-          target: &job_result.get_str_job_id(),
-          "PTS: {}, image size: {}x{}",
-          frame.get_pts(),
-          width,
-          height
-        );
-      } else {
-        info!(
-          target: &job_result.get_str_job_id(),
-          "PTS: {}, sample_rate: {}Hz, channels: {}, nb_samples: {}",
-          frame.get_pts(),
-          sample_rate,
-          channels,
-          nb_samples,
-        );
+          if width != 0 && height != 0 {
+            info!(
+              target: &job_result.get_str_job_id(),
+              "PTS: {}, image size: {}x{}",
+              frame.get_pts(),
+              width,
+              height
+            );
+          } else {
+            info!(
+              target: &job_result.get_str_job_id(),
+              "PTS: {}, sample_rate: {}Hz, channels: {}, nb_samples: {}",
+              frame.get_pts(),
+              sample_rate,
+              channels,
+              nb_samples,
+            );
+          }
+        }
+        Ok(ProcessResult::new_json(""))
       }
+      ProcessFrame::EbuTtmlLive(ebu_ttml_live) => {
+        Ok(ProcessResult::new_xml(ebu_ttml_live.deref().clone()))
+      }
+      _ => Err(MessageError::NotImplemented()),
     }
-    Ok(ProcessResult::new_json(""))
   }
 
   #[cfg(feature = "media")]
