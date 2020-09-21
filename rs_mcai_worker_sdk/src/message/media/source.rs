@@ -1,12 +1,3 @@
-use crate::{
-  error::MessageError::RuntimeError,
-  job::JobResult,
-  message::media::{media_stream::MediaStream, srt::SrtStream},
-  MessageEvent, ProcessResult, Result,
-};
-use ringbuf::RingBuffer;
-use schemars::JsonSchema;
-use serde::de::DeserializeOwned;
 use std::sync::{
   mpsc,
   mpsc::{Receiver, Sender},
@@ -14,17 +5,22 @@ use std::sync::{
 };
 use std::{cell::RefCell, collections::HashMap, io::Cursor, rc::Rc, thread};
 
+use ringbuf::RingBuffer;
+use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
 use stainless_ffmpeg::{
-  audio_decoder::AudioDecoder,
-  filter_graph::FilterGraph,
-  format_context::FormatContext,
-  frame::Frame,
-  order::{filter::Filter, filter_output::FilterOutput, parameters::ParameterValue},
-  packet::Packet,
-  video_decoder::VideoDecoder,
+  audio_decoder::AudioDecoder, filter_graph::FilterGraph, format_context::FormatContext,
+  frame::Frame, packet::Packet, video_decoder::VideoDecoder,
 };
 use stainless_ffmpeg_sys::{
   av_frame_alloc, av_frame_clone, avcodec_receive_frame, avcodec_send_packet,
+};
+
+use crate::{
+  error::MessageError::RuntimeError,
+  job::JobResult,
+  message::media::{media_stream::MediaStream, srt::SrtStream},
+  AudioFilter, MessageEvent, ProcessResult, Result, VideoFilter,
 };
 
 pub enum DecodeResult {
@@ -201,83 +197,168 @@ impl Source {
 
     let mut decoders = HashMap::<usize, Decoder>::new();
     for selected_stream in &selected_streams {
-      // AudioDecoder can decode any codec, not only video
-      let audio_decoder = AudioDecoder::new(
-        format!("decoder_{}", selected_stream.index),
-        &format_context.clone().lock().unwrap(),
-        selected_stream.index as isize,
-      )
-      .map_err(RuntimeError)?;
+      if let Some(audio_configuration) = &selected_stream.audio_configuration {
+        // AudioDecoder can decode any codec, not only video
+        let audio_decoder = AudioDecoder::new(
+          format!("decoder_{}", selected_stream.index),
+          &format_context.clone().lock().unwrap(),
+          selected_stream.index as isize,
+        )
+        .map_err(RuntimeError)?;
 
-      let audio_graph = if let Some(audio_configuration) = &selected_stream.audio_configuration {
-        let mut graph = FilterGraph::new().unwrap();
+        let audio_graph =
+          Source::get_audio_filter_graph(&audio_configuration.filters, &audio_decoder)?;
 
-        graph
-          .add_input_from_audio_decoder("audio_input", &audio_decoder)
-          .unwrap();
-
-        graph.add_audio_output("audio_output").unwrap();
-
-        let mut parameters = HashMap::new();
-
-        if !audio_configuration.sample_rates.is_empty() {
-          let sample_rates = audio_configuration
-            .sample_rates
-            .iter()
-            .map(|i| i.to_string())
-            .collect::<Vec<String>>()
-            .join("|");
-
-          parameters.insert(
-            "sample_rates".to_string(),
-            ParameterValue::String(sample_rates),
-          );
-        }
-        if !audio_configuration.channel_layouts.is_empty() {
-          parameters.insert(
-            "channel_layouts".to_string(),
-            ParameterValue::String(audio_configuration.channel_layouts.join("|")),
-          );
-        }
-        if !audio_configuration.sample_formats.is_empty() {
-          parameters.insert(
-            "sample_fmts".to_string(),
-            ParameterValue::String(audio_configuration.sample_formats.join("|")),
-          );
-        }
-
-        let filter_definition = Filter {
-          name: "aformat".to_string(),
-          label: Some("aformat_filter".to_string()),
-          parameters,
-          inputs: None,
-          outputs: Some(vec![FilterOutput {
-            stream_label: "audio_output".to_string(),
-          }]),
+        let decoder = Decoder {
+          audio_decoder: Some(audio_decoder),
+          video_decoder: None,
+          graph: audio_graph,
         };
 
-        let filter = graph.add_filter(&filter_definition).unwrap();
-        graph.connect_input("audio_input", 0, &filter, 0).unwrap();
-        graph.connect_output(&filter, 0, "audio_output", 0).unwrap();
+        decoders.insert(selected_stream.index, decoder);
+      } else if let Some(image_configuration) = &selected_stream.image_configuration {
+        let video_decoder = VideoDecoder::new(
+          format!("decoder_{}", selected_stream.index),
+          &format_context.clone().lock().unwrap(),
+          selected_stream.index as isize,
+        )
+        .map_err(RuntimeError)?;
 
-        graph.validate().unwrap();
+        let video_graph =
+          Source::get_video_filter_graph(&image_configuration.filters, &video_decoder)?;
 
-        Some(graph)
-      } else {
-        None
-      };
+        let decoder = Decoder {
+          audio_decoder: None,
+          video_decoder: Some(video_decoder),
+          graph: video_graph,
+        };
 
-      println!("{:?}", selected_stream);
-
-      let decoder = Decoder {
-        audio_decoder: Some(audio_decoder),
-        video_decoder: None,
-        graph: audio_graph,
-      };
-
-      decoders.insert(selected_stream.index, decoder);
+        decoders.insert(selected_stream.index, decoder);
+      }
     }
     Ok(decoders)
+  }
+
+  fn get_video_filter_graph(
+    video_filters: &[VideoFilter],
+    video_decoder: &VideoDecoder,
+  ) -> Result<Option<FilterGraph>> {
+    let mut graph = FilterGraph::new().map_err(RuntimeError)?;
+
+    let mut filters = vec![];
+    for video_filter in video_filters {
+      let filter = video_filter
+        .as_generic_filter(video_decoder)
+        .map_err(RuntimeError)?
+        .as_filter()
+        .map_err(RuntimeError)?;
+      filters.push(graph.add_filter(&filter).map_err(RuntimeError)?);
+    }
+
+    if !filters.is_empty() {
+      graph
+        .add_input_from_video_decoder("video_input", video_decoder)
+        .map_err(RuntimeError)?;
+      graph
+        .add_video_output("video_output")
+        .map_err(RuntimeError)?;
+
+      let mut filter = filters.remove(0);
+      trace!(
+        "Connect video graph input to filter {}...",
+        filter.get_label()
+      );
+      graph
+        .connect_input("video_input", 0, &filter, 0)
+        .map_err(RuntimeError)?;
+
+      while !filters.is_empty() {
+        let next_filter = filters.remove(0);
+        trace!(
+          "Connect filter {} to filter {}...",
+          filter.get_label(),
+          next_filter.get_label()
+        );
+        graph
+          .connect(&filter, 0, &next_filter, 0)
+          .map_err(RuntimeError)?;
+        filter = next_filter;
+      }
+
+      trace!(
+        "Connect filter {} to video graph output...",
+        filter.get_label()
+      );
+      graph
+        .connect_output(&filter, 0, "video_output", 0)
+        .map_err(RuntimeError)?;
+
+      graph.validate().map_err(RuntimeError)?;
+      Ok(Some(graph))
+    } else {
+      Ok(None)
+    }
+  }
+  fn get_audio_filter_graph(
+    audio_filters: &[AudioFilter],
+    audio_decoder: &AudioDecoder,
+  ) -> Result<Option<FilterGraph>> {
+    let mut graph = FilterGraph::new().map_err(RuntimeError)?;
+    let mut filters = vec![];
+
+    for audio_filter in audio_filters {
+      let filter = audio_filter
+        .as_generic_filter()
+        .map_err(RuntimeError)?
+        .as_filter()
+        .map_err(RuntimeError)?;
+      filters.push(graph.add_filter(&filter).map_err(RuntimeError)?);
+    }
+
+    if !filters.is_empty() {
+      graph
+        .add_input_from_audio_decoder("audio_input", audio_decoder)
+        .map_err(RuntimeError)?;
+
+      graph
+        .add_audio_output("audio_output")
+        .map_err(RuntimeError)?;
+
+      let mut filter = filters.remove(0);
+      trace!(
+        "Connect audio graph input to filter {}...",
+        filter.get_label()
+      );
+      graph
+        .connect_input("audio_input", 0, &filter, 0)
+        .map_err(RuntimeError)?;
+
+      while !filters.is_empty() {
+        let next_filter = filters.remove(0);
+        trace!(
+          "Connect filter {} to filter {}...",
+          filter.get_label(),
+          next_filter.get_label()
+        );
+        graph
+          .connect(&filter, 0, &next_filter, 0)
+          .map_err(RuntimeError)?;
+        filter = next_filter;
+      }
+
+      trace!(
+        "Connect filter {} to audio graph output...",
+        filter.get_label()
+      );
+      graph
+        .connect_output(&filter, 0, "audio_output", 0)
+        .map_err(RuntimeError)?;
+
+      graph.validate().map_err(RuntimeError)?;
+      Ok(Some(graph))
+    } else {
+      Ok(None)
+    }
   }
 }
 
@@ -323,11 +404,44 @@ impl Decoder {
         index: 1,
       };
 
-      return Ok(frame);
+      Ok(frame)
+    } else if let Some(video_decoder) = &self.video_decoder {
+      trace!("[FFmpeg] Send packet to video decoder");
+
+      let av_frame = unsafe {
+        avcodec_send_packet(video_decoder.codec_context, packet.packet);
+
+        let av_frame = av_frame_alloc();
+        avcodec_receive_frame(video_decoder.codec_context, av_frame);
+
+        let frame = Frame {
+          frame: av_frame,
+          name: Some("video_source_1".to_string()),
+          index: 1,
+        };
+
+        if let Some(graph) = &self.graph {
+          if let Ok((_audio_frames, video_frames)) = graph.process(&[], &[frame]) {
+            trace!("[FFmpeg] Output graph count {} frames", video_frames.len());
+            let frame = video_frames.first().unwrap();
+            av_frame_clone((*frame).frame)
+          } else {
+            av_frame
+          }
+        } else {
+          av_frame
+        }
+      };
+
+      let frame = Frame {
+        frame: av_frame,
+        name: Some("video".to_string()),
+        index: 1,
+      };
+
+      Ok(frame)
+    } else {
+      Err("No audio/video decoder found".to_string())
     }
-    if let Some(video_decoder) = &self.video_decoder {
-      return video_decoder.decode(packet);
-    }
-    unimplemented!();
   }
 }

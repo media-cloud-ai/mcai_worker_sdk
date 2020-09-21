@@ -15,12 +15,13 @@ use mcai_worker_sdk::{
   McaiChannel, MessageError, MessageEvent, Result, Version,
 };
 #[cfg(feature = "media")]
-pub use mcai_worker_sdk::{FormatContext, Frame, ProcessResult, StreamDescriptor};
+pub use mcai_worker_sdk::{
+  AudioFilter, AudioFormat, FormatContext, Frame, GenericFilter, ProcessResult, StreamDescriptor,
+};
 
-use crate::helpers::get_destination_paths;
 #[cfg(feature = "media")]
-use crate::helpers::get_stream_indexes;
-use crate::helpers::py_err_to_string;
+use crate::helpers::get_stream_descriptors;
+use crate::helpers::{get_destination_paths, py_err_to_string};
 use crate::parameters::{build_parameters, PythonWorkerParameters};
 
 mod helpers;
@@ -28,8 +29,11 @@ mod helpers;
 mod media;
 mod parameters;
 
-#[derive(Debug, Clone)]
-struct PythonWorkerEvent {}
+#[derive(Clone, Debug, Default)]
+struct PythonWorkerEvent {
+  #[cfg(feature = "media")]
+  result: Option<Arc<Mutex<Sender<ProcessResult>>>>,
+}
 
 impl PythonWorkerEvent {
   fn read_python_file() -> String {
@@ -129,6 +133,102 @@ impl CallbackHandle {
   }
 }
 
+#[pyclass]
+#[cfg(feature = "media")]
+#[derive(Debug)]
+struct StreamDescriptorHandler {}
+
+#[pyclass]
+#[cfg(feature = "media")]
+#[derive(Debug, Clone)]
+struct StreamType {
+  video: bool,
+  audio: bool,
+  data: bool,
+}
+
+#[pymethods]
+#[cfg(feature = "media")]
+impl StreamType {
+  #[staticmethod]
+  fn new_video() -> Self {
+    StreamType {
+      video: true,
+      audio: false,
+      data: false,
+    }
+  }
+  #[staticmethod]
+  fn new_audio() -> Self {
+    StreamType {
+      video: false,
+      audio: true,
+      data: false,
+    }
+  }
+  #[staticmethod]
+  fn new_data() -> Self {
+    StreamType {
+      video: false,
+      audio: false,
+      data: true,
+    }
+  }
+  fn is_video(&self) -> bool {
+    self.video
+  }
+  fn is_audio(&self) -> bool {
+    self.audio
+  }
+  fn is_data(&self) -> bool {
+    self.data
+  }
+}
+
+#[pyclass]
+#[cfg(feature = "media")]
+#[derive(Debug, Clone)]
+struct GenericStreamDescriptor {
+  index: u32,
+  stream_type: StreamType,
+  filters: Vec<GenericFilter>,
+}
+
+#[pymethods]
+#[cfg(feature = "media")]
+impl StreamDescriptorHandler {
+  #[staticmethod]
+  pub fn new_video_stream(index: u32, video_filters: &PyList) -> GenericStreamDescriptor {
+    let filters = video_filters
+      .iter()
+      .map(|value| value.extract::<GenericFilter>())
+      .filter(|extracted| extracted.is_ok())
+      .map(|extracted| extracted.unwrap())
+      .collect();
+
+    GenericStreamDescriptor {
+      index,
+      stream_type: StreamType::new_video(),
+      filters,
+    }
+  }
+  #[staticmethod]
+  pub fn new_audio_stream(index: u32, video_filters: &PyList) -> GenericStreamDescriptor {
+    let filters = video_filters
+      .iter()
+      .map(|value| value.extract::<GenericFilter>())
+      .filter(|extracted| extracted.is_ok())
+      .map(|extracted| extracted.unwrap())
+      .collect();
+
+    GenericStreamDescriptor {
+      index,
+      stream_type: StreamType::new_audio(),
+      filters,
+    }
+  }
+}
+
 fn get_python_module<'a>(gil: &'a GILGuard) -> Result<(Python<'a>, &'a PyModule)> {
   let python_file_content = PythonWorkerEvent::read_python_file();
   let py = gil.python();
@@ -214,22 +314,26 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
     &mut self,
     parameters: PythonWorkerParameters,
     format_context: Arc<Mutex<FormatContext>>,
-    _result: Arc<Mutex<Sender<ProcessResult>>>,
+    result: Arc<Mutex<Sender<ProcessResult>>>,
   ) -> Result<Vec<StreamDescriptor>> {
+    self.result = Some(result);
+
     let gil = Python::acquire_gil();
     let (py, python_module) = get_python_module(&gil)?;
 
     let context = media::FormatContext::from(format_context);
     let list_of_parameters = build_parameters(parameters, py)?;
 
+    let handler = StreamDescriptorHandler {};
+
     let response = call_module_function(
       py,
       python_module,
       "init_process",
-      (context, list_of_parameters),
+      (handler, context, list_of_parameters),
     )
     .map_err(MessageError::ParameterValueError)?;
-    get_stream_indexes(response)
+    get_stream_descriptors(response)
   }
 
   #[cfg(feature = "media")]
@@ -267,6 +371,14 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
 
     let _result = call_module_function(py, python_module, "ending_process", ())
       .map_err(MessageError::ParameterValueError)?;
+
+    if let Some(result) = &self.result {
+      result
+        .lock()
+        .unwrap()
+        .send(ProcessResult::end_of_process())
+        .unwrap();
+    }
 
     Ok(())
   }
@@ -309,8 +421,6 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
   }
 }
 
-static PYTHON_WORKER_EVENT: PythonWorkerEvent = PythonWorkerEvent {};
-
 fn main() {
-  start_worker(PYTHON_WORKER_EVENT.clone());
+  start_worker(PythonWorkerEvent::default());
 }

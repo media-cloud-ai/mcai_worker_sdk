@@ -1,39 +1,36 @@
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 #[cfg(feature = "media")]
 use std::mem::size_of;
 use std::os::raw::{c_char, c_uint, c_void};
 use std::os::raw::{c_int, c_uchar};
 use std::ptr::null;
+#[cfg(feature = "media")]
+use std::sync::{Arc, Mutex};
 
 use libloading::Library;
 use serde_json::Value;
 
-use mcai_worker_sdk::publish_job_progression;
+#[cfg(test)]
+use mcai_worker_sdk::job::Job;
 use mcai_worker_sdk::{
-  debug, error, info,
-  job::JobResult,
-  trace, warn,
-  worker::{Parameter, ParameterType},
+  debug, error, info, job::JobResult, publish_job_progression, trace, warn, worker::Parameter,
   McaiChannel, MessageError, Result,
 };
 #[cfg(feature = "media")]
 use mcai_worker_sdk::{FormatContext, Frame, ProcessResult, StreamDescriptor};
 
 use crate::constants;
-use crate::parameters::CWorkerParameters;
+#[cfg(feature = "media")]
+use crate::filters::{
+  add_descriptor_filter, add_filter_parameter, new_filter, new_stream_descriptor,
+  AddDescriptorFilterCallback, AddFilterParameterCallback, NewFilterCallback,
+  NewStreamDescriptorCallback,
+};
+use crate::get_c_string;
+use crate::parameters::{get_parameter_from_worker_parameter, CWorkerParameters};
 use crate::process_return::ProcessReturn;
 #[cfg(feature = "media")]
-use std::sync::{Arc, Mutex};
-
-macro_rules! get_c_string {
-  ($name:expr) => {
-    if $name.is_null() {
-      "".to_string()
-    } else {
-      std::str::from_utf8_unchecked(CStr::from_ptr($name).to_bytes()).to_string()
-    }
-  };
-}
+use crate::stream_descriptors::CStreamDescriptor;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -67,11 +64,14 @@ type InitFunc = unsafe fn(logger: LoggerCallback);
 #[cfg(feature = "media")]
 type InitProcessFunc = unsafe fn(
   handler: *mut c_void,
-  callback: GetParameterValueCallback,
+  new_stream_descriptor_callback: NewStreamDescriptorCallback,
+  new_filter_callback: NewFilterCallback,
+  add_descriptor_filter_callback: AddDescriptorFilterCallback,
+  add_filter_parameter_callback: AddFilterParameterCallback,
   logger: LoggerCallback,
   av_format_context: *mut c_void,
-  output_stream_indexes: &*mut c_uint,
-  output_stream_indexes_size: *mut c_uint,
+  output_stream_descriptors: &*mut c_void,
+  output_stream_descriptors_size: *mut c_uint,
 ) -> c_uint;
 #[cfg(feature = "media")]
 type ProcessFrameFunc = unsafe fn(
@@ -188,42 +188,6 @@ extern "C" fn progress(mut c_handler: *mut c_void, progression: c_uchar) {
 /************************
  *   Utility functions
  ************************/
-
-fn get_parameter_type_from_c_str(c_str: &CStr) -> ParameterType {
-  match c_str.to_str() {
-    Ok(c_str) => {
-      // keep string quotes in string to json deserializer
-      let json_string = format!("{:?}", c_str);
-      match serde_json::from_str(&json_string) {
-        Ok(parameter_type) => parameter_type,
-        Err(msg) => panic!(
-          "unable to deserialize worker parameter type {:?}: {:?}",
-          json_string, msg
-        ),
-      }
-    }
-    Err(msg) => panic!("unable to parse worker parameter type: {:?}", msg),
-  }
-}
-
-unsafe fn get_parameter_from_worker_parameter(worker_parameter: &WorkerParameter) -> Parameter {
-  let identifier = get_c_string!(worker_parameter.identifier);
-  let label = get_c_string!(worker_parameter.label);
-  let kind_list: &[*const c_char] =
-    std::slice::from_raw_parts(worker_parameter.kind, worker_parameter.kind_size);
-  let mut parameter_types = vec![];
-  for kind in kind_list.iter() {
-    parameter_types.push(get_parameter_type_from_c_str(CStr::from_ptr(*kind)));
-  }
-  let required = worker_parameter.required > 0;
-
-  Parameter {
-    identifier,
-    label,
-    kind: parameter_types,
-    required,
-  }
-}
 
 fn get_library_file_path() -> String {
   std::env::var("WORKER_LIBRARY_FILE").unwrap_or_else(|_| "libworker.so".to_string())
@@ -357,17 +321,19 @@ pub fn call_worker_init_process(
     let format_context = format_context.lock().unwrap();
     let av_format_context_ptr = format_context.format_context;
 
-    let mut c_output_streams = Vec::<c_uint>::with_capacity(256);
-    let output_stream_indexes_ptr = c_output_streams.as_mut_ptr();
-    let output_stream_indexes_size_ptr = libc::malloc(size_of::<c_uint>()) as *mut c_uint;
+    let c_stream_descriptors: &mut [*mut CStreamDescriptor; 256] = &mut [std::ptr::null_mut(); 256];
+    let output_stream_descriptors_size_ptr = libc::malloc(size_of::<c_uint>()) as *mut c_uint;
 
     let return_code = init_process_func(
       handler_ptr as *mut c_void,
-      get_parameter_value,
+      new_stream_descriptor,
+      new_filter,
+      add_descriptor_filter,
+      add_filter_parameter,
       logger,
       av_format_context_ptr as *mut c_void,
-      &output_stream_indexes_ptr,
-      output_stream_indexes_size_ptr,
+      &(c_stream_descriptors.as_mut_ptr() as *mut c_void),
+      output_stream_descriptors_size_ptr,
     );
 
     if return_code != 0 {
@@ -378,30 +344,25 @@ pub fn call_worker_init_process(
       )));
     }
 
-    let mut output_stream_indexes_size = 0;
-    if !output_stream_indexes_size_ptr.is_null() {
-      output_stream_indexes_size = *output_stream_indexes_size_ptr;
-      libc::free(output_stream_indexes_size_ptr as *mut c_void);
+    let mut output_stream_descriptors_size = 0;
+    if !output_stream_descriptors_size_ptr.is_null() {
+      output_stream_descriptors_size = *output_stream_descriptors_size_ptr;
+      libc::free(output_stream_descriptors_size_ptr as *mut c_void);
     }
 
-    if output_stream_indexes_size == 0 || output_stream_indexes_ptr.is_null() {
-      return Err(MessageError::RuntimeError(format!(
-        "The worker {:?} function returned an empty array of stream indexes.",
-        constants::INIT_PROCESS_FUNCTION
-      )));
+    let mut output_stream_descriptors = vec![];
+
+    for i in 0..output_stream_descriptors_size {
+      let c_stream_descriptor_ptr = c_stream_descriptors[i as usize];
+
+      if !c_stream_descriptor_ptr.is_null() {
+        let c_stream_descriptor = Box::from_raw(c_stream_descriptor_ptr as *mut CStreamDescriptor);
+        output_stream_descriptors.push(c_stream_descriptor.into());
+      } else {
+        break;
+      }
     }
-
-    // let mut output_streams = vec![];
-    // for offset in 0..output_stream_indexes_size {
-    //   let value_ptr = output_stream_indexes_ptr.offset(offset as isize);
-    //   if value_ptr.is_null() {
-    //     break;
-    //   }
-    //   output_streams.push((*value_ptr) as usize);
-    // }
-
-    // Ok(output_streams)
-    Ok(vec![])
+    Ok(output_stream_descriptors)
   }
 }
 
@@ -602,9 +563,6 @@ pub fn call_worker_process(
     Ok(ProcessReturn::new(return_code, &message).with_output_paths(output_paths))
   }
 }
-
-#[cfg(test)]
-use mcai_worker_sdk::job::Job;
 
 #[test]
 pub fn test_c_binding_process() {

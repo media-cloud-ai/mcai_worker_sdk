@@ -2,7 +2,9 @@
 extern crate serde_derive;
 
 #[cfg(feature = "media")]
-use mcai_worker_sdk::{info, FormatContext, Frame, ProcessResult, StreamDescriptor};
+use mcai_worker_sdk::{
+  info, AudioFilter, AudioFormat, FormatContext, Frame, ProcessResult, StreamDescriptor,
+};
 use mcai_worker_sdk::{
   job::{JobResult, JobStatus},
   publish_job_progression, McaiChannel, MessageError, MessageEvent, Result,
@@ -62,8 +64,12 @@ Do no use in production, just for developments."#
     let sample_formats = vec!["s16".to_string()];
     let sample_rates = vec![16000];
 
-    let audio_stream =
-      StreamDescriptor::new_audio(index, channel_layouts, sample_formats, sample_rates);
+    let filters = vec![AudioFilter::Format(AudioFormat {
+      sample_rates,
+      channel_layouts,
+      sample_formats,
+    })];
+    let audio_stream = StreamDescriptor::new_audio(index, filters);
 
     Ok(vec![audio_stream])
   }

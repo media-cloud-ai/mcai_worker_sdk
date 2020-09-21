@@ -17,6 +17,16 @@ typedef struct Parameter {
     int required;
 } Parameter;
 
+
+/**
+ * Audio / Video streams descriptors type
+ */
+enum StreamType {
+    VIDEO,
+    AUDIO,
+    DATA
+};
+
 /**
  * Job & channel handler
  */
@@ -44,6 +54,14 @@ typedef void* (*Logger)(const char* _level, const char* _message);
  * @param _progression_percentage    the progression percentage (between 0 and 100)
  */
 typedef void* (*ProgressCallback)(Handler _handler, unsigned char _progression_percentage);
+
+typedef const void* StreamDescriptor;
+typedef const void* Filter;
+typedef void* (*NewStreamDescriptorCallback)(unsigned int _index, StreamType _stream_type);
+typedef void* (*NewFilterCallback)(const char* _filter_name, const char* _filter_label);
+
+typedef void* (*AddDescriptorFilterCallback)(StreamDescriptor _stream_descriptor, Filter _filter);
+typedef void* (*AddFilterParameterCallback)(Filter _filter, const char* _parameter_key, const char* _parameter_value);
 
 /**
  * Get worker name
@@ -86,19 +104,22 @@ void init(Logger logger);
 /**
  * Initialize worker media process
  * (the "media" feature must be enabled)
- * @param handler                  Handler
- * @param parameters_value_getter  Get job parameter value callback
- * @param logger                   Rust Logger
- * @param format_context           Format context pointer
- * @param output_stream_indexes    Pointer of indexes of the output streams
+ * @param handler                   Handler
+ * @param parameters_value_getter   Get job parameter value callback
+ * @param logger                    Rust Logger
+ * @param format_context            Format context pointer
+ * @param output_stream_descriptors Pointer of descriptors of the output streams
  */
 int init_process(
     Handler handler,
-    GetParameterValueCallback parameters_value_getter,
+    NewStreamDescriptorCallback new_stream_descriptor_callback,
+    NewFilterCallback new_filter_callback,
+    AddDescriptorFilterCallback add_descriptor_filter_callback,
+    AddFilterParameterCallback add_filter_parameter_callback,
     Logger logger,
     void* format_context,
-    unsigned int** output_stream_indexes,
-    unsigned int* output_stream_indexes_size
+    void** output_stream_descriptors,
+    unsigned int* output_stream_descriptors_size
   );
 
 /**

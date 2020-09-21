@@ -4,10 +4,13 @@ use schemars::{
   JsonSchema,
 };
 
-use crate::worker::get_worker_parameters;
-use mcai_worker_sdk::worker::ParameterType;
+use crate::get_c_string;
+use crate::worker::{get_worker_parameters, WorkerParameter};
+use mcai_worker_sdk::worker::{Parameter, ParameterType};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
+use std::ffi::CStr;
+use std::os::raw::c_char;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct CWorkerParameters {
@@ -62,6 +65,42 @@ impl JsonSchema for CWorkerParameters {
     };
 
     schema.into()
+  }
+}
+
+fn get_parameter_type_from_c_str(c_str: &CStr) -> ParameterType {
+  match c_str.to_str() {
+    Ok(c_str) => {
+      // keep string quotes in string to json deserializer
+      let json_string = format!("{:?}", c_str);
+      match serde_json::from_str(&json_string) {
+        Ok(parameter_type) => parameter_type,
+        Err(msg) => panic!(
+          "unable to deserialize worker parameter type {:?}: {:?}",
+          json_string, msg
+        ),
+      }
+    }
+    Err(msg) => panic!("unable to parse worker parameter type: {:?}", msg),
+  }
+}
+
+pub unsafe fn get_parameter_from_worker_parameter(worker_parameter: &WorkerParameter) -> Parameter {
+  let identifier = get_c_string!(worker_parameter.identifier);
+  let label = get_c_string!(worker_parameter.label);
+  let kind_list: &[*const c_char] =
+    std::slice::from_raw_parts(worker_parameter.kind, worker_parameter.kind_size);
+  let mut parameter_types = vec![];
+  for kind in kind_list.iter() {
+    parameter_types.push(get_parameter_type_from_c_str(CStr::from_ptr(*kind)));
+  }
+  let required = worker_parameter.required > 0;
+
+  Parameter {
+    identifier,
+    label,
+    kind: parameter_types,
+    required,
   }
 }
 

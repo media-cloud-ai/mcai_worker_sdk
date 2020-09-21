@@ -83,11 +83,14 @@ void init(Logger logger) {
 
 int init_process(
     Handler handler,
-    GetParameterValueCallback parameters_value_getter,
+    NewStreamDescriptorCallback new_stream_descriptor_callback,
+    NewFilterCallback new_filter_callback,
+    AddDescriptorFilterCallback add_descriptor_filter_callback,
+    AddFilterParameterCallback add_filter_parameter_callback,
     Logger logger,
     void* format_context,
-    unsigned int** output_stream_indexes,
-    unsigned int* output_stream_indexes_size
+    void** output_stream_descriptors,
+    unsigned int* output_stream_descriptors_size
   ) {
     logger("debug", "Initialize C Worker media process...");
 
@@ -96,15 +99,31 @@ int init_process(
 
     // Get nb streams
     const unsigned int nb_streams = av_format_context->nb_streams;
-    const size_t length = sizeof(unsigned int) * nb_streams;
-    *output_stream_indexes_size = nb_streams;
+    const size_t length = sizeof(StreamDescriptor) * nb_streams;
+    *output_stream_descriptors_size = nb_streams;
 
-    // Return stream indexes
-    unsigned int streams[nb_streams];
+    // Return stream descriptors
+    const void* stream_descriptors[nb_streams];
+
     for (unsigned int i = 0; i < nb_streams; ++i) {
-        streams[i] = i;
+
+        logger("debug", "New stream descriptor...");
+        const void* descriptor = new_stream_descriptor_callback(i, AUDIO);
+
+        logger("debug", "New filter...");
+        const void* filter = new_filter_callback("aformat", "aformat_filter");
+        logger("debug", "Set parameters...");
+        add_filter_parameter_callback(filter, "sample_rates", "16000");
+        add_filter_parameter_callback(filter, "sample_fmts", "s32");
+        add_filter_parameter_callback(filter, "channel_layouts", "mono");
+
+        logger("debug", "Set filter to descriptor...");
+        add_descriptor_filter_callback(descriptor, filter);
+
+        stream_descriptors[i] = descriptor;
     }
-    memcpy(*output_stream_indexes, &streams, length);
+
+    memcpy(*output_stream_descriptors, &stream_descriptors, length);
     return 0;
 }
 

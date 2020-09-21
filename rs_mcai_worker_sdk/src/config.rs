@@ -12,10 +12,7 @@ macro_rules! get_env_value {
 
 fn get_amqp_tls() -> bool {
   let value = get_env_value!("AMQP_TLS", "true");
-  match value.as_str() {
-    "true" | "1" | "True" | "TRUE" => true,
-    _ => false,
-  }
+  matches!(value.as_str(), "true" | "1" | "True" | "TRUE")
 }
 
 fn get_amqp_hostname() -> String {

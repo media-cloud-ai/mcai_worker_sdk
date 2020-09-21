@@ -104,7 +104,10 @@ pub use semver::Version;
 pub use error::{MessageError, Result};
 #[cfg(feature = "media")]
 pub use message::media::{
+  audio::AudioFormat,
+  filters::{AudioFilter, GenericFilter, VideoFilter},
   ttml::{Body, Div, Head, Paragraph, Span, TimeExpression, TimeUnit, Ttml},
+  video::{RegionOfInterest, Scaling, VideoFormat},
   StreamDescriptor,
 };
 pub use message::publish_job_progression;
