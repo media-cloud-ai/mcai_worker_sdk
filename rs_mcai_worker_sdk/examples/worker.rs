@@ -1,22 +1,25 @@
 #[macro_use]
 extern crate serde_derive;
 
-#[cfg(feature = "media")]
-use mcai_worker_sdk::{
-  info, AudioFilter, AudioFormat, FormatContext, ProcessResult, StreamDescriptor,
-};
 use mcai_worker_sdk::{
   job::{JobResult, JobStatus},
-  publish_job_progression, McaiChannel, MessageError, MessageEvent, ProcessFrame, Result, Scaling,
-  VideoFilter,
+  publish_job_progression, McaiChannel, MessageError, MessageEvent, Result,
 };
 use schemars::JsonSchema;
 use semver::Version;
+
+#[cfg(feature = "media")]
+use mcai_worker_sdk::{
+  info, AudioFilter, AudioFormat, FormatContext, ProcessFrame, ProcessResult, Scaling,
+  StreamDescriptor, VideoFilter,
+};
 #[cfg(feature = "media")]
 use stainless_ffmpeg_sys::AVMediaType;
-use std::ops::Deref;
 #[cfg(feature = "media")]
-use std::sync::{mpsc::Sender, Arc, Mutex};
+use std::{
+  ops::Deref,
+  sync::{mpsc::Sender, Arc, Mutex},
+};
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct WorkerParameters {

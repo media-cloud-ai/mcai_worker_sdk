@@ -339,7 +339,7 @@ fn compare_time_expressions() {
   };
 
   let src2 = TimeExpression::OffsetTime {
-    offset: 1352.0,
+    offset: 1408.0,
     unit: TimeUnit::Frames,
   };
 
