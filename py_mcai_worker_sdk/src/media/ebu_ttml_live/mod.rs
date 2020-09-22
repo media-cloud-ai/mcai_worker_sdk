@@ -117,3 +117,43 @@ impl From<Span> for PyTtmlSpan {
     PyTtmlSpan { text: span.content }
   }
 }
+
+#[cfg(test)]
+use mcai_worker_sdk::{TimeExpression, TimeUnit};
+
+#[test]
+pub fn test_py_ttml_paragraph() {
+  let span = Span {
+    content: "Hello world!".to_string(),
+  };
+  let py_ttml_span = PyTtmlSpan::from(span.clone());
+
+  let paragraph = Paragraph {
+    spans: vec![span],
+    duration: Some(TimeExpression::OffsetTime {
+      offset: 123.0,
+      unit: TimeUnit::Frames,
+    }),
+    begin: None,
+    end: None,
+  };
+  let py_ttml_paragraph = PyTtmlParagraph::from(paragraph);
+
+  assert_eq!(vec![py_ttml_span], py_ttml_paragraph.spans);
+  assert_eq!(
+    "00:00:04:23".to_string(),
+    py_ttml_paragraph.duration.unwrap().to_time_code()
+  );
+  assert!(py_ttml_paragraph.begin.is_none());
+  assert!(py_ttml_paragraph.end.is_none());
+}
+
+#[test]
+pub fn test_py_ttml_span() {
+  let span = Span {
+    content: "Hello world!".to_string(),
+  };
+  let py_ttml_span = PyTtmlSpan::from(span.clone());
+
+  assert_eq!(span.content, py_ttml_span.text);
+}
