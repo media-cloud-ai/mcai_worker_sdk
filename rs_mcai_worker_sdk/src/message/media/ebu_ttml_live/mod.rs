@@ -6,6 +6,9 @@ use std::io::{Read, Write};
 pub use time_expression::{Frames, TimeExpression, TimeUnit};
 use yaserde::{YaDeserialize, YaSerialize};
 
+#[cfg(all(feature = "media", feature = "python"))]
+use dict_derive::{FromPyObject, IntoPyObject};
+
 pub fn default_lang() -> String {
   "en".to_owned()
 }
@@ -42,6 +45,7 @@ impl EbuTtmlLive {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(
   rename = "head",
   prefix = "tt",
@@ -57,6 +61,7 @@ pub struct Head {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(
   rename = "metadata",
   prefix = "tt",
@@ -77,6 +82,7 @@ pub struct Metadata {
 }
 
 #[derive(Clone, Default, Debug, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(
   rename = "styling",
   prefix = "tt",
@@ -88,6 +94,7 @@ pub struct Styling {
 }
 
 #[derive(Clone, Default, Debug, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(prefix = "ttm", namespace = "ttm: http://www.w3.org/ns/ttml#metadata")]
 pub struct Title {
   #[yaserde(prefix = "ttm")]
@@ -99,6 +106,7 @@ pub struct Title {
 }
 
 #[derive(Clone, Default, Debug, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(prefix = "tt", namespace = "tt: http://www.w3.org/ns/ttml")]
 pub struct Layout {
   #[yaserde(attribute, default = "default_lang")]
@@ -151,6 +159,7 @@ pub struct Paragraph {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(
   rename = "span",
   prefix = "tt",
@@ -162,6 +171,7 @@ pub struct Span {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(
   rename = "br",
   prefix = "tt",

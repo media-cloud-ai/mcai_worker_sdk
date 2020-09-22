@@ -67,7 +67,7 @@ impl TimeExpression {
         let minutes = (time_frames / (fps * 60.0)) % 60.0;
         let hours = time_frames / (fps * 60.0 * 60.0);
 
-        format!("{:02}:{:02}:{:02}:{:02}", hours, minutes, seconds, frames)
+        format!("{:02}:{:02}:{:02}:{:02}", hours as u32, minutes as u32, seconds as u32, frames as u32)
       }
       TimeExpression::ClockTime {
         hours,

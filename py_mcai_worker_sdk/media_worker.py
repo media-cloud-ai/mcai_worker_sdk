@@ -123,19 +123,56 @@ def process_ebu_ttml_live(job_id, stream_index, ttml_content):
     '''
     Process EBU TTML live content (the "media" feature must be activated).
     '''
-    data_length = len(ttml_content)
 
-    logging.info(f"Job: {job_id} - Process {data_length}-bytes EBU TTML live content from stream #{stream_index}: {ttml_content}")
 
-    ttml_root = ET.fromstring(ttml_content)
-    logging.debug(f"{ttml_root.tag}: {ttml_root.attrib}")
+    logging.info(f"Job: {job_id} - Process EBU TTML live content from stream #{stream_index}:")
 
-    subtitle = ""
-    for body in ttml_root.findall('body'):
-        subtitle += f"\t {body.tag}: {body.attrib}"
-        for span in body.iterfind("div/p/span"):
-            subtitle += f" - '{span.text}'"
-    logging.info(subtitle)
+    if ttml_content.sequence_identifier:
+        logging.debug(f"sequence_identifier: {ttml_content.sequence_identifier}")
+
+    if ttml_content.sequence_number:
+        logging.debug(f"sequence_number: {ttml_content.sequence_number}")
+
+    if ttml_content.language:
+        logging.debug(f"language: {ttml_content.language}")
+
+    if ttml_content.clock_mode:
+        logging.debug(f"clock_mode: {ttml_content.clock_mode}")
+
+    if ttml_content.time_base:
+        logging.debug(f"time_base: {ttml_content.time_base}")
+
+    if ttml_content.head:
+        logging.debug(f"head: {ttml_content.head}")
+
+    begin = ""
+    end = ""
+    duration = ""
+    text = ""
+    if ttml_content.body:
+        if ttml_content.body.duration:
+            duration = ttml_content.body.duration.to_time_code()
+
+        if ttml_content.body.begin:
+            begin = ttml_content.body.begin.to_time_code()
+
+        if ttml_content.body.end:
+            end = ttml_content.body.end.to_time_code()
+
+
+        for div in ttml_content.body.divs:
+            for p in div.paragraphs:
+                if p.duration:
+                    duration = p.duration.to_time_code()
+                if p.begin:
+                    begin = p.begin.to_time_code()
+                if p.end:
+                    end = p.end.to_time_code()
+
+                for span in p.spans:
+                    text += span.text
+                    logging.info(f"{begin} => {end} ({duration}): {text}")
+
 
     # returns the process result as a JSON object (this is fully customisable)
     return { "status": "success" }

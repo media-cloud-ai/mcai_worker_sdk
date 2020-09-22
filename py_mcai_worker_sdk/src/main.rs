@@ -1,9 +1,12 @@
 #[macro_use]
 extern crate serde_derive;
 
-#[cfg(feature = "media")]
-use std::sync::{mpsc::Sender, Arc, Mutex};
 use std::{env, fs};
+#[cfg(feature = "media")]
+use std::{
+  ops::Deref,
+  sync::{mpsc::Sender, Arc, Mutex},
+};
 
 use pyo3::{prelude::*, types::*};
 
@@ -23,8 +26,9 @@ pub use mcai_worker_sdk::{
 #[cfg(feature = "media")]
 use crate::helpers::get_stream_descriptors;
 use crate::helpers::{get_destination_paths, py_err_to_string};
+#[cfg(feature = "media")]
+use crate::media::PyEbuTtmlLive;
 use crate::parameters::{build_parameters, PythonWorkerParameters};
-use std::ops::Deref;
 
 mod helpers;
 #[cfg(feature = "media")]
@@ -378,10 +382,7 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
         Ok(ProcessResult::new_json(&response.to_string()))
       }
       ProcessFrame::EbuTtmlLive(ebu_ttml_live) => {
-        let ttml_content = ebu_ttml_live
-          .deref()
-          .to_xml()
-          .map_err(MessageError::RuntimeError)?;
+        let ttml_content: PyEbuTtmlLive = ebu_ttml_live.deref().clone().into();
 
         let response = call_module_function(
           py,

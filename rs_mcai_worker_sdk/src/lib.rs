@@ -105,7 +105,7 @@ pub use error::{MessageError, Result};
 #[cfg(feature = "media")]
 pub use message::media::{
   audio::AudioFormat,
-  ebu_ttml_live::{Body, Div, EbuTtmlLive, Head, Paragraph, Span, TimeExpression, TimeUnit},
+  ebu_ttml_live::{Body, Div, EbuTtmlLive, Frames, Head, Paragraph, Span, Styling, TimeExpression, TimeUnit, Title},
   filters::{AudioFilter, GenericFilter, VideoFilter},
   video::{RegionOfInterest, Scaling, VideoFormat},
   StreamDescriptor,
