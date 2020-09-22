@@ -43,7 +43,23 @@ impl FormatContext {
     let nb_streams = context.get_nb_streams();
 
     let metadata = context.get_metadata();
-    let streams = vec![];
+    let mut streams = vec![];
+
+    for index in 0..nb_streams {
+      let stream_type = context.get_stream_type(index as isize);
+      let stream_descriptor = StreamDescriptor {
+        index,
+        stream_type: format!("{:?}", stream_type),
+        codec_name: None,
+        codec_long_name: None,
+        codec_tag: None,
+        start_time,
+        duration: duration.map(|value| value as f32),
+        bit_rate,
+        stream_metadata: Default::default(),
+      };
+      streams.push(stream_descriptor);
+    }
 
     // TODO complete format context struct
 

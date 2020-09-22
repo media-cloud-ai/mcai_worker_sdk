@@ -35,6 +35,12 @@ pub struct EbuTtmlLive {
   pub body: Body,
 }
 
+impl EbuTtmlLive {
+  pub fn to_xml(&self) -> Result<String, String> {
+    yaserde::ser::to_string(self)
+  }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, YaDeserialize, YaSerialize)]
 #[yaserde(
   rename = "head",

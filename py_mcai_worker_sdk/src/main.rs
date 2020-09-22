@@ -16,13 +16,15 @@ use mcai_worker_sdk::{
 };
 #[cfg(feature = "media")]
 pub use mcai_worker_sdk::{
-  AudioFilter, AudioFormat, FormatContext, Frame, GenericFilter, ProcessResult, StreamDescriptor,
+  AudioFilter, AudioFormat, FormatContext, Frame, GenericFilter, ProcessFrame, ProcessResult,
+  StreamDescriptor,
 };
 
 #[cfg(feature = "media")]
 use crate::helpers::get_stream_descriptors;
 use crate::helpers::{get_destination_paths, py_err_to_string};
 use crate::parameters::{build_parameters, PythonWorkerParameters};
+use std::ops::Deref;
 
 mod helpers;
 #[cfg(feature = "media")]
@@ -212,6 +214,7 @@ impl StreamDescriptorHandler {
       filters,
     }
   }
+
   #[staticmethod]
   pub fn new_audio_stream(index: u32, video_filters: &PyList) -> GenericStreamDescriptor {
     let filters = video_filters
@@ -225,6 +228,15 @@ impl StreamDescriptorHandler {
       index,
       stream_type: StreamType::new_audio(),
       filters,
+    }
+  }
+
+  #[staticmethod]
+  pub fn new_data_stream(index: u32) -> GenericStreamDescriptor {
+    GenericStreamDescriptor {
+      index,
+      stream_type: StreamType::new_data(),
+      filters: vec![],
     }
   }
 }
@@ -341,27 +353,53 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
     &mut self,
     job_result: JobResult,
     stream_index: usize,
-    frame: Frame,
+    process_frame: ProcessFrame,
   ) -> Result<ProcessResult> {
     let gil = Python::acquire_gil();
     let (py, python_module) = get_python_module(&gil)?;
 
-    let media_frame = media::Frame::from(&frame)?;
+    match process_frame {
+      ProcessFrame::AudioVideo(frame) => {
+        let media_frame = media::Frame::from(&frame)?;
 
-    let response = call_module_function(
-      py,
-      python_module,
-      "process_frame",
-      (&job_result.get_str_job_id(), stream_index, media_frame),
-    )
-    .map_err(|error_message| {
-      let result = job_result
-        .with_status(JobStatus::Error)
-        .with_message(&error_message);
-      MessageError::ProcessingError(result)
-    })?;
+        let response = call_module_function(
+          py,
+          python_module,
+          "process_frame",
+          (&job_result.get_str_job_id(), stream_index, media_frame),
+        )
+        .map_err(|error_message| {
+          let result = job_result
+            .with_status(JobStatus::Error)
+            .with_message(&error_message);
+          MessageError::ProcessingError(result)
+        })?;
 
-    Ok(ProcessResult::new_json(&response.to_string()))
+        Ok(ProcessResult::new_json(&response.to_string()))
+      }
+      ProcessFrame::EbuTtmlLive(ebu_ttml_live) => {
+        let ttml_content = ebu_ttml_live
+          .deref()
+          .to_xml()
+          .map_err(MessageError::RuntimeError)?;
+
+        let response = call_module_function(
+          py,
+          python_module,
+          "process_ebu_ttml_live",
+          (&job_result.get_str_job_id(), stream_index, ttml_content),
+        )
+        .map_err(|error_message| {
+          let result = job_result
+            .with_status(JobStatus::Error)
+            .with_message(&error_message);
+          MessageError::ProcessingError(result)
+        })?;
+
+        Ok(ProcessResult::new_json(&response.to_string()))
+      }
+      ProcessFrame::Data(_data) => Err(MessageError::NotImplemented()),
+    }
   }
 
   #[cfg(feature = "media")]
