@@ -1,4 +1,4 @@
-FROM rust:1.43-stretch as builder
+FROM rust:1.46-buster as builder
 
 ADD . /src
 WORKDIR /src/c_mcai_worker_sdk
@@ -7,7 +7,7 @@ RUN rustup default && \
     cargo build --verbose --release && \
     cargo install --path .
 
-FROM debian:stretch
+FROM debian:buster
 COPY --from=builder /usr/local/cargo/bin/c_mcai_worker_sdk /usr/bin
 
 RUN apt update && \
