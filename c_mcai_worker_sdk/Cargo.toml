@@ -7,6 +7,14 @@ authors = [
 ]
 edition = "2018"
 
+[lib]
+name = "c_mcai_worker_sdk"
+path = "src/lib.rs"
+
+[[bin]]
+name = "c_mcai_worker_sdk"
+path = "src/main.rs"
+
 [features]
 default = []
 media = ["mcai_worker_sdk/media"]
