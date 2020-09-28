@@ -42,7 +42,7 @@ futures-core = "^0.3"
 lapin = "1.1.0"
 log = "0.4.5"
 reqwest = { version = "0.10", features = ["blocking", "json"] }
-schemars = "0.7.6"
+schemars = "0.8.0"
 semver = { version = "0.10", features = ["serde"] }
 serde = "^1.0"
 serde_derive = "^1.0"
