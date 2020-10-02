@@ -24,13 +24,14 @@ RUN apt-get update && \
     cargo build --verbose --release --features=media && \
     cargo install --features=media --path .
 
-FROM debian:stretch
+FROM ubuntu:focal
 COPY --from=builder /root/.cargo/bin/py_mcai_worker_sdk /usr/bin
 
 RUN apt update && \
     apt install -y \
-      libssl1.1 \
       ca-certificates \
+      libssl1.1 \
+      libpython3.8 \
       ffmpeg
 
 ENV AMQP_QUEUE=job_python_worker
