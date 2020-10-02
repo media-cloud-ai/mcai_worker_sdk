@@ -1,0 +1,37 @@
+FROM ubuntu:focal as builder
+
+ADD . /src
+WORKDIR /src/py_mcai_worker_sdk
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        pkg-config \
+        clang \
+        curl \
+        libssl-dev \
+        libavcodec-dev \
+        libavdevice-dev \
+        libavfilter-dev \
+        libavformat-dev \
+        libavresample-dev \
+        libpostproc-dev \
+        libpython3.8-dev \
+        libswresample-dev \
+        ffmpeg \
+        && \
+    curl https://sh.rustup.rs -sSf | sh -s -- -y && \
+    export PATH="/root/.cargo/bin:${PATH}" && \
+    cargo build --verbose --release --features=media && \
+    cargo install --features=media --path .
+
+FROM debian:stretch
+COPY --from=builder /root/.cargo/bin/py_mcai_worker_sdk /usr/bin
+
+RUN apt update && \
+    apt install -y \
+      libssl1.1 \
+      ca-certificates \
+      ffmpeg
+
+ENV AMQP_QUEUE=job_python_worker
+CMD py_mcai_worker_sdk
