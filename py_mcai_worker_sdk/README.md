@@ -52,11 +52,17 @@ cargo run
 ```
 
 #### Media worker
+
+First set the media filename:
+```
+export SOURCE_PATH="/folder/filename.ext"
+```
+
+Then run the SDK with these parameters:
 ```
 RUST_LOG=debug \
 SOURCE_ORDERS="examples/message.json" \
 PYTHON_WORKER_FILENAME="media_worker.py" \
-SOURCE_PATH="README.md" \
-DESTINATION_PATH="README.md.out" \
+DESTINATION_PATH="results.json" \
 cargo run --features media
 ```
