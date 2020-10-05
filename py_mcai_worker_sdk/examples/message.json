@@ -30,6 +30,7 @@
     {
       "id": "destination_path",
       "type": "string",
+      "store": "environment",
       "value": "DESTINATION_PATH"
     },
     {

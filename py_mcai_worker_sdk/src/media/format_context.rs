@@ -48,7 +48,7 @@ impl FormatContext {
     for stream_index in 0..context.get_nb_streams() {
       let stream = context.get_stream(stream_index as isize);
       unsafe {
-        streams.push(StreamDescriptor{
+        streams.push(StreamDescriptor {
           index: (*stream).id as u32,
           nb_frames: (*stream).nb_frames as u64,
           avg_frame_rate: (*stream).avg_frame_rate.num as f32 / (*stream).avg_frame_rate.den as f32,
