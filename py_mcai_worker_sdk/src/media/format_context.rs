@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 #[pyclass]
@@ -43,7 +43,24 @@ impl FormatContext {
     let nb_streams = context.get_nb_streams();
 
     let metadata = context.get_metadata();
-    let streams = vec![];
+    let mut streams = vec![];
+
+    for stream_index in 0..context.get_nb_streams() {
+      let stream = context.get_stream(stream_index as isize);
+      unsafe {
+        streams.push(StreamDescriptor {
+          index: (*stream).id as u32,
+          nb_frames: (*stream).nb_frames as u64,
+          avg_frame_rate: (*stream).avg_frame_rate.num as f32 / (*stream).avg_frame_rate.den as f32,
+          r_frame_rate: (*stream).r_frame_rate.num as f32 / (*stream).r_frame_rate.den as f32,
+          kind: format!("{:?}", (*(*stream).codec).codec_type),
+          width: (*(*stream).codec).width as u32,
+          height: (*(*stream).codec).height as u32,
+          channels: (*(*stream).codec).channels as u32,
+          sample_rate: (*(*stream).codec).sample_rate as u32,
+        });
+      }
+    }
 
     // TODO complete format context struct
 
@@ -68,19 +85,19 @@ pub struct StreamDescriptor {
   #[pyo3(get)]
   index: u32,
   #[pyo3(get)]
-  stream_type: String,
+  nb_frames: u64,
   #[pyo3(get)]
-  codec_name: Option<String>,
+  avg_frame_rate: f32,
   #[pyo3(get)]
-  codec_long_name: Option<String>,
+  r_frame_rate: f32,
   #[pyo3(get)]
-  codec_tag: Option<String>,
+  kind: String,
   #[pyo3(get)]
-  start_time: Option<f32>,
+  width: u32,
   #[pyo3(get)]
-  duration: Option<f32>,
+  height: u32,
   #[pyo3(get)]
-  bit_rate: Option<i64>,
+  channels: u32,
   #[pyo3(get)]
-  stream_metadata: HashMap<String, String>,
+  sample_rate: u32,
 }
