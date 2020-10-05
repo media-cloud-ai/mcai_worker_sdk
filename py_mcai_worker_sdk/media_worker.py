@@ -33,6 +33,12 @@ def get_parameters():
             "label": "My array parameter",
             "kind": ["string"],
             "required": False,
+        },
+        {
+            "identifier": "requirements",
+            "label": "Requirements",
+            "kind": ["requirement"],
+            "required": False,
         }
     ]
 
