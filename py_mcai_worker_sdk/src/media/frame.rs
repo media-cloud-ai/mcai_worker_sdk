@@ -52,7 +52,7 @@ impl Frame {
         data.append(PyBytes::from_ptr(
           py,
           self.data[plane_index],
-          self.line_size[plane_index] as usize,
+          self.line_size[plane_index] * self.height as usize,
         ))?;
       }
     }
