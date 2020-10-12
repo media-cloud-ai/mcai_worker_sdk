@@ -72,7 +72,7 @@ fn get_instance_type_from_parameter_type(parameter_type: &ParameterType) -> Inst
     ParameterType::Boolean => InstanceType::Boolean,
     ParameterType::Credential => InstanceType::String,
     ParameterType::Integer => InstanceType::Integer,
-    ParameterType::Requirement => InstanceType::Object,
+    ParameterType::Requirements => InstanceType::Object,
   }
 }
 
@@ -197,7 +197,7 @@ pub fn test_get_instance_type_from_parameter() {
   );
   assert_eq!(
     InstanceType::Object,
-    get_instance_type_from_parameter_type(&ParameterType::Requirement)
+    get_instance_type_from_parameter_type(&ParameterType::Requirements)
   );
 }
 
