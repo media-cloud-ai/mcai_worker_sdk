@@ -79,98 +79,74 @@ fn get_instance_type_from_parameter_type(parameter_type: &ParameterType) -> Inst
 pub fn build_parameters(parameters: PythonWorkerParameters, py: Python) -> Result<&PyDict> {
   let list_of_parameters = PyDict::new(py);
   for (key, value) in parameters.parameters {
-    match value {
-      Value::String(string) => {
-        list_of_parameters.set_item(key, string).map_err(|e| {
-          MessageError::ParameterValueError(format!(
-            "Cannot set item to parameters: {}",
-            py_err_to_string(py, e)
-          ))
-        })?;
-      }
-      Value::Null => {}
-      Value::Bool(boolean) => {
-        list_of_parameters.set_item(key, boolean).map_err(|e| {
-          MessageError::ParameterValueError(format!(
-            "Cannot set item to parameters: {}",
-            py_err_to_string(py, e)
-          ))
-        })?;
-      }
-      Value::Number(number) => {
-        list_of_parameters
-          .set_item(key, number.as_u64())
-          .map_err(|e| {
-            MessageError::ParameterValueError(format!(
-              "Cannot set item to parameters: {}",
-              py_err_to_string(py, e)
-            ))
-          })?;
-      }
-      Value::Array(array) => {
-        let list = get_parameters_array_values(array, py)?;
-        list_of_parameters.set_item(key, list).map_err(|e| {
-          MessageError::ParameterValueError(format!(
-            "Cannot set item to parameters: {}",
-            py_err_to_string(py, e)
-          ))
-        })?;
-      }
-      Value::Object(map) => {
-        return Err(MessageError::ParameterValueError(format!(
-          "Unsupported parameter object value: {:?}",
-          map
-        )));
-      }
-    }
+    serde_json_to_pyo3_value(&key, &value, list_of_parameters, py).map_err(|e| {
+      MessageError::ParameterValueError(format!(
+        "Cannot build parameters: {}",
+        py_err_to_string(py, e)
+      ))
+    })?;
   }
   Ok(list_of_parameters)
 }
 
-fn get_parameters_array_values(values: Vec<Value>, py: Python) -> Result<&PyList> {
-  let array = PyList::empty(py);
-  for value in values {
-    match value {
-      Value::String(string) => {
-        array.append(string).map_err(|e| {
-          MessageError::ParameterValueError(format!(
-            "Cannot append item to array: {}",
-            py_err_to_string(py, e)
-          ))
-        })?;
+fn serde_json_to_pyo3_value(
+  key: &str,
+  value: &Value,
+  result: &PyDict,
+  py: Python,
+) -> pyo3::PyResult<()> {
+  match value {
+    Value::Null => {}
+    Value::Bool(boolean) => result.set_item(key, boolean)?,
+    Value::Number(number) => result.set_item(key, number.as_u64())?,
+    Value::String(content) => result.set_item(key, content)?,
+    Value::Array(values) => {
+      let list = PyList::empty(py);
+      for value in values {
+        add_value_to_py_list(&value, list, py)?;
       }
-      Value::Null => {}
-      Value::Bool(boolean) => {
-        array.append(boolean).map_err(|e| {
-          MessageError::ParameterValueError(format!(
-            "Cannot append item to array: {}",
-            py_err_to_string(py, e)
-          ))
-        })?;
+
+      result.set_item(key, list)?;
+    }
+    Value::Object(map) => {
+      let object = PyDict::new(py);
+      for (key, value) in map.iter() {
+        serde_json_to_pyo3_value(key, value, object, py)?;
       }
-      Value::Number(number) => {
-        array.append(number.as_u64()).map_err(|e| {
-          MessageError::ParameterValueError(format!(
-            "Cannot append item to array: {}",
-            py_err_to_string(py, e)
-          ))
-        })?;
-      }
-      Value::Array(_) => {
-        return Err(MessageError::ParameterValueError(format!(
-          "Unsupported parameter array of array value: {:?}",
-          value
-        )));
-      }
-      Value::Object(_) => {
-        return Err(MessageError::ParameterValueError(format!(
-          "Unsupported parameter array of object value: {:?}",
-          value
-        )));
-      }
+      result.set_item(key, object)?;
     }
   }
-  Ok(array)
+  Ok(())
+}
+
+fn add_value_to_py_list(value: &Value, list: &PyList, py: Python) -> pyo3::PyResult<()> {
+  match value {
+    Value::String(string) => {
+      list.append(string)?;
+    }
+    Value::Null => {}
+    Value::Bool(boolean) => {
+      list.append(boolean)?;
+    }
+    Value::Number(number) => {
+      list.append(number.as_u64())?;
+    }
+    Value::Array(values) => {
+      let sub_list = PyList::empty(py);
+      for value in values {
+        add_value_to_py_list(&value, sub_list, py)?;
+      }
+      list.append(sub_list)?;
+    }
+    Value::Object(map) => {
+      let object = PyDict::new(py);
+      for (key, value) in map.iter() {
+        serde_json_to_pyo3_value(key, value, object, py)?;
+      }
+      list.append(object)?;
+    }
+  }
+  Ok(())
 }
 
 #[test]
@@ -265,11 +241,49 @@ pub fn test_build_parameters_with_object_value() {
   let gil = Python::acquire_gil();
   let py = gil.python();
 
-  let expected_error =
-    MessageError::ParameterValueError("Unsupported parameter object value: {}".to_string());
   let result = build_parameters(worker_parameters, py);
-  assert!(result.is_err());
-  assert_eq!(expected_error, result.unwrap_err());
+  assert!(result.is_ok());
+
+  let reference = PyDict::new(py);
+  reference.set_item(parameter_key, PyDict::new(py)).unwrap();
+  assert_eq!(
+    core::cmp::Ordering::Equal,
+    result.unwrap().compare(reference).unwrap()
+  );
+}
+
+#[test]
+pub fn test_build_parameters_for_requirements() {
+  use serde_json::json;
+
+  let mut parameters = HashMap::<String, Value>::new();
+  let parameter_key = "requirements".to_string();
+
+  let value = json!({
+    "paths": []
+  });
+
+  parameters.insert(parameter_key.clone(), value);
+  let worker_parameters = PythonWorkerParameters { parameters };
+
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  let result = build_parameters(worker_parameters, py);
+  assert!(result.is_ok());
+
+  let reference = PyDict::new(py);
+  let requirement_content = PyDict::new(py);
+  requirement_content
+    .set_item("paths", PyList::empty(py))
+    .unwrap();
+  reference
+    .set_item(parameter_key, requirement_content)
+    .unwrap();
+  assert_eq!(
+    core::cmp::Ordering::Equal,
+    result.unwrap().compare(reference).unwrap()
+  );
 }
 
 #[test]
@@ -285,12 +299,18 @@ pub fn test_build_parameters_with_array_of_array_value() {
   let gil = Python::acquire_gil();
   let py = gil.python();
 
-  let expected_error = MessageError::ParameterValueError(
-    "Unsupported parameter array of array value: Array([Bool(true)])".to_string(),
-  );
   let result = build_parameters(worker_parameters, py);
-  assert!(result.is_err());
-  assert_eq!(expected_error, result.unwrap_err());
+
+  let reference = PyDict::new(py);
+  let content = PyList::empty(py);
+  let sub_content = PyList::empty(py);
+  sub_content.append(PyBool::new(py, true)).unwrap();
+  content.append(sub_content).unwrap();
+  reference.set_item(parameter_key, content).unwrap();
+  assert_eq!(
+    core::cmp::Ordering::Equal,
+    result.unwrap().compare(reference).unwrap()
+  );
 }
 
 #[test]
@@ -306,10 +326,14 @@ pub fn test_build_parameters_with_array_of_object_value() {
   let gil = Python::acquire_gil();
   let py = gil.python();
 
-  let expected_error = MessageError::ParameterValueError(
-    "Unsupported parameter array of object value: Object({})".to_string(),
-  );
   let result = build_parameters(worker_parameters, py);
-  assert!(result.is_err());
-  assert_eq!(expected_error, result.unwrap_err());
+
+  let reference = PyDict::new(py);
+  let content = PyList::empty(py);
+  content.append(PyDict::new(py)).unwrap();
+  reference.set_item(parameter_key, content).unwrap();
+  assert_eq!(
+    core::cmp::Ordering::Equal,
+    result.unwrap().compare(reference).unwrap()
+  );
 }
