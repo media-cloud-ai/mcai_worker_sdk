@@ -1,5 +1,5 @@
 use crate::{
-  job::{Job, JobResult},
+  job::{Job, JobResult, JobStatus},
   message::publish_job_progression,
   parameter::container::ParametersContainer,
   AudioFilter, McaiChannel, MessageEvent, Result,
@@ -129,6 +129,7 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
         message_event.borrow_mut().ending_process()?;
 
         output.complete()?;
+        let job_result = job_result.with_status(JobStatus::Completed);
         return Ok(job_result);
       }
     }
