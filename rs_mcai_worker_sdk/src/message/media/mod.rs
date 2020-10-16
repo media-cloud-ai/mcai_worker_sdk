@@ -23,6 +23,9 @@ pub mod video;
 pub const SOURCE_PATH_PARAMETER: &str = "source_path";
 pub const DESTINATION_PATH_PARAMETER: &str = "destination_path";
 
+pub const START_INDEX_PARAMETER: &str = "sdk_start_index";
+pub const END_INDEX_PARAMETER: &str = "sdk_end_index";
+
 #[cfg(all(feature = "media"))]
 #[derive(Debug, PartialEq)]
 pub struct StreamDescriptor {
@@ -80,6 +83,8 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
 
   let source_url: String = job.get_parameter(SOURCE_PATH_PARAMETER)?;
   let output_url: String = job.get_parameter(DESTINATION_PATH_PARAMETER)?;
+  let start_index_ms: Option<i64> = job.get_parameter(START_INDEX_PARAMETER).ok();
+  let end_index_ms: Option<i64> = job.get_parameter(END_INDEX_PARAMETER).ok();
 
   let mut output = output::Output::new(&output_url)?;
 
@@ -89,9 +94,16 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
     parameters,
     &source_url,
     output.get_sender(),
+    start_index_ms,
+    end_index_ms,
   )?;
 
-  info!(target: &str_job_id, "Start to process media");
+  debug!(
+    target: &str_job_id,
+    "Start to process media {:?} frames from frame {}",
+    source.get_duration(),
+    source.get_start_offset()
+  );
 
   let total_duration = source.get_duration();
   let mut count = 0;
@@ -103,11 +115,11 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
         stream_index,
         frame,
       } => {
-        if stream_index == 0 {
+        if stream_index == source.get_first_stream_index() {
           count += 1;
 
           if let Some(duration) = total_duration {
-            let progress = std::cmp::min((count as f64 / duration * 100.0) as u8, 100);
+            let progress = std::cmp::min((count / duration * 100) as u8, 100);
             if progress > previous_progress {
               publish_job_progression(channel.clone(), job.job_id, progress)?;
               previous_progress = progress;

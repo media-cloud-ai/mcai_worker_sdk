@@ -13,14 +13,15 @@ use stainless_ffmpeg::{
   frame::Frame, packet::Packet, video_decoder::VideoDecoder,
 };
 use stainless_ffmpeg_sys::{
-  av_frame_alloc, av_frame_clone, avcodec_receive_frame, avcodec_send_packet,
+  av_frame_alloc, av_frame_clone, av_seek_frame, avcodec_receive_frame, avcodec_send_packet,
+  AVSEEK_FLAG_ANY, AVSEEK_FLAG_FRAME, AV_TIME_BASE,
 };
 
 use crate::{
   error::MessageError::RuntimeError,
   job::JobResult,
   message::media::{media_stream::MediaStream, srt::SrtStream},
-  AudioFilter, MessageEvent, ProcessResult, Result, VideoFilter,
+  AudioFilter, MessageError, MessageEvent, ProcessResult, Result, VideoFilter,
 };
 
 pub enum DecodeResult {
@@ -39,6 +40,9 @@ pub struct Source {
   decoders: HashMap<usize, Decoder>,
   format_context: Arc<Mutex<FormatContext>>,
   thread: Option<thread::JoinHandle<()>>,
+  duration: Option<u64>,
+  start_offset: u64,
+  position: u64,
 }
 
 impl Source {
@@ -48,6 +52,8 @@ impl Source {
     parameters: P,
     source_url: &str,
     sender: Arc<Mutex<Sender<ProcessResult>>>,
+    start_index_ms: Option<i64>,
+    end_index_ms: Option<i64>,
   ) -> Result<Self> {
     info!(target: &job_result.get_str_job_id(), "Opening source: {}", source_url);
 
@@ -103,10 +109,44 @@ impl Source {
         decoders,
         format_context,
         thread: Some(source_thread),
+        duration: None,
+        start_offset: 0,
+        position: 0,
       })
     } else {
       let mut format_context = FormatContext::new(source_url).map_err(RuntimeError)?;
       format_context.open_input().map_err(RuntimeError)?;
+
+      // FIXME: hard-coded fps
+      let default_fps = 25.0;
+
+      let start_offset = start_index_ms.unwrap_or_else(|| 0);
+      let end: Option<i64> = end_index_ms.or_else(|| {
+        format_context
+          .get_duration()
+          .map(|seconds| (seconds * 1000.0) as i64)
+      });
+      let duration = end.map(|end| Self::get_duration_from_index(start_offset, end, default_fps));
+
+      if let Some(ms) = start_index_ms {
+        unsafe {
+          let time_stamp = (ms * AV_TIME_BASE as i64) as f32 / 1000.0;
+          if av_seek_frame(
+            format_context.format_context,
+            -1,
+            time_stamp as i64,
+            AVSEEK_FLAG_ANY | AVSEEK_FLAG_FRAME,
+          ) != 0
+          {
+            return Err(MessageError::ProcessingError(
+              job_result
+                .clone()
+                .with_message("Could not seek at expected position into source file."),
+            ));
+          }
+          debug!("Seek at {}/{} in source.", time_stamp, AV_TIME_BASE);
+        }
+      }
 
       let format_context = Arc::new(Mutex::new(format_context));
 
@@ -122,24 +162,37 @@ impl Source {
         decoders,
         format_context,
         thread: None,
+        duration,
+        start_offset: start_offset as u64,
+        position: start_offset as u64,
       })
     }
   }
 
-  pub fn get_duration(&self) -> Option<f64> {
-    if self.thread.is_some() {
-      return None;
-    }
+  fn get_duration_from_index(start: i64, end: i64, fps: f64) -> u64 {
+    ((end - start) as f64 * fps / 1000.0) as u64
+  }
 
-    self
-      .format_context
-      .lock()
-      .unwrap()
-      .get_duration()
-      .map(|duration| duration * 25.0)
+  pub fn get_start_offset(&self) -> u64 {
+    self.start_offset
+  }
+
+  pub fn get_duration(&self) -> Option<u64> {
+    self.duration
+  }
+
+  pub fn get_first_stream_index(&self) -> usize {
+    self.decoders.keys().cloned().min().unwrap_or_else(|| 0)
   }
 
   pub fn next_frame(&mut self) -> Result<DecodeResult> {
+    // Check whether the end is not reached
+    if let Some(duration) = self.duration {
+      if self.position >= self.start_offset + duration {
+        return Ok(DecodeResult::EndOfStream);
+      }
+    }
+
     match self.format_context.lock().unwrap().next_packet() {
       Err(message) => {
         if message == "Unable to read next packet" {
@@ -158,6 +211,11 @@ impl Source {
       }
       Ok(packet) => {
         let stream_index = packet.get_stream_index() as usize;
+
+        if stream_index == self.get_first_stream_index() {
+          self.position += 1;
+        }
+
         if let Some(decoder) = self.decoders.get(&stream_index) {
           match decoder.decode(&packet) {
             Ok(frame) => Ok(DecodeResult::Frame {
