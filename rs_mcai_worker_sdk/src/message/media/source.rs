@@ -9,8 +9,8 @@ use ringbuf::RingBuffer;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use stainless_ffmpeg::{
-  audio_decoder::AudioDecoder, filter_graph::FilterGraph, format_context::FormatContext,
-  frame::Frame, packet::Packet, video_decoder::VideoDecoder,
+  audio_decoder::AudioDecoder, check_result, filter_graph::FilterGraph,
+  format_context::FormatContext, frame::Frame, packet::Packet, tools, video_decoder::VideoDecoder,
 };
 use stainless_ffmpeg_sys::{
   av_frame_alloc, av_frame_clone, av_seek_frame, avcodec_receive_frame, avcodec_send_packet,
@@ -432,10 +432,12 @@ impl Decoder {
       trace!("[FFmpeg] Send packet to audio decoder");
 
       let av_frame = unsafe {
-        avcodec_send_packet(audio_decoder.codec_context, packet.packet);
+        let ret_code = avcodec_send_packet(audio_decoder.codec_context, packet.packet);
+        check_result!(ret_code);
 
         let av_frame = av_frame_alloc();
-        avcodec_receive_frame(audio_decoder.codec_context, av_frame);
+        let ret_code = avcodec_receive_frame(audio_decoder.codec_context, av_frame);
+        check_result!(ret_code);
 
         let frame = Frame {
           frame: av_frame,
@@ -467,10 +469,12 @@ impl Decoder {
       trace!("[FFmpeg] Send packet to video decoder");
 
       let av_frame = unsafe {
-        avcodec_send_packet(video_decoder.codec_context, packet.packet);
+        let ret_code = avcodec_send_packet(video_decoder.codec_context, packet.packet);
+        check_result!(ret_code);
 
         let av_frame = av_frame_alloc();
-        avcodec_receive_frame(video_decoder.codec_context, av_frame);
+        let ret_code = avcodec_receive_frame(video_decoder.codec_context, av_frame);
+        check_result!(ret_code);
 
         let frame = Frame {
           frame: av_frame,
