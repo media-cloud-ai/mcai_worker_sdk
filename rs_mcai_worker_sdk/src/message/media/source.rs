@@ -8,13 +8,14 @@ use std::{cell::RefCell, collections::HashMap, io::Cursor, rc::Rc, thread};
 use ringbuf::RingBuffer;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
+use stainless_ffmpeg::tools::rational::Rational;
 use stainless_ffmpeg::{
   audio_decoder::AudioDecoder, check_result, filter_graph::FilterGraph,
   format_context::FormatContext, frame::Frame, packet::Packet, tools, video_decoder::VideoDecoder,
 };
 use stainless_ffmpeg_sys::{
-  av_frame_alloc, av_frame_clone, av_seek_frame, avcodec_receive_frame, avcodec_send_packet,
-  AVSEEK_FLAG_ANY, AVSEEK_FLAG_FRAME, AV_TIME_BASE,
+  av_frame_alloc, av_frame_clone, av_seek_frame, av_strerror, avcodec_receive_frame,
+  avcodec_send_packet, AVSEEK_FLAG_BACKWARD, AV_ERROR_MAX_STRING_SIZE,
 };
 
 use crate::{
@@ -40,8 +41,13 @@ pub struct Source {
   decoders: HashMap<usize, Decoder>,
   format_context: Arc<Mutex<FormatContext>>,
   thread: Option<thread::JoinHandle<()>>,
+  /// Program duration
   duration: Option<u64>,
+  /// Segment duration in ms
+  segment_duration: Option<u64>,
+  /// Segment entry point in ms
   start_offset: u64,
+  /// Time offset into the program
   position: u64,
 }
 
@@ -103,6 +109,7 @@ impl Source {
         parameters,
         format_context.clone(),
         sender,
+        start_index_ms,
       )?;
 
       Ok(Source {
@@ -110,6 +117,7 @@ impl Source {
         format_context,
         thread: Some(source_thread),
         duration: None,
+        segment_duration: None,
         start_offset: 0,
         position: 0,
       })
@@ -117,36 +125,13 @@ impl Source {
       let mut format_context = FormatContext::new(source_url).map_err(RuntimeError)?;
       format_context.open_input().map_err(RuntimeError)?;
 
-      // FIXME: hard-coded fps
-      let default_fps = 25.0;
-
       let start_offset = start_index_ms.unwrap_or_else(|| 0);
-      let end: Option<i64> = end_index_ms.or_else(|| {
-        format_context
-          .get_duration()
-          .map(|seconds| (seconds * 1000.0) as i64)
-      });
-      let duration = end.map(|end| Self::get_duration_from_index(start_offset, end, default_fps));
+      let duration = format_context
+        .get_duration()
+        .map(|seconds| (seconds * 1000.0) as u64);
 
-      if let Some(ms) = start_index_ms {
-        unsafe {
-          let time_stamp = (ms * AV_TIME_BASE as i64) as f32 / 1000.0;
-          if av_seek_frame(
-            format_context.format_context,
-            -1,
-            time_stamp as i64,
-            AVSEEK_FLAG_ANY | AVSEEK_FLAG_FRAME,
-          ) != 0
-          {
-            return Err(MessageError::ProcessingError(
-              job_result
-                .clone()
-                .with_message("Could not seek at expected position into source file."),
-            ));
-          }
-          debug!("Seek at {}/{} in source.", time_stamp, AV_TIME_BASE);
-        }
-      }
+      let end: Option<i64> = end_index_ms.or_else(|| duration.map(|ms| ms as i64));
+      let segment_duration = end.map(|end| (end - start_offset) as u64);
 
       let format_context = Arc::new(Mutex::new(format_context));
 
@@ -156,6 +141,7 @@ impl Source {
         parameters,
         format_context.clone(),
         sender,
+        start_index_ms,
       )?;
 
       Ok(Source {
@@ -163,14 +149,57 @@ impl Source {
         format_context,
         thread: None,
         duration,
+        segment_duration,
         start_offset: start_offset as u64,
-        position: start_offset as u64,
+        position: 0,
       })
     }
   }
 
-  fn get_duration_from_index(start: i64, end: i64, fps: f64) -> u64 {
-    ((end - start) as f64 * fps / 1000.0) as u64
+  pub fn get_stream_time_base(index: isize, format_context: &FormatContext) -> Rational {
+    unsafe {
+      let time_base = (*format_context.get_stream(index)).time_base;
+      Rational::new(time_base.num, time_base.den)
+    }
+  }
+
+  pub fn seek_in_stream_at(
+    stream_index: i32,
+    milliseconds: i64,
+    format_context: Arc<Mutex<FormatContext>>,
+    flag: i32,
+  ) -> Result<()> {
+    unsafe {
+      let format_context = format_context.lock().unwrap();
+      let time_base = Self::get_stream_time_base(stream_index as isize, &format_context);
+      let time_stamp = Self::get_pts_from_milliseconds(milliseconds, &time_base);
+      debug!(
+        "Seek in source stream {}, at position {} (with time base: {}/{})",
+        stream_index, time_stamp, time_base.num, time_base.den
+      );
+
+      if av_seek_frame(
+        format_context.format_context,
+        stream_index,
+        time_stamp as i64,
+        flag,
+      ) != 0
+      {
+        return Err(MessageError::RuntimeError(format!(
+          "Could not seek at expected position into source stream {}.",
+          stream_index
+        )));
+      }
+    }
+    Ok(())
+  }
+
+  pub fn get_pts_from_milliseconds(milliseconds: i64, time_base: &Rational) -> i64 {
+    (milliseconds as f64 * time_base.den as f64 / (1000.0 * time_base.num as f64)) as i64
+  }
+
+  pub fn get_milliseconds_from_pts(pts: i64, time_base: &Rational) -> u64 {
+    (pts as f64 * time_base.num as f64 / time_base.den as f64 * 1000.0) as u64
   }
 
   pub fn get_start_offset(&self) -> u64 {
@@ -181,19 +210,18 @@ impl Source {
     self.duration
   }
 
+  pub fn get_segment_duration(&self) -> Option<u64> {
+    self.segment_duration
+  }
+
   pub fn get_first_stream_index(&self) -> usize {
     self.decoders.keys().cloned().min().unwrap_or_else(|| 0)
   }
 
   pub fn next_frame(&mut self) -> Result<DecodeResult> {
-    // Check whether the end is not reached
-    if let Some(duration) = self.duration {
-      if self.position >= self.start_offset + duration {
-        return Ok(DecodeResult::EndOfStream);
-      }
-    }
+    let mut format_context = self.format_context.lock().unwrap();
 
-    match self.format_context.lock().unwrap().next_packet() {
+    match format_context.next_packet() {
       Err(message) => {
         if message == "Unable to read next packet" {
           if self.thread.is_none() {
@@ -212,16 +240,38 @@ impl Source {
       Ok(packet) => {
         let stream_index = packet.get_stream_index() as usize;
 
-        if stream_index == self.get_first_stream_index() {
-          self.position += 1;
-        }
-
         if let Some(decoder) = self.decoders.get(&stream_index) {
           match decoder.decode(&packet) {
-            Ok(frame) => Ok(DecodeResult::Frame {
-              stream_index,
-              frame,
-            }),
+            Ok(frame) => {
+              let time_base = Self::get_stream_time_base(stream_index as isize, &format_context);
+
+              if stream_index == self.get_first_stream_index() {
+                self.position = Self::get_milliseconds_from_pts(frame.get_pts(), &time_base);
+
+                // Check whether the end is not reached
+                if let Some(segment_duration) = self.segment_duration {
+                  if self.position >= self.start_offset + segment_duration {
+                    return Ok(DecodeResult::EndOfStream);
+                  }
+                }
+              }
+
+              let start_pts = Self::get_pts_from_milliseconds(self.start_offset as i64, &time_base);
+
+              if frame.get_pts() < start_pts {
+                trace!(
+                  "Need to decode more frames to reach the expected start PTS: {}/{}",
+                  frame.get_pts(),
+                  start_pts
+                );
+                return Ok(DecodeResult::WaitMore);
+              }
+
+              Ok(DecodeResult::Frame {
+                stream_index,
+                frame,
+              })
+            }
             Err(message) => {
               if message == "Resource temporarily unavailable" {
                 return Ok(DecodeResult::Nothing);
@@ -242,6 +292,7 @@ impl Source {
     parameters: P,
     format_context: Arc<Mutex<FormatContext>>,
     sender: Arc<Mutex<Sender<ProcessResult>>>,
+    start_index_ms: Option<i64>,
   ) -> Result<HashMap<usize, Decoder>> {
     let selected_streams =
       message_event
@@ -267,6 +318,15 @@ impl Source {
         let audio_graph =
           Source::get_audio_filter_graph(&audio_configuration.filters, &audio_decoder)?;
 
+        if let Some(ms) = start_index_ms {
+          Self::seek_in_stream_at(
+            selected_stream.index as i32,
+            ms,
+            format_context.clone(),
+            AVSEEK_FLAG_BACKWARD,
+          )?;
+        }
+
         let decoder = Decoder {
           audio_decoder: Some(audio_decoder),
           video_decoder: None,
@@ -290,6 +350,15 @@ impl Source {
           video_decoder: Some(video_decoder),
           graph: video_graph,
         };
+
+        if let Some(ms) = start_index_ms {
+          Self::seek_in_stream_at(
+            selected_stream.index as i32,
+            ms,
+            format_context.clone(),
+            AVSEEK_FLAG_BACKWARD,
+          )?;
+        }
 
         decoders.insert(selected_stream.index, decoder);
       }

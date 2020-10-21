@@ -15,7 +15,7 @@ pub mod audio;
 pub mod filters;
 mod media_stream;
 mod output;
-mod source;
+pub mod source;
 mod srt;
 pub mod ttml;
 pub mod video;
@@ -100,9 +100,12 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
 
   debug!(
     target: &str_job_id,
-    "Start to process media {:?} frames from frame {}",
-    source.get_duration(),
-    source.get_start_offset()
+    "Start to process media (start: {} ms, duration: {})",
+    source.get_start_offset(),
+    source
+      .get_segment_duration()
+      .map(|duration| format!("{} ms", duration))
+      .unwrap_or_else(|| "unknown".to_string())
   );
 
   let total_duration = source.get_duration();
