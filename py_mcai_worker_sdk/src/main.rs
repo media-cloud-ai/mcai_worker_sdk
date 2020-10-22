@@ -403,7 +403,7 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
       py,
       python_module,
       "process",
-      (callback_handle, list_of_parameters),
+      (callback_handle, list_of_parameters, job_result.get_job_id()),
     )
     .map_err(|error_message| {
       let result = job_result
