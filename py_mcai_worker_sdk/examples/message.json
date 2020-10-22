@@ -24,12 +24,20 @@
     {
       "id": "source_path",
       "type": "string",
-      "value": "/path/to/audio_video/file.ext"
+      "store": "environment",
+      "value": "SOURCE_PATH"
     },
     {
       "id": "destination_path",
       "type": "string",
-      "value": "/path/to/output/file.ext"
+      "store": "environment",
+      "value": "DESTINATION_PATH"
+    },
+    {
+      "id": "requirements",
+      "type": "requirement",
+      "store": "environment",
+      "value": "SOURCE_PATH"
     }
   ]
 }

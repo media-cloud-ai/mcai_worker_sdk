@@ -90,7 +90,7 @@ mod channels;
 mod config;
 mod error;
 pub mod job;
-mod message;
+pub mod message;
 pub mod parameter;
 pub mod worker;
 

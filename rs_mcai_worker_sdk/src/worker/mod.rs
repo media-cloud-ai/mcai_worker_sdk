@@ -31,8 +31,8 @@ pub enum ParameterType {
   Credential,
   #[serde(rename = "integer")]
   Integer,
-  #[serde(rename = "requirement")]
-  Requirement,
+  #[serde(rename = "requirements")]
+  Requirements,
   #[serde(rename = "string")]
   String,
 }
