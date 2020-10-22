@@ -1,6 +1,6 @@
 [package]
 name = "c_mcai_worker_sdk"
-version = "0.11.7"
+version = "0.11.8"
 authors = [
   "Valentin NOEL <valentin.noel@media-io.com>",
   "Marc-Antoine Arnaud <maarnaud@media-io.com>",
