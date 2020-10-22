@@ -14,7 +14,7 @@ media = ["mcai_worker_sdk/media"]
 [dependencies]
 libc = "0.2"
 mcai_worker_sdk = { path = "../rs_mcai_worker_sdk" }
-schemars = "0.7.6"
+schemars = "0.8.0"
 serde = "^1.0"
 serde_derive = "^1.0"
 serde_json = "^1.0"
