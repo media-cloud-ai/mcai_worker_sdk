@@ -1,4 +1,4 @@
-FROM rust:1.46-buster as builder
+FROM rust:1.47-buster as builder
 
 ADD . /src
 WORKDIR /src/py_mcai_worker_sdk
