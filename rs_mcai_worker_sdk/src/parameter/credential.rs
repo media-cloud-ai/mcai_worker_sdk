@@ -2,13 +2,11 @@ use crate::{
   config::*,
   job::{Session, SessionBody, SessionResponseBody, ValueResponseBody},
 };
-use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
-use serde::de::Visitor;
-use serde::Deserialize;
-use serde::Deserializer;
-use serde::Serialize;
-use serde::Serializer;
+use reqwest::{
+  blocking::Client,
+  header::{HeaderMap, HeaderValue, AUTHORIZATION},
+};
+use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use std::env::var;
 
