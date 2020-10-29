@@ -77,8 +77,6 @@ impl JobResult {
   where
     T: Serialize + ParameterValue + Sized,
   {
-    // let json_string = serde_json::to_string(serializable)
-    // .map_err(|error| format!("Unable to serialize object: {:?}", error))?;
     self.parameters.push(Parameter {
       id: id.to_string(),
       kind: T::get_type_as_string(),

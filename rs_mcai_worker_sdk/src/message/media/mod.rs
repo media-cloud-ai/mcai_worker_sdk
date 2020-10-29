@@ -24,7 +24,7 @@ pub const SOURCE_PATH_PARAMETER: &str = "source_path";
 pub const DESTINATION_PATH_PARAMETER: &str = "destination_path";
 
 pub const START_INDEX_PARAMETER: &str = "sdk_start_index";
-pub const END_INDEX_PARAMETER: &str = "sdk_end_index";
+pub const STOP_INDEX_PARAMETER: &str = "sdk_stop_index";
 
 #[cfg(all(feature = "media"))]
 #[derive(Debug, PartialEq)]
@@ -84,7 +84,7 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   let source_url: String = job.get_parameter(SOURCE_PATH_PARAMETER)?;
   let output_url: String = job.get_parameter(DESTINATION_PATH_PARAMETER)?;
   let start_index_ms: Option<i64> = job.get_parameter(START_INDEX_PARAMETER).ok();
-  let end_index_ms: Option<i64> = job.get_parameter(END_INDEX_PARAMETER).ok();
+  let stop_index_ms: Option<i64> = job.get_parameter(STOP_INDEX_PARAMETER).ok();
 
   let mut output = output::Output::new(&output_url)?;
 
@@ -95,7 +95,7 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
     &source_url,
     output.get_sender(),
     start_index_ms,
-    end_index_ms,
+    stop_index_ms,
   )?;
 
   debug!(
