@@ -59,7 +59,7 @@ impl Source {
     source_url: &str,
     sender: Arc<Mutex<Sender<ProcessResult>>>,
     start_index_ms: Option<i64>,
-    end_index_ms: Option<i64>,
+    stop_index_ms: Option<i64>,
   ) -> Result<Self> {
     info!(target: &job_result.get_str_job_id(), "Opening source: {}", source_url);
 
@@ -130,8 +130,8 @@ impl Source {
         .get_duration()
         .map(|seconds| (seconds * 1000.0) as u64);
 
-      let end: Option<i64> = end_index_ms.or_else(|| duration.map(|ms| ms as i64));
-      let segment_duration = end.map(|end| (end - start_offset) as u64);
+      let stop: Option<i64> = stop_index_ms.or_else(|| duration.map(|ms| ms as i64));
+      let segment_duration = stop.map(|end| (end - start_offset) as u64);
 
       let format_context = Arc::new(Mutex::new(format_context));
 

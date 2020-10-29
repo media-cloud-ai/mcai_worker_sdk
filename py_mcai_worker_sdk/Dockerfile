@@ -16,7 +16,7 @@ RUN apt update && \
     apt install -y \
         libssl1.1 \
         ca-certificates \
-        python3
+        libpython3.7
 
 ENV AMQP_QUEUE=job_python_worker
 CMD py_mcai_worker_sdk
