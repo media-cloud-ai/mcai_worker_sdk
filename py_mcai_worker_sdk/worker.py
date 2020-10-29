@@ -44,11 +44,12 @@ def init():
     print("Initialise Python worker...")
 
 
-def process(handle_callback, parameters):
+def process(handle_callback, parameters, job_id):
     '''
     Standard worker process function.
     '''
-    print("parameters: ", parameters)
+    print("Job ID: ", job_id)
+    print("Parameters: ", parameters)
 
     # do some stuff here
 
