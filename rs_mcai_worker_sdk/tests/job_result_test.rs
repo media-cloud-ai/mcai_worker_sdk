@@ -3,7 +3,7 @@ extern crate mcai_worker_sdk;
 use mcai_worker_sdk::{
   job::*,
   parameter::{media_segment::MediaSegment, MediaSegments},
-  Credential, MessageError, ParameterValue, ParametersContainer,
+  MessageError, ParameterValue, ParametersContainer,
 };
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -44,7 +44,8 @@ fn job_result_from_json() {
         "default": "{\"key\":\"default\"}",
         "value": "{\"key\":\"value\"}" },
       { "id":"credential_parameter",
-        "type":"credential",
+        "type":"string",
+        "store":"backend",
         "default":"default_credential_key",
         "value":"credential_key" },
       { "id":"array_of_string_parameter",
@@ -82,7 +83,7 @@ fn job_result_from_json() {
   let json_param: JsonParamTestStruct = serde_json::from_str(&optional_json.unwrap()).unwrap();
   assert_eq!("value", &json_param.key);
 
-  let optional_credential = job_result.get_parameter::<Credential>("credential_parameter");
+  let optional_credential = job_result.get_parameter::<String>("credential_parameter");
   assert!(optional_credential.is_err());
   let credential_value = optional_credential.unwrap_err();
 
@@ -181,7 +182,8 @@ fn job_result_from_json_without_value() {
         "type":"string",
         "default": "{\"key\":\"default\"}" },
       { "id":"credential_parameter",
-        "type":"credential",
+        "type":"string",
+        "store":"backend",
         "default":"default_credential_key" },
       { "id":"array_of_string_parameter",
         "type":"array_of_strings",
@@ -221,7 +223,7 @@ fn job_result_from_json_without_value() {
   let json_param: JsonParamTestStruct = serde_json::from_str(&optional_json.unwrap()).unwrap();
   assert_eq!("default", &json_param.key);
 
-  let optional_credential = job_result.get_parameter::<Credential>("credential_parameter");
+  let optional_credential = job_result.get_parameter::<String>("credential_parameter");
   assert!(optional_credential.is_err());
   let credential_value = optional_credential.unwrap_err();
   #[cfg(target_os = "linux")]
@@ -320,7 +322,8 @@ fn job_result_from_job() {
         "default": "{\"key\":\"default\"}",
         "value": "{\"key\":\"value\"}" },
       { "id":"credential_parameter",
-        "type":"credential",
+        "type":"string",
+        "store":"backend",
         "default":"default_credential_key",
         "value":"credential_key" },
       { "id":"array_of_string_parameter",

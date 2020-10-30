@@ -10,7 +10,6 @@ use mcai_worker_sdk::job::*;
 use mcai_worker_sdk::parameter::media_segment::MediaSegment;
 use mcai_worker_sdk::MessageError;
 
-use mcai_worker_sdk::Credential;
 use std::collections::HashMap;
 
 use schemars::JsonSchema;
@@ -65,7 +64,8 @@ fn test_new_job() {
         "default": 123456,
         "value": 654321 },
       { "id":"credential_parameter",
-        "type":"credential",
+        "type":"string",
+        "store":"backend",
         "default":"default_credential_key",
         "value":"credential_key" },
       { "id":"array_of_string_parameter",
@@ -99,7 +99,7 @@ fn test_new_job() {
   let integer_value = optional_integer.unwrap();
   assert_eq!(integer_value, 654321);
 
-  let optional_credential = job.get_parameter::<Credential>("credential_parameter");
+  let optional_credential = job.get_parameter::<String>("credential_parameter");
   assert!(optional_credential.is_err());
   let credential_value = optional_credential.unwrap_err();
 

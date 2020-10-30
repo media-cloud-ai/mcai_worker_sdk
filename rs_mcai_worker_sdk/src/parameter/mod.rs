@@ -1,5 +1,5 @@
 pub mod container;
-pub mod credential;
+pub mod store;
 pub mod media_segment;
 
 use crate::{MessageError, Result};
@@ -35,7 +35,7 @@ pub trait ParameterValue {
   }
 
   fn from_store(key: &str, store_code: &str) -> Result<Value> {
-    credential::request_value(&key, &store_code)
+    store::request_value(&key, &store_code)
       .map_err(|e| MessageError::ParameterValueError(format!("{:?}", e)))
   }
 
@@ -132,36 +132,6 @@ impl ParameterValue for bool {
 impl ParameterValue for Vec<String> {
   fn get_type_as_string() -> String {
     "array_of_strings".to_string()
-  }
-}
-
-#[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
-impl ParameterValue for credential::Credential {
-  fn parse_value(content: Value, store: &Option<String>) -> Result<Self>
-  where
-    Self: Sized + DeserializeOwned,
-  {
-    let store_code = store.clone().unwrap_or_else(|| "BACKEND".to_string());
-
-    debug!(
-      "Retrieve credential value {} from store {}",
-      content.to_string(),
-      store_code
-    );
-
-    if let Value::String(credential_key) = &content {
-      let value = Self::from_store(&credential_key, &store_code)?;
-      Self::from_value(value)
-    } else {
-      Err(MessageError::ParameterValueError(format!(
-        "Cannot handle credential type for {:?}",
-        content
-      )))
-    }
-  }
-
-  fn get_type_as_string() -> String {
-    "credential".to_string()
   }
 }
 

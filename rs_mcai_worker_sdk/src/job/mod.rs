@@ -8,7 +8,7 @@ mod job_progression;
 mod job_result;
 mod job_status;
 
-use crate::parameter::credential::request_value;
+use crate::parameter::store::request_value;
 use crate::Result;
 pub use job_progression::JobProgression;
 pub use job_result::JobResult;
