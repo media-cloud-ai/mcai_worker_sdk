@@ -69,8 +69,8 @@ impl<'de> Deserialize<'de> for Credential {
 pub fn request_value(credential_key: &str, store_code: &str) -> Result<Value, String> {
   if vec!["env", "ENV", "environment"].contains(&store_code) {
     return var(credential_key)
-      .map(Value::String)
-      .map_err(|error| error.to_string());
+      .map_err(|error| error.to_string())
+      .map(|value| serde_json::from_str(&value).unwrap_or(Value::String(value)));
   }
 
   let backend_endpoint = get_store_hostname(store_code);
@@ -116,5 +116,12 @@ pub fn request_value(credential_key: &str, store_code: &str) -> Result<Value, St
     .json()
     .map_err(|e| e.to_string())?;
 
-  Ok(response.data.value)
+  let value = match response.data.value.clone() {
+    Value::String(string) => {
+      serde_json::from_str(&string).unwrap_or(response.data.value)
+    }
+    _ => response.data.value
+  };
+
+  Ok(value)
 }

@@ -392,6 +392,51 @@ fn test_get_job_parameters_with_environment_credential_3() {
 }
 
 #[test]
+fn test_get_job_parameters_with_environment_credential_4() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id":"key",
+        "type":"string",
+        "value": "credential_key_4",
+        "store": "environment"
+      }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  assert_eq!(123, job.job_id);
+
+  #[derive(JsonSchema, Deserialize, Debug, PartialEq, Serialize)]
+  struct SubStruct {
+    some_key: String,
+    other_key: String,
+  }
+
+  #[derive(JsonSchema, Deserialize, Debug)]
+  struct WorkerJobParameters {
+    key: SubStruct,
+  }
+
+  let expected = SubStruct {
+    some_key: "some_value".to_string(),
+    other_key: "other_value".to_string()
+  };
+
+  std::env::set_var("credential_key_4", serde_json::to_string(&expected).unwrap());
+
+  let job_parameters = job.get_parameters::<WorkerJobParameters>().unwrap();
+
+  assert_eq!(expected, job_parameters.key);
+
+  std::env::remove_var("credential_key_4");
+}
+
+
+#[test]
 fn test_get_job_parameters_with_unsupported_integer_credential_type() {
   let message = r#"{
     "job_id": 123,
