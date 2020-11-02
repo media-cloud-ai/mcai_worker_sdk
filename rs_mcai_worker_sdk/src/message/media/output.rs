@@ -53,7 +53,7 @@ impl Output {
                 end_of_process: false,
               };
 
-              cloned_results.lock().unwrap().push(message);
+              cloned_results.clone().lock().unwrap().push(message);
             }
           }
           ProcessResult {
@@ -71,7 +71,7 @@ impl Output {
                 end_of_process: false,
               };
 
-              cloned_results.lock().unwrap().push(message);
+              cloned_results.clone().lock().unwrap().push(message);
             }
           }
           ProcessResult {

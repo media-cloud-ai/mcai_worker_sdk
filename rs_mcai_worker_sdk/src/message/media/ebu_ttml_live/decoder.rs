@@ -5,6 +5,7 @@ use stainless_ffmpeg::packet::Packet;
 
 use crate::EbuTtmlLive;
 
+#[derive(Default)]
 pub struct EbuTtmlLiveDecoder {
   buffer: VecDeque<String>,
 }

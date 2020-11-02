@@ -152,7 +152,7 @@ impl Source {
       let mut format_context = FormatContext::new(source_url).map_err(RuntimeError)?;
       format_context.open_input().map_err(RuntimeError)?;
 
-      let start_offset = start_index_ms.unwrap_or_else(|| 0);
+      let start_offset = start_index_ms.unwrap_or(0);
       let duration = format_context
         .get_duration()
         .map(|seconds| (seconds * 1000.0) as u64);
@@ -242,7 +242,7 @@ impl Source {
   }
 
   pub fn get_first_stream_index(&self) -> usize {
-    self.decoders.keys().cloned().min().unwrap_or_else(|| 0)
+    self.decoders.keys().cloned().min().unwrap_or(0)
   }
 
   pub fn next_frame(&mut self) -> Result<DecodeResult> {
