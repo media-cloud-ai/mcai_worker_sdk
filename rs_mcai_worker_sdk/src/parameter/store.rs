@@ -60,10 +60,8 @@ pub fn request_value(credential_key: &str, store_code: &str) -> Result<Value, St
     .map_err(|e| e.to_string())?;
 
   let value = match response.data.value.clone() {
-    Value::String(string) => {
-      serde_json::from_str(&string).unwrap_or(response.data.value)
-    }
-    _ => response.data.value
+    Value::String(string) => serde_json::from_str(&string).unwrap_or(response.data.value),
+    _ => response.data.value,
   };
 
   Ok(value)

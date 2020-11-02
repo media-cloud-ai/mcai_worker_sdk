@@ -1,7 +1,7 @@
 extern crate mcai_worker_sdk;
 
 use mcai_worker_sdk::{
-  job::*, parameter::media_segment::MediaSegment, MessageError, ParametersContainer
+  job::*, parameter::media_segment::MediaSegment, MessageError, ParametersContainer,
 };
 
 #[test]

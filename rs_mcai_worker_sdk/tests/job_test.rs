@@ -423,10 +423,13 @@ fn test_get_job_parameters_with_environment_credential_4() {
 
   let expected = SubStruct {
     some_key: "some_value".to_string(),
-    other_key: "other_value".to_string()
+    other_key: "other_value".to_string(),
   };
 
-  std::env::set_var("credential_key_4", serde_json::to_string(&expected).unwrap());
+  std::env::set_var(
+    "credential_key_4",
+    serde_json::to_string(&expected).unwrap(),
+  );
 
   let job_parameters = job.get_parameters::<WorkerJobParameters>().unwrap();
 
@@ -434,7 +437,6 @@ fn test_get_job_parameters_with_environment_credential_4() {
 
   std::env::remove_var("credential_key_4");
 }
-
 
 #[test]
 fn test_get_job_parameters_with_unsupported_integer_credential_type() {
