@@ -296,6 +296,34 @@ fn test_get_missing_job_parameters() {
 }
 
 #[test]
+fn test_get_job_parameters_with_missing_environment_credential() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id":"key",
+        "type":"string",
+        "value": "unset_credential_key",
+        "store": "env"
+      }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  assert_eq!(123, job.job_id);
+
+  std::env::remove_var("unset_credential_key");
+
+  let result = job.get_parameters::<String>();
+  assert_eq!(
+    MessageError::ParameterValueError("\"environment variable not found\"".to_string()),
+    result.unwrap_err()
+  );
+}
+
+#[test]
 fn test_get_job_parameters_with_environment_credential_1() {
   let message = r#"{
     "job_id": 123,

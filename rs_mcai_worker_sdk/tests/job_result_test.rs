@@ -5,6 +5,7 @@ use mcai_worker_sdk::{
   parameter::{media_segment::MediaSegment, MediaSegments},
   MessageError, ParameterValue, ParametersContainer,
 };
+use reqwest::blocking::Client;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -195,7 +196,6 @@ fn job_result_from_json_without_value() {
   }"#;
 
   let result = serde_json::from_str(json);
-  println!("{:?}", result);
   assert!(result.is_ok());
   let job_result: JobResult = result.unwrap();
   assert_eq!(job_result.get_job_id(), 456);
@@ -342,6 +342,7 @@ fn job_result_from_job() {
   let job = result.unwrap();
   let job_result = JobResult::from(job);
   assert_eq!(job_result.get_job_id(), 123);
+  assert_eq!(job_result.get_str_job_id(), 123.to_string());
   assert_eq!(job_result.get_status(), &JobStatus::Unknown);
   assert_eq!(job_result.get_parameters().len(), 0);
 }
@@ -393,6 +394,38 @@ fn job_result_with_setters() {
 
   let json_param = job_result.get_parameter::<JsonParamTestStruct>("json_param_id");
   assert_eq!(Ok(json_object), json_param);
+}
+
+#[test]
+fn job_result_with_error() {
+  let job_id = 123;
+  let mut job_result = JobResult::new(job_id);
+
+  let client = Client::builder().build().unwrap();
+  let error = client.get("somewhere").send().unwrap_err();
+  job_result = job_result.with_error(error);
+
+  let expected_message = "builder error: relative URL without a base";
+  assert_eq!(
+    Ok(expected_message.to_string()),
+    job_result.get_parameter::<String>("message")
+  );
+
+  assert!(job_result.get_execution_duration() > 0.0);
+}
+
+#[test]
+fn job_result_with_destination_paths() {
+  let job_id = 123;
+  let mut job_result = JobResult::new(job_id);
+
+  let destination_paths = vec![
+    "/path/to/dest_file_1.ext".to_string(),
+    "/path/to/dest_file_2.ext".to_string(),
+  ];
+  job_result = job_result.with_destination_paths(&mut destination_paths.clone());
+
+  assert_eq!(&destination_paths, job_result.get_destination_paths());
 }
 
 #[test]

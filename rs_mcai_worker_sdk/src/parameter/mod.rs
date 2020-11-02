@@ -114,7 +114,12 @@ impl ParameterValue for bool {
       Value::String(value) => value
         .parse()
         .map_err(|e| MessageError::ParameterValueError(format!("{:?}", e))),
-      Value::Number(value) => Ok(value.as_i64().map_or_else(|| false, |v| v > 0)),
+      Value::Number(value) => Ok(
+        value
+          .as_i64()
+          .or_else(|| value.as_f64().map(|f| f as i64))
+          .map_or_else(|| false, |v| v != 0),
+      ),
       Value::Bool(value) => Ok(value),
       _ => Err(MessageError::ParameterValueError(format!(
         "Cannot convert value type '{:?}' to type {}",
