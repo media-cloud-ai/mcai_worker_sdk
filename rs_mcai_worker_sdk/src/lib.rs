@@ -90,7 +90,7 @@ mod channels;
 mod config;
 mod error;
 pub mod job;
-mod message;
+pub mod message;
 pub mod parameter;
 pub mod worker;
 
@@ -193,6 +193,21 @@ pub enum ProcessFrame {
   AudioVideo(Frame),
   EbuTtmlLive(Box<EbuTtmlLive>),
   Data(Vec<u8>),
+}
+
+impl ProcessFrame {
+  pub fn get_pts(&self) -> i64 {
+    match self {
+      ProcessFrame::AudioVideo(frame) => {
+        frame.get_pts()
+      }
+      ProcessFrame::EbuTtmlLive(_) |
+      ProcessFrame::Data(_) => {
+        // improvement: support pts to terminate
+        0
+      }
+    }
+  }
 }
 
 /// # Trait to describe a worker

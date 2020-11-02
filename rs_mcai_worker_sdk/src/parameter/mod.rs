@@ -1,13 +1,11 @@
-use crate::parameter::media_segment::MediaSegment;
-use crate::{MessageError, Result};
-use serde::de::DeserializeOwned;
-use serde::Deserialize;
-use serde::Serialize;
-use serde_json::Value;
-
 pub mod container;
 pub mod credential;
 pub mod media_segment;
+
+use crate::{MessageError, Result};
+pub use media_segment::MediaSegments;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::Value;
 
 pub trait ParameterValue {
   fn parse_value(content: Value, store: &Option<String>) -> Result<Self>
@@ -173,7 +171,7 @@ impl ParameterValue for Requirement {
   }
 }
 
-impl ParameterValue for Vec<MediaSegment> {
+impl ParameterValue for MediaSegments {
   fn get_type_as_string() -> String {
     "array_of_media_segments".to_string()
   }

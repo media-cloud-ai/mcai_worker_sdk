@@ -1,3 +1,5 @@
+pub type MediaSegments = Vec<MediaSegment>;
+
 #[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct MediaSegment {
   pub start: u64,

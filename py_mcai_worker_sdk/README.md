@@ -38,3 +38,31 @@ __NB:__ the `process(handle_callback, parameters)` function is not called when t
 For more details, see the provided [worker.py](worker.py) and [media_worker.py](media_worker.py) examples.
 
 Set the `PYTHON_WORKER_FILENAME` environment variable to specify the path of your Python worker. Otherwise, the `worker.py` file will be loaded by default.
+
+### Running examples
+
+#### Simple worker
+```
+RUST_LOG=debug \
+SOURCE_ORDERS="examples/message.json" \
+PYTHON_WORKER_FILENAME="worker.py" \
+SOURCE_PATH="README.md" \
+DESTINATION_PATH="README.md.out" \
+cargo run
+```
+
+#### Media worker
+
+First set the media filename:
+```
+export SOURCE_PATH="/folder/filename.ext"
+```
+
+Then run the SDK with these parameters:
+```
+RUST_LOG=debug \
+SOURCE_ORDERS="examples/message.json" \
+PYTHON_WORKER_FILENAME="media_worker.py" \
+DESTINATION_PATH="results.json" \
+cargo run --features media
+```

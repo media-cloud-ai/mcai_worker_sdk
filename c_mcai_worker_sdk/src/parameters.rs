@@ -26,7 +26,7 @@ fn get_instance_type_from_parameter_type(parameter_type: &ParameterType) -> Inst
     ParameterType::Boolean => InstanceType::Boolean,
     ParameterType::Credential => InstanceType::String,
     ParameterType::Integer => InstanceType::Integer,
-    ParameterType::Requirement => InstanceType::Array,
+    ParameterType::Requirements => InstanceType::Array,
   }
 }
 
@@ -129,6 +129,6 @@ pub fn test_get_instance_type_from_parameter() {
   );
   assert_eq!(
     InstanceType::Array,
-    get_instance_type_from_parameter_type(&ParameterType::Requirement)
+    get_instance_type_from_parameter_type(&ParameterType::Requirements)
   );
 }

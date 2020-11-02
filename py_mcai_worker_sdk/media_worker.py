@@ -34,6 +34,12 @@ def get_parameters():
             "label": "My array parameter",
             "kind": ["string"],
             "required": False,
+        },
+        {
+            "identifier": "requirements",
+            "label": "Requirements",
+            "kind": ["requirement"],
+            "required": False,
         }
     ]
 
@@ -56,6 +62,14 @@ def init_process(stream_handler, format_context, parameters):
     logging.info("Initialise the media process...")
     logging.debug("Number of streams: %d", format_context.nb_streams)
     logging.debug("Message parameters: %s", parameters)
+
+    for stream in format_context.streams:
+        if stream.kind == "AVMEDIA_TYPE_VIDEO":
+            logging.debug("Video Resolution: %dx%d, %s frames, %sfps", stream.width, stream.height, stream.nb_frames, stream.r_frame_rate)
+        if stream.kind == "AVMEDIA_TYPE_AUDIO":
+            logging.debug("Audio %s channels, %s Hz, %s samples", stream.channels, stream.sample_rate, stream.nb_frames)
+        if stream.kind == "AVMEDIA_TYPE_DATA":
+            logging.debug("Data")
 
     # Here audio/video filters can be set to be applied on the worker input frames, using a simple python dict as follow.
     # Check the FFmpeg documentation to have more details on filters usage: https://ffmpeg.org/ffmpeg-filters.html

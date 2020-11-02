@@ -75,16 +75,14 @@ impl JobResult {
 
   pub fn with_json<T>(mut self, id: &str, serializable: &T) -> Result<Self, String>
   where
-    T: Serialize + Sized,
+    T: Serialize + ParameterValue + Sized,
   {
-    let json_string = serde_json::to_string(serializable)
-      .map_err(|error| format!("Unable to serialize object: {:?}", error))?;
     self.parameters.push(Parameter {
       id: id.to_string(),
-      kind: String::get_type_as_string(),
+      kind: T::get_type_as_string(),
       store: None,
       default: None,
-      value: serde_json::to_value(json_string).ok(),
+      value: serde_json::to_value(serializable).ok(),
     });
     Ok(self)
   }

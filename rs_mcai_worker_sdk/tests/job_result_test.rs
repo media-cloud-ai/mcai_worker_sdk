@@ -1,21 +1,26 @@
 extern crate mcai_worker_sdk;
 
+use mcai_worker_sdk::{
+  job::*,
+  parameter::{media_segment::MediaSegment, MediaSegments},
+  Credential, MessageError, ParameterValue, ParametersContainer,
+};
 use serde_derive::{Deserialize, Serialize};
-
-use crate::mcai_worker_sdk::ParametersContainer;
-use mcai_worker_sdk::job::*;
-
-use mcai_worker_sdk::parameter::media_segment::MediaSegment;
-use mcai_worker_sdk::{Credential, MessageError};
 use std::collections::HashMap;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
 struct JsonParamTestStruct {
   key: String,
 }
 
+impl ParameterValue for JsonParamTestStruct {
+  fn get_type_as_string() -> String {
+    "key_test".to_string()
+  }
+}
+
 #[test]
-fn test_job_result_from_json() {
+fn job_result_from_json() {
   let json = r#"{
     "job_id": 456,
     "status": "completed",
@@ -156,7 +161,7 @@ fn test_job_result_from_json() {
 }
 
 #[test]
-fn test_job_result_from_json_without_value() {
+fn job_result_from_json_without_value() {
   let json = r#"{
     "job_id": 456,
     "status": "completed",
@@ -294,7 +299,7 @@ fn test_job_result_from_json_without_value() {
 }
 
 #[test]
-fn test_job_result_from_job() {
+fn job_result_from_job() {
   let message = r#"{
     "job_id": 123,
     "parameters": [
@@ -339,7 +344,7 @@ fn test_job_result_from_job() {
 }
 
 #[test]
-fn test_job_result_from_job_ref() {
+fn job_result_from_job_ref() {
   let message = r#"{
     "job_id": 123,
     "parameters": [
@@ -358,7 +363,7 @@ fn test_job_result_from_job_ref() {
 }
 
 #[test]
-fn test_job_result_with_setters() {
+fn job_result_with_setters() {
   let job_id = 123;
   let mut job_result = JobResult::new(job_id);
   assert_eq!(job_result.get_job_id(), job_id);
@@ -376,16 +381,24 @@ fn test_job_result_with_setters() {
     job_result.get_parameter::<String>("message")
   );
 
-  job_result = job_result
-    .with_json(
-      "json_param_id",
-      &JsonParamTestStruct {
-        key: "json".to_string(),
-      },
-    )
-    .unwrap();
+  let json_object = JsonParamTestStruct {
+    key: "json".to_string(),
+  };
+
+  job_result = job_result.with_json("json_param_id", &json_object).unwrap();
   assert_eq!(job_result.get_status(), &JobStatus::Completed);
 
-  let json_param = job_result.get_parameter::<String>("json_param_id");
-  assert_eq!(Ok("{\"key\":\"json\"}".to_string()), json_param);
+  let json_param = job_result.get_parameter::<JsonParamTestStruct>("json_param_id");
+  assert_eq!(Ok(json_object), json_param);
+}
+
+#[test]
+fn job_result_with_media_segments() {
+  let job_id = 123;
+  let mut job_result = JobResult::new(job_id);
+  let segments = vec![MediaSegment { start: 0, end: 10 }];
+  job_result = job_result.with_json("segments", &segments).unwrap();
+
+  let json_param = job_result.get_parameter::<MediaSegments>("segments");
+  assert_eq!(Ok(segments), json_param);
 }

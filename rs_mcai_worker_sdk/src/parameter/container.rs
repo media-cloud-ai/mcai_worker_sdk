@@ -1,5 +1,7 @@
-use crate::parameter::{Parameter, ParameterValue};
-use crate::{MessageError, Result};
+use crate::{
+  parameter::{Parameter, ParameterValue},
+  MessageError, Result,
+};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
