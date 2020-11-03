@@ -63,7 +63,7 @@ jobs:
         - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
         - gcc -c -Wall -Werror -fpic c_mcai_worker_sdk/worker.cpp && gcc -shared -o libworker.so worker.o
-        - travis_wait cargo tarpaulin --verbose --all-features --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+        - travis_wait cargo tarpaulin --verbose --all-features --ciserver travis-ci --coveralls $TRAVIS_JOB_ID -- --test-threads 1
       env:
         - COVERAGE_CHECK=TRUE
         - TRAVIS_RUST_VERSION=nightly-2020-01-21

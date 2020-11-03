@@ -1,0 +1,16 @@
+{
+	"job_id": 1234,
+	"parameters": [
+		{
+			"id": "source_path",
+			"type": "string",
+			"value": "srt://:8999",
+			"default": "srt://127.0.0.1:8999"
+		},
+		{
+			"id": "destination_path",
+			"type": "string",
+			"value": "/path/to/output/file.ext"
+		}
+	]
+}

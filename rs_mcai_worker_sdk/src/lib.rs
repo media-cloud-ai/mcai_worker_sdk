@@ -105,8 +105,10 @@ pub use error::{MessageError, Result};
 #[cfg(feature = "media")]
 pub use message::media::{
   audio::AudioFormat,
+  ebu_ttml_live::{
+    Body, Div, EbuTtmlLive, Frames, Head, Paragraph, Span, Styling, TimeExpression, TimeUnit, Title,
+  },
   filters::{AudioFilter, GenericFilter, VideoFilter},
-  ttml::{Body, Div, Head, Paragraph, Span, TimeExpression, TimeUnit, Ttml},
   video::{RegionOfInterest, Scaling, VideoFormat},
   StreamDescriptor,
 };
@@ -184,6 +186,26 @@ impl ProcessResult {
   }
 }
 
+#[cfg(feature = "media")]
+pub enum ProcessFrame {
+  AudioVideo(Frame),
+  EbuTtmlLive(Box<EbuTtmlLive>),
+  Data(Vec<u8>),
+}
+
+#[cfg(feature = "media")]
+impl ProcessFrame {
+  pub fn get_pts(&self) -> i64 {
+    match self {
+      ProcessFrame::AudioVideo(frame) => frame.get_pts(),
+      ProcessFrame::EbuTtmlLive(_) | ProcessFrame::Data(_) => {
+        // improvement: support pts to terminate
+        0
+      }
+    }
+  }
+}
+
 /// # Trait to describe a worker
 /// Implement this trait to implement a worker
 pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
@@ -211,7 +233,7 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
     &mut self,
     _job_result: JobResult,
     _stream_index: usize,
-    _frame: Frame,
+    _frame: ProcessFrame,
   ) -> Result<ProcessResult> {
     Err(MessageError::NotImplemented())
   }

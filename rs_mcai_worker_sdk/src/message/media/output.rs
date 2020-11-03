@@ -53,7 +53,7 @@ impl Output {
                 end_of_process: false,
               };
 
-              cloned_results.lock().unwrap().push(message);
+              cloned_results.clone().lock().unwrap().push(message);
             }
           }
           ProcessResult {
@@ -71,7 +71,7 @@ impl Output {
                 end_of_process: false,
               };
 
-              cloned_results.lock().unwrap().push(message);
+              cloned_results.clone().lock().unwrap().push(message);
             }
           }
           ProcessResult {
@@ -169,6 +169,13 @@ pub fn test_output() {
   // wait a bit for the result to be received...
   std::thread::sleep(std::time::Duration::from_millis(10));
 
+  // ends the thread
+  let result = output.complete();
+  assert!(result.is_err());
+
+  let expected_error = MessageError::RuntimeError(format!("Could not write to '/path/to/somewhere' destination: Os {{ code: 2, kind: NotFound, message: \"No such file or directory\" }}"));
+  assert_eq!(expected_error, result.unwrap_err());
+
   {
     // check results
     let results_ref = output.results.lock().unwrap();
@@ -183,10 +190,4 @@ pub fn test_output() {
     assert_eq!(process_result.json_content, expected_result.json_content);
     assert_eq!(process_result.xml_content, expected_result.xml_content);
   }
-
-  let result = output.complete();
-  assert!(result.is_err());
-
-  let expected_error = MessageError::RuntimeError(format!("Could not write to '/path/to/somewhere' destination: Os {{ code: 2, kind: NotFound, message: \"No such file or directory\" }}"));
-  assert_eq!(expected_error, result.unwrap_err());
 }

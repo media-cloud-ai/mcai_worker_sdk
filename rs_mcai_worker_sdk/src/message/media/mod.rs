@@ -12,12 +12,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 pub mod audio;
+pub mod ebu_ttml_live;
 pub mod filters;
 mod media_stream;
 mod output;
 pub mod source;
 mod srt;
-pub mod ttml;
 pub mod video;
 
 pub const SOURCE_PATH_PARAMETER: &str = "source_path";

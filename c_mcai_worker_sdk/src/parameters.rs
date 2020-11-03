@@ -5,7 +5,8 @@ use schemars::{
 };
 
 use crate::get_c_string;
-use crate::worker::{get_worker_parameters, WorkerParameter};
+use crate::utils::get_worker_parameters;
+use crate::worker::WorkerParameter;
 use mcai_worker_sdk::worker::{Parameter, ParameterType};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};

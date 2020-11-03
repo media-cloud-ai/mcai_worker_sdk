@@ -17,6 +17,16 @@ typedef struct Parameter {
     int required;
 } Parameter;
 
+
+/**
+ * Audio / Video streams descriptors type
+ */
+enum StreamType {
+    VIDEO,
+    AUDIO,
+    DATA
+};
+
 /**
  * Job & channel handler
  */
@@ -38,12 +48,13 @@ typedef char* (*GetParameterValueCallback)(Handler _handler, const char* _parame
  */
 typedef void* (*Logger)(const char* _level, const char* _message);
 
-/**
- * Progress callback
- * @param _handler                   the job & channel handler
- * @param _progression_percentage    the progression percentage (between 0 and 100)
- */
-typedef void* (*ProgressCallback)(Handler _handler, unsigned char _progression_percentage);
+typedef const void* StreamDescriptor;
+typedef const void* Filter;
+typedef void* (*NewStreamDescriptorCallback)(unsigned int _index, StreamType _stream_type);
+typedef void* (*NewFilterCallback)(const char* _filter_name, const char* _filter_label);
+
+typedef void* (*AddDescriptorFilterCallback)(StreamDescriptor _stream_descriptor, Filter _filter);
+typedef void* (*AddFilterParameterCallback)(Filter _filter, const char* _parameter_key, const char* _parameter_value);
 
 /**
  * Get worker name
@@ -84,22 +95,52 @@ void get_parameters(Parameter* parameters);
 void init(Logger logger);
 
 /**
- * Worker main process function
+ * Initialize worker media process
+ * (the "media" feature must be enabled)
+ * @param handler                   Handler
+ * @param parameters_value_getter   Get job parameter value callback
+ * @param logger                    Rust Logger
+ * @param format_context            Format context pointer
+ * @param output_stream_descriptors Pointer of descriptors of the output streams
+ */
+int init_process(
+    Handler handler,
+    NewStreamDescriptorCallback new_stream_descriptor_callback,
+    NewFilterCallback new_filter_callback,
+    AddDescriptorFilterCallback add_descriptor_filter_callback,
+    AddFilterParameterCallback add_filter_parameter_callback,
+    Logger logger,
+    void* format_context,
+    void** output_stream_descriptors,
+    unsigned int* output_stream_descriptors_size
+  );
+
+/**
+ * Process the media frame
+ * (the "media" feature must be enabled)
  * @param handler                  Handler
  * @param parameters_value_getter  Get job parameter value callback
- * @param progress_callback        Progress callback
  * @param logger                   Rust Logger
+ * @param stream_index             Frame stream index
+ * @param frame                    Frame pointer
  * @param message                  Output message pointer
- * @param output_paths             Output paths pointer
  */
-int process(
+int process_frame(
     Handler handler,
     GetParameterValueCallback parameters_value_getter,
-    ProgressCallback progress_callback,
     Logger logger,
-    const char** message,
-    const char*** output_paths
+    const unsigned int job_id,
+    const unsigned int stream_index,
+    void* frame,
+    const char** message
   );
+
+/**
+ * End the media process
+ * (the "media" feature must be enabled)
+ * @param logger  Rust Logger
+ */
+void ending_process(Logger logger);
 
 /**
  * Set the C string to the pointer

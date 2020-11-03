@@ -1,8 +1,13 @@
+pub mod decoder;
 mod time_expression;
 
+pub use decoder::EbuTtmlLiveDecoder;
 use std::io::{Read, Write};
 pub use time_expression::{Frames, TimeExpression, TimeUnit};
 use yaserde::{YaDeserialize, YaSerialize};
+
+#[cfg(all(feature = "media", feature = "python"))]
+use dict_derive::{FromPyObject, IntoPyObject};
 
 pub fn default_lang() -> String {
   "en".to_owned()
@@ -10,15 +15,15 @@ pub fn default_lang() -> String {
 
 #[derive(Debug, Default, Clone, PartialEq, YaDeserialize, YaSerialize)]
 #[yaserde(
-  rename="tt",
-  prefix="tt",
-  namespace="tt: http://www.w3.org/ns/ttml"
-  namespace="xml: http://www.w3.org/XML/1998/namespace"
-  namespace="ttm: http://www.w3.org/ns/ttml#metadata"
-  namespace="ttp: http://www.w3.org/ns/ttml#parameter"
-  namespace="ebuttp: urn:ebu:tt:parameters"
+  rename = "tt",
+  prefix = "tt",
+  namespace = "tt: http://www.w3.org/ns/ttml",
+  namespace = "xml: http://www.w3.org/XML/1998/namespace",
+  namespace = "ttm: http://www.w3.org/ns/ttml#metadata",
+  namespace = "ttp: http://www.w3.org/ns/ttml#parameter",
+  namespace = "ebuttp: urn:ebu:tt:parameters"
 )]
-pub struct Ttml {
+pub struct EbuTtmlLive {
   #[yaserde(rename = "lang", prefix = "xml", attribute)]
   pub language: Option<String>,
   #[yaserde(rename = "sequenceIdentifier", prefix = "ebuttp", attribute)]
@@ -33,11 +38,18 @@ pub struct Ttml {
   pub body: Body,
 }
 
+impl EbuTtmlLive {
+  pub fn to_xml(&self) -> Result<String, String> {
+    yaserde::ser::to_string(self)
+  }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(
   rename = "head",
   prefix = "tt",
-  namespace = "tt: http://www.w3.org/ns/ttml"
+  namespace = "tt: http://www.w3.org/ns/ebu_ttml_live"
 )]
 pub struct Head {
   #[yaserde(prefix = "tt")]
@@ -49,10 +61,11 @@ pub struct Head {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(
   rename = "metadata",
   prefix = "tt",
-  namespace = "tt: http://www.w3.org/ns/ttml"
+  namespace = "tt: http://www.w3.org/ns/ttml",
   namespace = "ttm: http://www.w3.org/ns/ttml#metadata"
 )]
 pub struct Metadata {
@@ -69,6 +82,7 @@ pub struct Metadata {
 }
 
 #[derive(Clone, Default, Debug, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(
   rename = "styling",
   prefix = "tt",
@@ -80,6 +94,7 @@ pub struct Styling {
 }
 
 #[derive(Clone, Default, Debug, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(prefix = "ttm", namespace = "ttm: http://www.w3.org/ns/ttml#metadata")]
 pub struct Title {
   #[yaserde(prefix = "ttm")]
@@ -91,6 +106,7 @@ pub struct Title {
 }
 
 #[derive(Clone, Default, Debug, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(prefix = "tt", namespace = "tt: http://www.w3.org/ns/ttml")]
 pub struct Layout {
   #[yaserde(attribute, default = "default_lang")]
@@ -143,6 +159,7 @@ pub struct Paragraph {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(
   rename = "span",
   prefix = "tt",
@@ -154,9 +171,17 @@ pub struct Span {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, YaDeserialize, YaSerialize)]
+#[cfg_attr(feature = "python", derive(FromPyObject, IntoPyObject))]
 #[yaserde(
   rename = "br",
   prefix = "tt",
   namespace = "tt: http://www.w3.org/ns/ttml"
 )]
 pub struct BreakLine {}
+
+// #[test]
+// pub fn test_deser() {
+//   let content = "<?xml version=\"1.0\" encoding=\"utf-8\"?><tt:tt xmlns:ebuttp=\"urn:ebu:tt:parameters\" xmlns:tt=\"http://www.w3.org/ns/ttml\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\" xmlns:ttp=\"http://www.w3.org/ns/ttml#parameter\" xml:lang=\"fr-FR\" ebuttp:sequenceIdentifier=\"LiveSubtitle\" ebuttp:sequenceNumber=\"0\" ttp:clockMode=\"local\" ttp:timeBase=\"clock\"><head><tt:metadata /><tt:styling /><tt:layout /></head><body dur=\"00:00:10:00\" begin=\"0ms\"><div><p begin=\"0ms\" end=\"10ms\"><span>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore disputandum putant. Sed ut perspiciatis, unde omnis iste.</span></p></div></body></tt:tt>";
+//   let result = yaserde::de::from_str::<EbuTtmlLive>(content);
+//   println!("result: {:?}", result);
+// }

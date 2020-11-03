@@ -1,6 +1,8 @@
 use pyo3::prelude::*;
-use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use std::{
+  collections::{BTreeMap, HashMap},
+  sync::{Arc, Mutex},
+};
 
 #[pyclass]
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
@@ -47,9 +49,13 @@ impl FormatContext {
 
     for stream_index in 0..context.get_nb_streams() {
       let stream = context.get_stream(stream_index as isize);
-      unsafe {
-        streams.push(StreamDescriptor {
+
+      let stream_descriptor = unsafe {
+        StreamDescriptor {
           index: (*stream).id as u32,
+          start_time,
+          duration: duration.map(|value| value as f32),
+          stream_metadata: Default::default(),
           nb_frames: (*stream).nb_frames as u64,
           avg_frame_rate: (*stream).avg_frame_rate.num as f32 / (*stream).avg_frame_rate.den as f32,
           r_frame_rate: (*stream).r_frame_rate.num as f32 / (*stream).r_frame_rate.den as f32,
@@ -58,8 +64,9 @@ impl FormatContext {
           height: (*(*stream).codec).height as u32,
           channels: (*(*stream).codec).channels as u32,
           sample_rate: (*(*stream).codec).sample_rate as u32,
-        });
-      }
+        }
+      };
+      streams.push(stream_descriptor);
     }
 
     // TODO complete format context struct
@@ -100,4 +107,10 @@ pub struct StreamDescriptor {
   channels: u32,
   #[pyo3(get)]
   sample_rate: u32,
+  #[pyo3(get)]
+  start_time: Option<f32>,
+  #[pyo3(get)]
+  duration: Option<f32>,
+  #[pyo3(get)]
+  stream_metadata: HashMap<String, String>,
 }
