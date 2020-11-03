@@ -67,7 +67,6 @@ impl FormatContext {
         }
       };
       streams.push(stream_descriptor);
-
     }
 
     // TODO complete format context struct

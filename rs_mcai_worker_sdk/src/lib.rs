@@ -195,14 +195,12 @@ pub enum ProcessFrame {
   Data(Vec<u8>),
 }
 
+#[cfg(feature = "media")]
 impl ProcessFrame {
   pub fn get_pts(&self) -> i64 {
     match self {
-      ProcessFrame::AudioVideo(frame) => {
-        frame.get_pts()
-      }
-      ProcessFrame::EbuTtmlLive(_) |
-      ProcessFrame::Data(_) => {
+      ProcessFrame::AudioVideo(frame) => frame.get_pts(),
+      ProcessFrame::EbuTtmlLive(_) | ProcessFrame::Data(_) => {
         // improvement: support pts to terminate
         0
       }
