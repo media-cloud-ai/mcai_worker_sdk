@@ -6,71 +6,14 @@ use reqwest::{
   blocking::Client,
   header::{HeaderMap, HeaderValue, AUTHORIZATION},
 };
-use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use std::env::var;
-
-// #[deprecated(
-//   since = "0.10.4",
-//   note = "Please use the `store` field in Parameter instead"
-// )]
-#[derive(Debug, PartialEq)]
-pub struct Credential {
-  pub value: String,
-}
-
-#[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
-impl Serialize for Credential {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-  where
-    S: Serializer,
-  {
-    serializer.serialize_str(&self.value)
-  }
-}
-
-struct CredentialVisitor;
-
-#[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
-impl<'de> Visitor<'de> for CredentialVisitor {
-  type Value = Credential;
-
-  fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-    formatter.write_str("string or map")
-  }
-
-  fn visit_str<E>(self, value: &str) -> Result<Credential, E>
-  where
-    E: serde::de::Error,
-  {
-    Ok(Credential {
-      value: value.to_string(),
-    })
-  }
-
-  fn visit_string<E>(self, value: String) -> Result<Credential, E>
-  where
-    E: serde::de::Error,
-  {
-    Ok(Credential { value })
-  }
-}
-
-#[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
-impl<'de> Deserialize<'de> for Credential {
-  fn deserialize<D>(deserializer: D) -> Result<Credential, D::Error>
-  where
-    D: Deserializer<'de>,
-  {
-    deserializer.deserialize_any(CredentialVisitor)
-  }
-}
 
 pub fn request_value(credential_key: &str, store_code: &str) -> Result<Value, String> {
   if vec!["env", "ENV", "environment"].contains(&store_code) {
     return var(credential_key)
-      .map(Value::String)
-      .map_err(|error| error.to_string());
+      .map_err(|error| error.to_string())
+      .map(|value| serde_json::from_str(&value).unwrap_or(Value::String(value)));
   }
 
   let backend_endpoint = get_store_hostname(store_code);
@@ -116,5 +59,10 @@ pub fn request_value(credential_key: &str, store_code: &str) -> Result<Value, St
     .json()
     .map_err(|e| e.to_string())?;
 
-  Ok(response.data.value)
+  let value = match response.data.value.clone() {
+    Value::String(string) => serde_json::from_str(&string).unwrap_or(response.data.value),
+    _ => response.data.value,
+  };
+
+  Ok(value)
 }

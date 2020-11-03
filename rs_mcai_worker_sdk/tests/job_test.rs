@@ -10,7 +10,6 @@ use mcai_worker_sdk::job::*;
 use mcai_worker_sdk::parameter::media_segment::MediaSegment;
 use mcai_worker_sdk::MessageError;
 
-use mcai_worker_sdk::Credential;
 use std::collections::HashMap;
 
 use schemars::JsonSchema;
@@ -65,7 +64,8 @@ fn test_new_job() {
         "default": 123456,
         "value": 654321 },
       { "id":"credential_parameter",
-        "type":"credential",
+        "type":"string",
+        "store":"backend",
         "default":"default_credential_key",
         "value":"credential_key" },
       { "id":"array_of_string_parameter",
@@ -99,7 +99,7 @@ fn test_new_job() {
   let integer_value = optional_integer.unwrap();
   assert_eq!(integer_value, 654321);
 
-  let optional_credential = job.get_parameter::<Credential>("credential_parameter");
+  let optional_credential = job.get_parameter::<String>("credential_parameter");
   assert!(optional_credential.is_err());
   let credential_value = optional_credential.unwrap_err();
 
@@ -296,6 +296,34 @@ fn test_get_missing_job_parameters() {
 }
 
 #[test]
+fn test_get_job_parameters_with_missing_environment_credential() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id":"key",
+        "type":"string",
+        "value": "unset_credential_key",
+        "store": "env"
+      }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  assert_eq!(123, job.job_id);
+
+  std::env::remove_var("unset_credential_key");
+
+  let result = job.get_parameters::<String>();
+  assert_eq!(
+    MessageError::ParameterValueError("\"environment variable not found\"".to_string()),
+    result.unwrap_err()
+  );
+}
+
+#[test]
 fn test_get_job_parameters_with_environment_credential_1() {
   let message = r#"{
     "job_id": 123,
@@ -389,6 +417,53 @@ fn test_get_job_parameters_with_environment_credential_3() {
   assert_eq!("credential_value_3", &job_parameters.key);
 
   std::env::remove_var("credential_key_3");
+}
+
+#[test]
+fn test_get_job_parameters_with_environment_credential_4() {
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      {
+        "id":"key",
+        "type":"string",
+        "value": "credential_key_4",
+        "store": "environment"
+      }
+    ]
+  }"#;
+
+  let result = Job::new(message);
+  assert!(result.is_ok());
+  let job = result.unwrap();
+  assert_eq!(123, job.job_id);
+
+  #[derive(JsonSchema, Deserialize, Debug, PartialEq, Serialize)]
+  struct SubStruct {
+    some_key: String,
+    other_key: String,
+  }
+
+  #[derive(JsonSchema, Deserialize, Debug)]
+  struct WorkerJobParameters {
+    key: SubStruct,
+  }
+
+  let expected = SubStruct {
+    some_key: "some_value".to_string(),
+    other_key: "other_value".to_string(),
+  };
+
+  std::env::set_var(
+    "credential_key_4",
+    serde_json::to_string(&expected).unwrap(),
+  );
+
+  let job_parameters = job.get_parameters::<WorkerJobParameters>().unwrap();
+
+  assert_eq!(expected, job_parameters.key);
+
+  std::env::remove_var("credential_key_4");
 }
 
 #[test]

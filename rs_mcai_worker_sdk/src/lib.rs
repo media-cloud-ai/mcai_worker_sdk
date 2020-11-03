@@ -114,8 +114,6 @@ pub use message::media::{
 };
 pub use message::publish_job_progression;
 pub use parameter::container::ParametersContainer;
-#[cfg_attr(feature = "cargo-clippy", allow(deprecated))]
-pub use parameter::credential::Credential;
 pub use parameter::{Parameter, ParameterValue, Requirement};
 #[cfg(feature = "media")]
 pub use stainless_ffmpeg::{format_context::FormatContext, frame::Frame};
