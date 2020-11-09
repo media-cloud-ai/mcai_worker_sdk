@@ -64,7 +64,7 @@ pyo3 = {version = "0.11", optional = true }
 
 [dev-dependencies]
 assert_matches = "1.3.0"
-mockito = "0.27"
+mockito = "0.28"
 
 [build-dependencies]
 built = "0.4"
