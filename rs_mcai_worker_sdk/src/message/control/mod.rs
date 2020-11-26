@@ -7,7 +7,7 @@ use lapin::{
 };
 
 use crate::channels::EXCHANGE_NAME_DIRECT_MESSAGING_RESPONSE;
-use crate::worker::{WorkerConfiguration, system_information};
+use crate::worker::{system_information, WorkerConfiguration};
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -34,7 +34,7 @@ impl TryFrom<&Delivery> for DirectMessage {
         message_data,
         e.to_string()
       )
-    })?
+    })
   }
 }
 

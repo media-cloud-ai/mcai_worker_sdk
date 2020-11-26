@@ -86,7 +86,7 @@ extern crate serde_json;
 #[macro_use]
 extern crate yaserde_derive;
 
-mod channels;
+pub mod channels;
 mod config;
 mod error;
 pub mod job;

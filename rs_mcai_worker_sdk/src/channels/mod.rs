@@ -3,13 +3,13 @@ mod exchange_description;
 mod queue_description;
 
 use crate::worker::WorkerConfiguration;
-use bind_description::BindDescription;
-use exchange_description::ExchangeDescription;
+pub use bind_description::BindDescription;
+pub use exchange_description::ExchangeDescription;
 use lapin::{
   options::{BasicPublishOptions, BasicQosOptions, ExchangeDeclareOptions},
   BasicProperties, Channel, Connection, ExchangeKind,
 };
-use queue_description::QueueDescription;
+pub use queue_description::QueueDescription;
 use std::collections::HashMap;
 
 static EXCHANGE_NAME_SUBMIT: &str = "job_submit";
@@ -139,13 +139,13 @@ pub fn declare_consumer_channel(
   .cloned()
   .collect();
 
-  let delayed_bind = BindDescription {
+  let direct_message_bind = BindDescription {
     exchange: EXCHANGE_NAME_DIRECT_MESSAGING.to_string(),
     queue: worker_configuration.get_direct_messaging_queue_name(),
     routing_key: "*".to_string(),
     headers: direct_messaging_exchange_headers,
   };
-  delayed_bind.declare(&channel);
+  direct_message_bind.declare(&channel);
 
   let worker_discovery_queue = QueueDescription {
     name: QUEUE_NAME_WORKER_DISCOVERY.to_string(),
