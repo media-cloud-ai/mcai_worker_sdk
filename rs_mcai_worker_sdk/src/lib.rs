@@ -399,7 +399,7 @@ where
           .for_each(move |delivery| {
             let (_channel, delivery) = delivery.expect("error caught in in consumer");
 
-            worker::system_information::send_real_time_information(
+            message::control::handle_control_message(
               delivery,
               &status_response_channel,
               &status_worker_configuration,

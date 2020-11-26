@@ -16,6 +16,8 @@ static EXCHANGE_NAME_SUBMIT: &str = "job_submit";
 static EXCHANGE_NAME_RESPONSE: &str = "job_response";
 static EXCHANGE_NAME_DELAYED: &str = "job_delayed";
 static EXCHANGE_NAME_DIRECT_MESSAGING: &str = "direct_messaging";
+pub(crate) static EXCHANGE_NAME_DIRECT_MESSAGING_RESPONSE: &str = "direct_messaging_response";
+static EXCHANGE_NAME_DIRECT_MESSAGING_NOT_FOUND: &str = "direct_messaging_not_found";
 static EXCHANGE_NAME_RESPONSE_DELAYED: &str = "job_response_delayed";
 
 static QUEUE_NAME_WORKER_DISCOVERY: &str = "worker_discovery";
@@ -90,6 +92,24 @@ pub fn declare_consumer_channel(
     message_ttl: None,
   };
   direct_messaging_queue.declare(&channel);
+
+  let direct_message_response_exchange = ExchangeDescription {
+    name: EXCHANGE_NAME_DIRECT_MESSAGING_RESPONSE.to_string(),
+    kind: ExchangeKind::Topic,
+    alternate_exchange: Some("direct_messaging_not_found".to_string()),
+  };
+  direct_message_response_exchange.declare(&channel);
+
+  let direct_messaging_not_found_queue = QueueDescription {
+    name: EXCHANGE_NAME_DIRECT_MESSAGING_NOT_FOUND.to_string(),
+    durable: true,
+    auto_delete: false,
+    dead_letter_exchange: None,
+    dead_letter_routing_key: None,
+    max_priority: None,
+    message_ttl: None,
+  };
+  direct_messaging_not_found_queue.declare(&channel);
 
   let direct_messaging_exchange_headers: HashMap<String, String> = [
     ("broadcast".to_string(), "true".to_string()),

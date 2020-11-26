@@ -1,3 +1,4 @@
+use crate::channels::EXCHANGE_NAME_DIRECT_MESSAGING_RESPONSE;
 use crate::worker::WorkerConfiguration;
 use lapin::{
   message::Delivery,
@@ -6,8 +7,8 @@ use lapin::{
 };
 use sysinfo::SystemExt;
 
-#[derive(Debug, Serialize)]
-struct SystemInformation {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SystemInformation {
   docker_container_id: String,
   total_memory: u64,
   used_memory: u64,
@@ -49,7 +50,7 @@ pub fn send_real_time_information(
 
   let result = channel
     .basic_publish(
-      "",
+      EXCHANGE_NAME_DIRECT_MESSAGING_RESPONSE,
       "worker_status_response",
       BasicPublishOptions::default(),
       serialized.as_bytes().to_vec(),

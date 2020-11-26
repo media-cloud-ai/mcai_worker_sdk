@@ -1,3 +1,5 @@
+pub(crate) mod control;
+
 mod helpers;
 #[cfg(feature = "media")]
 pub mod media;
