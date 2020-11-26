@@ -9,12 +9,12 @@ use sysinfo::SystemExt;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemInformation {
-  docker_container_id: String,
-  total_memory: u64,
-  used_memory: u64,
-  total_swap: u64,
-  used_swap: u64,
-  number_of_processors: usize,
+  pub docker_container_id: String,
+  pub total_memory: u64,
+  pub used_memory: u64,
+  pub total_swap: u64,
+  pub used_swap: u64,
+  pub number_of_processors: usize,
 }
 
 impl SystemInformation {
