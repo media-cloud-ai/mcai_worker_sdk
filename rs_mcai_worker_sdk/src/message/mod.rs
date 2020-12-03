@@ -23,41 +23,66 @@ static QUEUE_JOB_COMPLETED: &str = "job_completed";
 static QUEUE_JOB_ERROR: &str = "job_error";
 static QUEUE_JOB_PROGRESSION: &str = "job_progression";
 
+#[derive(Clone, Debug)]
+pub(crate) struct ProcessRequest {
+  // TODO: DirectMessage or JobMessage instead
+  pub delivery: Delivery,
+  pub channel: McaiChannel,
+}
+
+#[derive(Clone, Debug)]
+pub struct ProcessResponse {
+  pub delivery: Delivery,
+  pub job_result: Option<JobResult>,
+  pub error: Option<MessageError>,
+}
+
+impl ProcessResponse {
+  pub fn new(delivery: Delivery) -> Self {
+    ProcessResponse {
+      delivery,
+      job_result: None,
+      error: None,
+    }
+  }
+
+  pub fn new_with_result(delivery: Delivery, job_result: JobResult) -> Self {
+    ProcessResponse {
+      delivery,
+      job_result: Some(job_result),
+      error: None,
+    }
+  }
+
+  pub fn new_with_error(delivery: Delivery, error: MessageError) -> Self {
+    ProcessResponse {
+      delivery,
+      job_result: None,
+      error: Some(error),
+    }
+  }
+}
+
 pub fn process_message<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   message_event: Rc<RefCell<ME>>,
   message: Delivery,
   channel: McaiChannel,
-) -> Promise<()> {
+) -> Result<ProcessResponse> {
   let count = helpers::get_message_death_count(&message);
   let message_data = std::str::from_utf8(&message.data).unwrap();
 
-  match parse_and_process_message(
+  let job_result = parse_and_process_message(
     message_event,
     message_data,
     count,
     Some(channel.clone()),
     publish_job_progression,
-  ) {
-    Ok(job_result) => {
-      info!(target: &job_result.get_str_job_id(), "Completed");
-      publish_job_completed(channel, message, job_result)
-    }
-    Err(error) => match error {
-      MessageError::RequirementsError(details) => {
-        publish_missing_requirements(channel, message, &details)
-      }
-      MessageError::NotImplemented() => publish_not_implemented(channel, message),
-      MessageError::ParameterValueError(error_message) => {
-        publish_parameter_error(channel, message, &error_message)
-      }
-      MessageError::ProcessingError(job_result) => {
-        publish_processing_error(channel, message, job_result)
-      }
-      MessageError::RuntimeError(error_message) => {
-        publish_runtime_error(channel, message, &error_message)
-      }
-    },
-  }
+  )?;
+
+  Ok(ProcessResponse::new_with_result(
+    message.clone(),
+    job_result,
+  ))
 }
 
 pub fn parse_and_process_message<
@@ -93,7 +118,7 @@ pub fn parse_and_process_message<
     .process(channel, parameters, job_result)
 }
 
-fn publish_job_completed(
+pub(crate) fn publish_job_completed(
   channel: McaiChannel,
   message: Delivery,
   job_result: JobResult,
@@ -157,7 +182,7 @@ pub fn publish_job_progression(
   }
 }
 
-fn publish_missing_requirements(
+pub(crate) fn publish_missing_requirements(
   channel: McaiChannel,
   message: Delivery,
   details: &str,
@@ -166,7 +191,7 @@ fn publish_missing_requirements(
   channel.basic_reject(message.delivery_tag, BasicRejectOptions::default())
 }
 
-fn publish_not_implemented(channel: McaiChannel, message: Delivery) -> Promise<()> {
+pub(crate) fn publish_not_implemented(channel: McaiChannel, message: Delivery) -> Promise<()> {
   error!("Not implemented feature");
   channel.basic_reject(
     message.delivery_tag,
@@ -174,12 +199,16 @@ fn publish_not_implemented(channel: McaiChannel, message: Delivery) -> Promise<(
   )
 }
 
-fn publish_parameter_error(channel: McaiChannel, message: Delivery, details: &str) -> Promise<()> {
+pub(crate) fn publish_parameter_error(
+  channel: McaiChannel,
+  message: Delivery,
+  details: &str,
+) -> Promise<()> {
   debug!("Parameter value error: {}", details);
   channel.basic_reject(message.delivery_tag, BasicRejectOptions::default())
 }
 
-fn publish_processing_error(
+pub(crate) fn publish_processing_error(
   channel: McaiChannel,
   message: Delivery,
   job_result: JobResult,
@@ -214,7 +243,11 @@ fn publish_processing_error(
   }
 }
 
-fn publish_runtime_error(channel: McaiChannel, message: Delivery, details: &str) -> Promise<()> {
+pub(crate) fn publish_runtime_error(
+  channel: McaiChannel,
+  message: Delivery,
+  details: &str,
+) -> Promise<()> {
   error!("An error occurred: {:?}", details);
   let content = json!({
     "status": "error",

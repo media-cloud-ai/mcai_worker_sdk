@@ -1,64 +1,35 @@
+pub mod direct_message;
+
 use std::convert::TryFrom;
 
-use lapin::{
-  message::Delivery,
-  options::{BasicAckOptions, BasicPublishOptions, BasicRejectOptions},
-  BasicProperties, Channel, Promise,
-};
+use lapin::{message::Delivery, options::BasicPublishOptions, BasicProperties, Channel};
 
 use crate::channels::EXCHANGE_NAME_DIRECT_MESSAGING_RESPONSE;
-use crate::worker::{system_information, WorkerConfiguration};
+pub use crate::message::control::direct_message::DirectMessage;
+use crate::message::ProcessResponse;
+use crate::worker::context::WorkerContext;
+use crate::{McaiChannel, MessageError, MessageEvent};
+use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-#[derive(Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum DirectMessage {
-  #[serde(rename = "status")]
-  Status,
-  #[serde(rename = "init")]
-  Initialize,
-  #[serde(rename = "start")]
-  StartProcess,
-  #[serde(rename = "stop")]
-  StopProcess,
-}
-
-impl TryFrom<&Delivery> for DirectMessage {
-  type Error = String;
-
-  fn try_from(delivery: &Delivery) -> Result<Self, Self::Error> {
-    let message_data = std::str::from_utf8(&delivery.data).map_err(|e| e.to_string())?;
-
-    serde_json::from_str(message_data).map_err(|e| {
-      format!(
-        "Could not deserialize direct message from {:?}: {}",
-        message_data,
-        e.to_string()
-      )
-    })
-  }
-}
-
-pub fn handle_control_message(
+pub fn handle_control_message<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   delivery: Delivery,
-  channel: &Channel,
-  worker_configuration: &WorkerConfiguration,
-) -> Promise<()> {
-  debug!("Handle control message: {:?}", delivery);
-
-  match DirectMessage::try_from(&delivery) {
-    Ok(DirectMessage::Status) => {
-      system_information::send_real_time_information(delivery, &channel, &worker_configuration)
-    }
-    Err(error) => publish_direct_message_error(channel, &delivery, &error),
-    _ => unimplemented!(),
-  }
+  channel: McaiChannel,
+  worker_context: &mut WorkerContext,
+  message_event: Rc<RefCell<ME>>,
+) -> Result<ProcessResponse, MessageError> {
+  let direct_message =
+    DirectMessage::try_from(&delivery).map_err(|e| MessageError::RuntimeError(e))?;
+  direct_message.handle(delivery, channel, worker_context, message_event)
 }
 
 fn publish_direct_message_error(
   channel: &Channel,
-  message: &Delivery,
+  _message: &Delivery,
   details: &str,
-) -> Promise<()> {
+) -> Result<(), MessageError> {
   error!("An error occurred: {:?}", details);
   let content = json!({
     "status": "error",
@@ -66,7 +37,7 @@ fn publish_direct_message_error(
   })
   .to_string();
 
-  if channel
+  channel
     .basic_publish(
       EXCHANGE_NAME_DIRECT_MESSAGING_RESPONSE,
       "direct_message_error",
@@ -75,18 +46,7 @@ fn publish_direct_message_error(
       BasicProperties::default(),
     )
     .wait()
-    .is_ok()
-  {
-    channel.basic_ack(message.delivery_tag, BasicAckOptions::default())
-  } else {
-    // NACK and requeue
-    channel.basic_reject(message.delivery_tag, BasicRejectOptions { requeue: true })
-  }
-}
+    .map(|_| ())
+    .map_err(|e| MessageError::RuntimeError(e.to_string()))
 
-#[test]
-pub fn test_direct_message_to_json() {
-  let status = DirectMessage::Status;
-  let json = serde_json::to_string(&status).unwrap();
-  assert_eq!(r#"{"type":"status"}"#, json);
 }

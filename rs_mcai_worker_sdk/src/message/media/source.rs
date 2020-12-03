@@ -251,11 +251,11 @@ impl Source {
     match format_context.next_packet() {
       Err(message) => {
         if message == "Unable to read next packet" {
-          if self.thread.is_none() {
-            return Ok(DecodeResult::EndOfStream);
+          return if self.thread.is_none() {
+            Ok(DecodeResult::EndOfStream)
           } else {
-            return Ok(DecodeResult::WaitMore);
-          }
+            Ok(DecodeResult::WaitMore)
+          };
         }
 
         if message == "End of data stream" {

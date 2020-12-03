@@ -1,7 +1,7 @@
 use crate::job::{JobResult, JobStatus};
 
 /// Internal error status to manage process errors
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MessageError {
   RuntimeError(String),
   ParameterValueError(String),

@@ -16,7 +16,7 @@ impl EbuTtmlLiveDecoder {
       buffer: VecDeque::new(),
     }
   }
-  // &self,
+
   pub fn decode(&mut self, packet: &Packet) -> Result<Option<EbuTtmlLive>, String> {
     let data_size = unsafe { (*packet.packet).size as usize };
     let data = unsafe { (*packet.packet).data as *mut u8 };
@@ -46,7 +46,7 @@ impl EbuTtmlLiveDecoder {
         trace!("Incomplete TTML content added to buffer: {}", ttml_content);
         None
       } else if ttml_content.ends_with("tt>") {
-        if let Some(previous_content) = self.buffer.pop_front() {
+        return if let Some(previous_content) = self.buffer.pop_front() {
           debug!(
             "Get a previous TTML content from buffer to complete the new one (buffer size: {})",
             self.buffer.len()
@@ -54,10 +54,10 @@ impl EbuTtmlLiveDecoder {
           let complete_ttml = format!("{}{}", previous_content, ttml_content);
 
           trace!("Concatenated TTML content: {}", complete_ttml);
-          return self.decode_content(&complete_ttml);
+          self.decode_content(&complete_ttml)
         } else {
-          return Err(format!("Incomplete TTML content: {}", ttml_content));
-        }
+          Err(format!("Incomplete TTML content: {}", ttml_content))
+        };
       } else {
         None
       };

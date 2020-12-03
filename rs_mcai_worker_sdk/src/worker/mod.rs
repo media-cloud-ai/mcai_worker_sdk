@@ -14,6 +14,7 @@ use crate::{
 use crate::{MessageEvent, Result};
 use serde::de::DeserializeOwned;
 
+pub(crate) mod context;
 pub mod docker;
 pub mod system_information;
 

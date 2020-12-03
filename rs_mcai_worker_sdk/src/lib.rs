@@ -109,6 +109,8 @@ pub use message::media::{
     Body, Div, EbuTtmlLive, Frames, Head, Paragraph, Span, Styling, TimeExpression, TimeUnit, Title,
   },
   filters::{AudioFilter, GenericFilter, VideoFilter},
+  output::Output,
+  source::Source,
   video::{RegionOfInterest, Scaling, VideoFormat},
   StreamDescriptor,
 };
@@ -118,7 +120,9 @@ pub use parameter::{Parameter, ParameterValue, Requirement};
 #[cfg(feature = "media")]
 pub use stainless_ffmpeg::{format_context::FormatContext, frame::Frame};
 
-use crate::worker::docker;
+use crate::worker::context::WorkerContext;
+use crate::worker::{docker, WorkerConfiguration};
+
 use chrono::prelude::*;
 use config::*;
 use env_logger::Builder;
@@ -130,8 +134,15 @@ use serde::de::DeserializeOwned;
 #[cfg(feature = "media")]
 use serde::Serialize;
 use std::str::FromStr;
+// #[cfg(feature = "media")]
+use crate::message::{
+  publish_job_completed, publish_missing_requirements, publish_not_implemented,
+  publish_parameter_error, publish_processing_error, publish_runtime_error, ProcessRequest,
+  ProcessResponse,
+};
+use std::sync::mpsc::{Receiver, Sender};
 #[cfg(feature = "media")]
-use std::sync::{mpsc::Sender, Mutex};
+use std::sync::Mutex;
 use std::{cell::RefCell, fs, io::Write, rc::Rc, sync::Arc, thread, time};
 #[cfg(feature = "media")]
 use yaserde::YaSerialize;
@@ -214,6 +225,8 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
   fn get_description(&self) -> String;
   fn get_version(&self) -> semver::Version;
 
+  /// Initialize worker context.
+  /// Override it for specific usage.
   fn init(&mut self) -> Result<()> {
     Ok(())
   }
@@ -258,14 +271,12 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
 }
 
 /// Function to start a worker
-pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(mut message_event: ME)
+pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P>>(mut message_event: ME)
 where
   ME: std::marker::Sync,
 {
   let mut builder = Builder::from_default_env();
-  let amqp_queue = get_amqp_queue();
   let instance_id = docker::get_instance_id("/proc/self/cgroup");
-
   let container_id = instance_id.clone();
   builder
     .format(move |stream, record| {
@@ -282,6 +293,7 @@ where
     })
     .init();
 
+  let amqp_queue = get_amqp_queue();
   let worker_configuration =
     worker::WorkerConfiguration::new(&amqp_queue, &message_event, &instance_id);
   if let Err(configuration_error) = worker_configuration {
@@ -321,41 +333,95 @@ where
 
   if let Some(source_orders) = get_source_orders() {
     warn!("Worker will process source orders");
-    for source_order in &source_orders {
-      info!("Start to process order: {:?}", source_order);
-
-      let count = None;
-      let channel = None;
-      let message_data = fs::read_to_string(source_order).unwrap();
-
-      let result = message::parse_and_process_message(
-        message_event_ref.clone(),
-        &message_data,
-        count,
-        channel,
-        message::publish_job_progression,
-      );
-
-      match result {
-        Ok(mut job_result) => {
-          job_result.update_execution_duration();
-          info!(target: &job_result.get_job_id().to_string(), "Process succeeded: {:?}", job_result)
-        }
-        Err(message) => {
-          error!("{:?}", message);
-        }
-      }
-    }
-
-    return;
+    return start_source_orders_process(source_orders, message_event_ref);
   }
 
-  loop {
-    let amqp_uri = get_amqp_uri();
-    let mut executor = LocalPool::new();
-    let spawner = executor.spawner();
+  let (message_thread_sender, process_thread_receiver) = std::sync::mpsc::channel();
+  let (process_thread_sender, message_thread_receiver) = std::sync::mpsc::channel(); // async_channel::unbounded();
 
-    executor.run_until(async {
+  start_consumers_thread(
+    message_thread_sender,
+    message_thread_receiver,
+    worker_configuration.clone(),
+  );
+
+  let mut worker_context = WorkerContext::new(Some(worker_configuration.clone()));
+  let cloned_message_event = message_event_ref.clone();
+
+  let message_event = message_event_ref.clone();
+
+  loop {
+    if let Ok(process_request) = process_thread_receiver.recv() {
+      info!("Process thread received: {:?}", process_request);
+      let delivery = process_request.delivery.clone();
+      let result = match delivery.exchange.as_str() {
+        "direct_messaging" => message::control::handle_control_message(
+          delivery.clone(),
+          process_request.channel.clone(),
+          &mut worker_context,
+          cloned_message_event.clone(),
+        ),
+        _ => message::process_message(
+          message_event.clone(),
+          delivery.clone(),
+          process_request.channel.clone(),
+        ),
+      };
+
+      let response = match result {
+        Ok(response) => response,
+        Err(error) => ProcessResponse::new_with_error(delivery, error),
+      };
+
+      if let Err(error) = process_thread_sender.send(response) {
+        error!("Could not send process response: {}", error.to_string());
+      }
+    }
+  }
+}
+
+fn start_source_orders_process<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P>>(
+  source_orders: Vec<String>,
+  message_event_ref: Rc<RefCell<ME>>,
+) {
+  for source_order in &source_orders {
+    info!("Start to process order: {:?}", source_order);
+
+    let count = None;
+    let channel = None;
+    let message_data = fs::read_to_string(source_order).unwrap();
+
+    let result = message::parse_and_process_message(
+      message_event_ref.clone(),
+      &message_data,
+      count,
+      channel,
+      message::publish_job_progression,
+    );
+
+    match result {
+      Ok(mut job_result) => {
+        job_result.update_execution_duration();
+        info!(target: &job_result.get_job_id().to_string(), "Process succeeded: {:?}", job_result)
+      }
+      Err(message) => {
+        error!("{:?}", message);
+      }
+    }
+  }
+}
+
+fn start_consumers_thread<'a>(
+  message_thread_sender: Sender<ProcessRequest>,
+  message_thread_receiver: Receiver<ProcessResponse>,
+  worker_configuration: WorkerConfiguration,
+) {
+  std::thread::spawn(move || {
+    loop {
+      let amqp_uri = get_amqp_uri();
+      let mut executor = LocalPool::new();
+      let spawner = executor.spawner();
+
       let conn = Connection::connect_uri(
         amqp_uri,
         ConnectionProperties::default().with_default_executor(8),
@@ -369,65 +435,143 @@ where
         &worker_configuration,
       ));
 
-      let consumer = channel
-        .clone()
-        .basic_consume(
-          &amqp_queue,
-          "amqp_worker",
-          BasicConsumeOptions::default(),
-          FieldTable::default(),
-        )
-        .await
-        .unwrap();
+      let message_response_channel = channel.clone();
 
-      let status_consumer = channel
-        .clone()
-        .basic_consume(
-          &worker_configuration.get_direct_messaging_queue_name(),
-          "status_amqp_worker",
-          BasicConsumeOptions::default(),
-          FieldTable::default(),
-        )
-        .await
-        .unwrap();
-
-      let status_response_channel = channel.clone();
-      let status_worker_configuration = worker_configuration.clone();
-
-      let _consumer = spawner.spawn_local(async move {
-        status_consumer
-          .for_each(move |delivery| {
-            let (_channel, delivery) = delivery.expect("error caught in in consumer");
-
-            message::control::handle_control_message(
+      let _result = spawner.spawn_local(async move {
+        while let Ok(response) = message_thread_receiver.recv() {
+          match response {
+            ProcessResponse {
               delivery,
-              &status_response_channel,
-              &status_worker_configuration,
-            )
+              error: Some(error),
+              ..
+            } => match error {
+              MessageError::RequirementsError(details) => {
+                publish_missing_requirements(message_response_channel.clone(), delivery, &details);
+              }
+              MessageError::NotImplemented() => {
+                publish_not_implemented(message_response_channel.clone(), delivery);
+              }
+              MessageError::ParameterValueError(error_message) => {
+                publish_parameter_error(message_response_channel.clone(), delivery, &error_message);
+              }
+              MessageError::ProcessingError(job_result) => {
+                publish_processing_error(message_response_channel.clone(), delivery, job_result);
+              }
+              MessageError::RuntimeError(error_message) => {
+                publish_runtime_error(message_response_channel.clone(), delivery, &error_message);
+              }
+            },
+            ProcessResponse {
+              delivery,
+              job_result: Some(job_result),
+              ..
+            } => {
+              info!(target: &job_result.get_str_job_id(), "Completed");
+              publish_job_completed(message_response_channel.clone(), delivery, job_result);
+            }
+            _ => {
+              // Nothing to do
+            }
+          };
+        }
+      });
+
+      executor.run_until(async {
+        let message_consumer = channel
+          .clone()
+          .basic_consume(
+            &worker_configuration.get_queue_name(),
+            "amqp_worker",
+            BasicConsumeOptions::default(),
+            FieldTable::default(),
+          )
+          .await
+          .unwrap();
+
+        let direct_message_queue_name = worker_configuration.get_direct_messaging_queue_name();
+        let direct_message_consumer = channel
+          .clone()
+          .basic_consume(
+            &direct_message_queue_name.clone(),
+            "status_amqp_worker",
+            BasicConsumeOptions::default(),
+            FieldTable::default(),
+          )
+          .await
+          .unwrap();
+
+        let direct_message_response_channel = channel.clone();
+        let direct_thread_sender = message_thread_sender.clone();
+
+        let _direct_consumer_result = spawner.spawn_local(async move {
+          info!(
+            "Start consuming direct message queue: {}",
+            direct_message_queue_name
+          );
+          direct_message_consumer
+            .for_each(move |delivery| {
+              let (channel, delivery) = delivery.expect("error caught in in consumer");
+
+              info!("Handle direct delivery: {:?}", delivery);
+
+              let delivery_tag = delivery.delivery_tag.clone();
+
+              if direct_thread_sender
+                .send(ProcessRequest {
+                  delivery,
+                  channel: Arc::new(channel),
+                })
+                .is_ok()
+              {
+                info!("ACK direct delivery reception...");
+                direct_message_response_channel.basic_ack(delivery_tag, BasicAckOptions::default())
+              } else {
+                info!("Reject direct delivery reception...");
+                direct_message_response_channel
+                  .basic_reject(delivery_tag, BasicRejectOptions { requeue: false })
+              }
+              .map(|_| ())
+            })
+            .await
+        });
+
+        info!(
+          "Start to consume on queue {:?}",
+          worker_configuration.get_queue_name()
+        );
+
+        let cloned_message_thread_sender = message_thread_sender.clone();
+        let message_response_channel = channel.clone();
+
+        message_consumer
+          .for_each(move |delivery| {
+            let (channel, delivery) = delivery.expect("error caught in in consumer");
+
+            let delivery_tag = delivery.delivery_tag.clone();
+            if cloned_message_thread_sender
+              .send(ProcessRequest {
+                delivery,
+                channel: Arc::new(channel),
+              })
+              .is_ok()
+            {
+              message_response_channel.basic_ack(delivery_tag, BasicAckOptions::default())
+            } else {
+              message_response_channel
+                .basic_reject(delivery_tag, BasicRejectOptions { requeue: false })
+            }
             .map(|_| ())
+
+            // promise.map(|_| ())
           })
           .await
       });
 
-      info!("Start to consume on queue {:?}", amqp_queue);
-
-      let clone_channel = channel.clone();
-      let message_event = message_event_ref.clone();
-
-      consumer
-        .for_each(move |delivery| {
-          let (_channel, delivery) = delivery.expect("error caught in in consumer");
-
-          message::process_message(message_event.clone(), delivery, clone_channel.clone())
-            .map(|_| ())
-        })
-        .await
-    });
-
-    let sleep_duration = time::Duration::new(1, 0);
-    thread::sleep(sleep_duration);
-    info!("Reconnection...");
-  }
+      let sleep_duration = time::Duration::new(1, 0);
+      thread::sleep(sleep_duration);
+      info!("Reconnection...");
+    }
+  });
 }
 
 #[test]

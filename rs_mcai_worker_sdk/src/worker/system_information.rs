@@ -1,10 +1,7 @@
 use crate::channels::EXCHANGE_NAME_DIRECT_MESSAGING_RESPONSE;
 use crate::worker::WorkerConfiguration;
-use lapin::{
-  message::Delivery,
-  options::{BasicAckOptions, BasicPublishOptions, BasicRejectOptions},
-  BasicProperties, Channel, Promise,
-};
+use crate::{McaiChannel, MessageError};
+use lapin::{message::Delivery, options::BasicPublishOptions, BasicProperties};
 use sysinfo::SystemExt;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -41,14 +38,14 @@ impl SystemInformation {
 }
 
 pub fn send_real_time_information(
-  message: Delivery,
-  channel: &Channel,
+  _message: Delivery,
+  channel: McaiChannel,
   worker_configuration: &WorkerConfiguration,
-) -> Promise<()> {
+) -> Result<(), MessageError> {
   let information = SystemInformation::new(worker_configuration);
   let serialized = serde_json::to_string(&information).unwrap();
 
-  let result = channel
+  channel
     .basic_publish(
       EXCHANGE_NAME_DIRECT_MESSAGING_RESPONSE,
       "worker_status_response",
@@ -57,17 +54,7 @@ pub fn send_real_time_information(
       BasicProperties::default(),
     )
     .wait()
-    .is_ok();
+    .map(|_| ())
+    .map_err(|e| MessageError::RuntimeError(e.to_string()))
 
-  if result {
-    channel.basic_ack(
-      message.delivery_tag,
-      BasicAckOptions::default(), /*not requeue*/
-    )
-  } else {
-    channel.basic_reject(
-      message.delivery_tag,
-      BasicRejectOptions { requeue: true }, /*requeue*/
-    )
-  }
 }
