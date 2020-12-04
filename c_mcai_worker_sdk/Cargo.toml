@@ -6,7 +6,7 @@ authors = [
   "Marc-Antoine Arnaud <maarnaud@media-io.com>",
 ]
 description = "AMQP Worker to listen and provide trait to process message"
-keywords = ["AMQP", "micro-service", "c/c++"]
+keywords = ["AMQP", "micro-service"]
 license = "MIT"
 repository = "https://github.com/media-cloud-ai/mcai_worker_sdk"
 homepage = "https://github.com/media-cloud-ai/mcai_worker_sdk"
