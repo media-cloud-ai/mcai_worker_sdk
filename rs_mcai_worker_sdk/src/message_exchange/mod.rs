@@ -1,7 +1,7 @@
 mod local;
 
-use crate::Result;
 use crate::job::Job;
+use crate::Result;
 pub use local::LocalExchange;
 use std::sync::{Arc, Mutex};
 
@@ -17,7 +17,7 @@ pub enum OrderMessage {
   Stop,
 }
 
-pub type SharedExternalExchange = Arc<Mutex<dyn InternalExchange + Send>>;
+pub type SharedExternalExchange = Arc<Mutex<dyn ExternalExchange + Send>>;
 pub type SharedInternalExchange = Arc<Mutex<dyn InternalExchange + Send>>;
 
 pub trait ExternalExchange {

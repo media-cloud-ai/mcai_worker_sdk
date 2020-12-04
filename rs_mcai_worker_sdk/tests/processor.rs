@@ -1,29 +1,21 @@
 #[macro_use]
 extern crate serde_derive;
 
+use mcai_worker_sdk::message_exchange::ResponseMessage;
 use mcai_worker_sdk::{
   job::{Job, JobResult},
-  message_exchange::{
-    LocalExchange,
-    OrderMessage,
-    ExternalExchange,
-  },
+  message_exchange::{ExternalExchange, LocalExchange, OrderMessage},
   processor::Processor,
-  McaiChannel,
-  MessageEvent,
-  JsonSchema,
-  Result,
+  JsonSchema, McaiChannel, MessageEvent, Result,
 };
 use std::sync::{Arc, Mutex};
 
 #[test]
 fn processor() {
-
-  struct Worker{}
+  struct Worker {}
 
   #[derive(Clone, Debug, Deserialize, JsonSchema)]
-  pub struct WorkerParameters {
-  }
+  pub struct WorkerParameters {}
 
   impl MessageEvent<WorkerParameters> for Worker {
     fn get_name(&self) -> String {
@@ -57,9 +49,9 @@ fn processor() {
     }
   }
 
-  let local_exchange = LocalExchange::new();
-  let local_exchange = Arc::new(Mutex::new(local_exchange));
-  let processor = Processor::new(local_exchange.clone());
+  let mut local_exchange = LocalExchange::new();
+  let local_exchange_ref = Arc::new(Mutex::new(local_exchange.clone()));
+  let processor = Processor::new(local_exchange_ref);
 
   let worker = Worker {};
 
@@ -69,8 +61,9 @@ fn processor() {
 
   let job = Job::new(r#"{ "job_id": 666, "parameters": [] }"#).unwrap();
 
-  local_exchange.lock().unwrap().send_order(OrderMessage::Job(job)).unwrap();
-  local_exchange.lock().unwrap().send_order(OrderMessage::Stop).unwrap();
+  local_exchange.send_order(OrderMessage::Job(job)).unwrap();
+  local_exchange.send_order(OrderMessage::Stop).unwrap();
 
-  assert!(false);
+  let response = local_exchange.next_response().unwrap();
+  assert_eq!(ResponseMessage::Completed, response.unwrap());
 }

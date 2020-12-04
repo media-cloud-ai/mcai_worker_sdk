@@ -1,19 +1,16 @@
 use crate::{
-  message_exchange::{
-    OrderMessage,
-    ResponseMessage,
-    ExternalExchange,
-    InternalExchange,
-  },
+  message_exchange::{ExternalExchange, InternalExchange, OrderMessage, ResponseMessage},
   Result,
 };
-use std::sync::mpsc::{channel, Sender, Receiver};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Arc, Mutex};
 
+#[derive(Clone)]
 pub struct LocalExchange {
   order_sender: Sender<OrderMessage>,
-  order_receiver: Receiver<OrderMessage>,
+  order_receiver: Arc<Mutex<Receiver<OrderMessage>>>,
   response_sender: Sender<ResponseMessage>,
-  response_receiver: Receiver<ResponseMessage>,
+  response_receiver: Arc<Mutex<Receiver<ResponseMessage>>>,
 }
 
 impl LocalExchange {
@@ -23,9 +20,9 @@ impl LocalExchange {
 
     LocalExchange {
       order_sender,
-      order_receiver,
+      order_receiver: Arc::new(Mutex::new(order_receiver)),
       response_sender,
-      response_receiver,
+      response_receiver: Arc::new(Mutex::new(response_receiver)),
     }
   }
 }
@@ -37,7 +34,7 @@ impl ExternalExchange for LocalExchange {
   }
 
   fn next_response(&mut self) -> Result<Option<ResponseMessage>> {
-    Ok(self.response_receiver.recv().ok())
+    Ok(self.response_receiver.lock().unwrap().recv().ok())
   }
 }
 
@@ -48,6 +45,6 @@ impl InternalExchange for LocalExchange {
   }
 
   fn next_order(&mut self) -> Result<Option<OrderMessage>> {
-    Ok(self.order_receiver.recv().ok())
+    Ok(self.order_receiver.lock().unwrap().recv().ok())
   }
 }
