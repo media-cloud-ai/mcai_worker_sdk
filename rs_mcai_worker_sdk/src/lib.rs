@@ -94,6 +94,9 @@ pub mod message;
 pub mod parameter;
 pub mod worker;
 
+pub mod message_exchange;
+pub mod processor;
+
 /// Re-export from lapin Channel
 pub use lapin::Channel;
 pub use log::{debug, error, info, trace, warn};

@@ -16,7 +16,7 @@ pub use job_status::JobStatus;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Job {
   pub job_id: u64,
   pub parameters: Vec<Parameter>,
