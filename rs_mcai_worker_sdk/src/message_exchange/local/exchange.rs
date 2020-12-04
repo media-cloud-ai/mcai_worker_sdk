@@ -27,6 +27,12 @@ impl LocalExchange {
   }
 }
 
+impl Default for LocalExchange {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl ExternalExchange for LocalExchange {
   fn send_order(&mut self, message: OrderMessage) -> Result<()> {
     self.order_sender.send(message).unwrap();
@@ -39,12 +45,12 @@ impl ExternalExchange for LocalExchange {
 }
 
 impl InternalExchange for LocalExchange {
+  fn next_order(&mut self) -> Result<Option<OrderMessage>> {
+    Ok(self.order_receiver.lock().unwrap().recv().ok())
+  }
+
   fn send_response(&mut self, message: ResponseMessage) -> Result<()> {
     self.response_sender.send(message).unwrap();
     Ok(())
-  }
-
-  fn next_order(&mut self) -> Result<Option<OrderMessage>> {
-    Ok(self.order_receiver.lock().unwrap().recv().ok())
   }
 }
