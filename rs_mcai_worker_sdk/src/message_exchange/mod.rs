@@ -1,20 +1,23 @@
 mod local;
 
-use crate::job::Job;
+use crate::job::{Job, JobResult};
 use crate::Result;
 pub use local::LocalExchange;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResponseMessage {
-  Completed,
-  Progression(u8),
+  Initialized,
+  Completed(JobResult),
+  Progression(u64, u8),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum OrderMessage {
-  Job(Job),
-  Stop,
+  InitProcess(Job),
+  StartProcess(Job),
+  StopProcess(Job),
+  StopWorker,
 }
 
 pub type SharedExternalExchange = Arc<Mutex<dyn ExternalExchange + Send>>;

@@ -1,8 +1,8 @@
 use crate::{
   job::{Job, JobResult, JobStatus},
-  message::publish_job_progression,
+  message::{media::output::Output, media::source::Source, publish_job_progression},
   parameter::container::ParametersContainer,
-  AudioFilter, McaiChannel, MessageEvent, Result,
+  AudioFilter, McaiChannel, MessageEvent, ProcessFrame, Result,
 };
 use filters::VideoFilter;
 use schemars::JsonSchema;
@@ -15,7 +15,7 @@ pub mod audio;
 pub mod ebu_ttml_live;
 pub mod filters;
 mod media_stream;
-mod output;
+pub mod output;
 pub mod source;
 mod srt;
 pub mod video;
@@ -72,24 +72,22 @@ pub struct ImageConfiguration {
   filters: Vec<VideoFilter>,
 }
 
-pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
+pub fn initialize_process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   message_event: Rc<RefCell<ME>>,
-  channel: Option<McaiChannel>,
   job: &Job,
-  parameters: P,
-  job_result: JobResult,
-) -> Result<JobResult> {
-  let str_job_id = job.job_id.to_string();
+) -> Result<(Source, Output)> {
+  let job_result = JobResult::new(job.job_id);
+  let parameters = job.get_parameters()?;
 
   let source_url: String = job.get_parameter(SOURCE_PATH_PARAMETER)?;
   let output_url: String = job.get_parameter(DESTINATION_PATH_PARAMETER)?;
   let start_index_ms: Option<i64> = job.get_parameter(START_INDEX_PARAMETER).ok();
   let stop_index_ms: Option<i64> = job.get_parameter(STOP_INDEX_PARAMETER).ok();
 
-  let mut output = output::Output::new(&output_url)?;
+  let output = output::Output::new(&output_url)?;
 
-  let mut source = source::Source::new(
-    message_event.clone(),
+  let source = source::Source::new(
+    message_event,
     &job_result,
     parameters,
     &source_url,
@@ -97,6 +95,47 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
     start_index_ms,
     stop_index_ms,
   )?;
+
+  Ok((source, output))
+}
+
+pub fn finish_process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
+  message_event: Rc<RefCell<ME>>,
+  output: &mut Output,
+  job_result: JobResult,
+) -> Result<JobResult> {
+  message_event.borrow_mut().ending_process()?;
+
+  output.complete()?;
+  let job_result = job_result.with_status(JobStatus::Completed);
+  Ok(job_result)
+}
+
+pub fn process_frame<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
+  message_event: Rc<RefCell<ME>>,
+  output: &mut Output,
+  job_result: JobResult,
+  stream_index: usize,
+  frame: ProcessFrame,
+) -> Result<()> {
+  let result = message_event
+    .borrow_mut()
+    .process_frame(job_result, stream_index, frame)?;
+
+  output.push(result);
+
+  Ok(())
+}
+
+pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
+  message_event: Rc<RefCell<ME>>,
+  channel: Option<McaiChannel>,
+  job: &Job,
+  _parameters: P,
+  job_result: JobResult,
+) -> Result<JobResult> {
+  let str_job_id = job.job_id.to_string();
+  let (mut source, mut output) = initialize_process(message_event.clone(), job)?;
 
   debug!(
     target: &str_job_id,
@@ -129,23 +168,20 @@ pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
             }
           }
         }
-
         trace!(target: &job_result.get_str_job_id(), "Process frame {}", count);
-        let result =
-          message_event
-            .borrow_mut()
-            .process_frame(job_result.clone(), stream_index, frame)?;
 
-        output.push(result);
+        process_frame(
+          message_event.clone(),
+          &mut output,
+          job_result.clone(),
+          stream_index,
+          frame,
+        )?;
       }
       DecodeResult::WaitMore => {}
       DecodeResult::Nothing => {}
       DecodeResult::EndOfStream => {
-        message_event.borrow_mut().ending_process()?;
-
-        output.complete()?;
-        let job_result = job_result.with_status(JobStatus::Completed);
-        return Ok(job_result);
+        return finish_process(message_event, &mut output, job_result);
       }
     }
   }
