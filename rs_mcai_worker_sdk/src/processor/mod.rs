@@ -43,7 +43,6 @@ impl Processor {
   ) -> Result<()> {
     let order_receiver = self.internal_exchange.get_order_receiver();
     let response_sender = self.internal_exchange.get_response_sender();
-    // let internal_exchange = Arc::new(Mutex::new(self.internal_exchange));
 
     let thread = spawn(move || {
       // Initialize the worker

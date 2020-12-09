@@ -1,15 +1,20 @@
-use std::rc::Rc;
-
-use failure::_core::cell::RefCell;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
+use std::sync::{Arc, Mutex};
 
-use crate::job::{Job, JobResult};
-use crate::message::media::initialize_process;
-use crate::message::media::output::Output;
-use crate::message::media::source::{DecodeResult, Source};
-use crate::processor::Process;
-use crate::{MessageError, MessageEvent, Result};
+use crate::{
+  job::{Job, JobResult},
+  message::media::{
+    finish_process,
+    initialize_process,
+    output::Output,
+    source::{DecodeResult, Source},
+  },
+  processor::Process,
+  MessageError,
+  MessageEvent,
+  Result,
+};
 
 #[derive(Default)]
 pub struct MediaProcess {
@@ -20,7 +25,7 @@ pub struct MediaProcess {
 impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Process<P, ME>
   for MediaProcess
 {
-  fn init(&mut self, message_event: Rc<RefCell<ME>>, job: &Job) -> Result<()> {
+  fn init(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<()> {
     info!("Initialize job: {:?}", job);
 
     initialize_process(message_event, &job).map(|(source, output)| {
@@ -29,7 +34,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
     })
   }
 
-  fn start(&mut self, message_event: Rc<RefCell<ME>>, job: &Job) -> Result<JobResult> {
+  fn start(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<JobResult> {
     info!("Start processing job: {:?}", job);
 
     let job_result = JobResult::from(job);
@@ -88,7 +93,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
           }
           DecodeResult::EndOfStream => {
             println!(">> EndOfStream...");
-            return crate::message::media::finish_process(message_event, output, job_result);
+            return finish_process(message_event, output, job_result);
           }
         }
       }
@@ -99,13 +104,13 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
     ))
   }
 
-  fn stop(&mut self, message_event: Rc<RefCell<ME>>, job: &Job) -> Result<JobResult> {
+  fn stop(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<JobResult> {
     info!("Stop job: {:?}", job);
 
     let job_result = JobResult::from(job);
 
     if let Some(output) = &mut self.output {
-      return crate::message::media::finish_process(message_event, output, job_result);
+      return finish_process(message_event, output, job_result);
     }
 
     Err(MessageError::RuntimeError(

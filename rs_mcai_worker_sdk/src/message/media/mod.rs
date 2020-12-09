@@ -8,8 +8,7 @@ use filters::VideoFilter;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use source::DecodeResult;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 pub mod audio;
 pub mod ebu_ttml_live;
@@ -73,7 +72,7 @@ pub struct ImageConfiguration {
 }
 
 pub fn initialize_process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
-  message_event: Rc<RefCell<ME>>,
+  message_event: Arc<Mutex<ME>>,
   job: &Job,
 ) -> Result<(Source, Output)> {
   let job_result = JobResult::new(job.job_id);
@@ -100,11 +99,11 @@ pub fn initialize_process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>
 }
 
 pub fn finish_process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
-  message_event: Rc<RefCell<ME>>,
+  message_event: Arc<Mutex<ME>>,
   output: &mut Output,
   job_result: JobResult,
 ) -> Result<JobResult> {
-  message_event.borrow_mut().ending_process()?;
+  message_event.lock().unwrap().ending_process()?;
 
   output.complete()?;
   let job_result = job_result.with_status(JobStatus::Completed);
@@ -112,14 +111,15 @@ pub fn finish_process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
 }
 
 pub fn process_frame<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
-  message_event: Rc<RefCell<ME>>,
+  message_event: Arc<Mutex<ME>>,
   output: &mut Output,
   job_result: JobResult,
   stream_index: usize,
   frame: ProcessFrame,
 ) -> Result<()> {
   let result = message_event
-    .borrow_mut()
+    .lock()
+    .unwrap()
     .process_frame(job_result, stream_index, frame)?;
 
   output.push(result);
@@ -128,7 +128,7 @@ pub fn process_frame<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
 }
 
 pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
-  message_event: Rc<RefCell<ME>>,
+  message_event: Arc<Mutex<ME>>,
   channel: Option<McaiChannel>,
   job: &Job,
   _parameters: P,

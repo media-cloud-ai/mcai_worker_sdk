@@ -2,6 +2,11 @@ use crate::{JobResult, McaiChannel, MessageError, Result};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 
+#[cfg(feature = "media")]
+use crate::{FormatContext, ProcessFrame, ProcessResult, StreamDescriptor};
+#[cfg(feature = "media")]
+use std::sync::{Arc, Mutex, mpsc::Sender};
+
 /// # Trait to describe a worker
 /// Implement this trait to implement a worker
 pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
