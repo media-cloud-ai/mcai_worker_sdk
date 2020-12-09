@@ -3,7 +3,7 @@ use crate::{
   config,
   message_exchange::{OrderMessage, ResponseMessage},
   worker::WorkerConfiguration,
-  Result, SdkResult,
+  Result,
 };
 use async_amqp::*;
 use async_std::channel::Sender;
@@ -17,7 +17,7 @@ pub struct RabbitmqConnection {
 }
 
 impl RabbitmqConnection {
-  pub async fn new(worker_configuration: &WorkerConfiguration) -> SdkResult<Self> {
+  pub async fn new(worker_configuration: &WorkerConfiguration) -> Result<Self> {
     let amqp_uri = config::get_amqp_uri();
     let properties = ConnectionProperties::default()
       .with_default_executor(8)
@@ -40,7 +40,7 @@ impl RabbitmqConnection {
     sender: Sender<OrderMessage>,
     queue_name: &str,
     consumer_tag: &str,
-  ) -> SdkResult<()> {
+  ) -> Result<()> {
     let consumer = RabbitmqConsumer::new(&self.channel, sender, queue_name, consumer_tag).await?;
 
     self.consumers.push(consumer);

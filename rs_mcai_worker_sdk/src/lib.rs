@@ -104,7 +104,7 @@ pub use schemars::JsonSchema;
 /// Re-export from semver:
 pub use semver::Version;
 
-pub use error::{MessageError, Result, SdkError, SdkResult};
+pub use error::{MessageError, Result};
 #[cfg(feature = "media")]
 pub use message::media::{
   audio::AudioFormat,

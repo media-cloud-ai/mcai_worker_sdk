@@ -2,7 +2,7 @@ use super::RabbitmqConnection;
 use crate::{
   message_exchange::{InternalExchange, OrderMessage, ResponseMessage, ResponseSender},
   worker::WorkerConfiguration,
-  Result, SdkResult,
+  Result,
 };
 use async_std::{
   channel::{self, Receiver, Sender},
@@ -17,7 +17,7 @@ pub struct RabbitmqExchange {
 }
 
 impl RabbitmqExchange {
-  pub async fn new(worker_configuration: &WorkerConfiguration) -> SdkResult<Self> {
+  pub async fn new(worker_configuration: &WorkerConfiguration) -> Result<Self> {
     let connection = RabbitmqConnection::new(worker_configuration).await?;
     let connection = Arc::new(Mutex::new(connection));
     let (order_sender, order_receiver) = channel::unbounded();
@@ -31,7 +31,7 @@ impl RabbitmqExchange {
     })
   }
 
-  pub async fn bind_consumer(&mut self, queue_name: &str, consumer_tag: &str) -> SdkResult<()> {
+  pub async fn bind_consumer(&mut self, queue_name: &str, consumer_tag: &str) -> Result<()> {
     self
       .connection
       .lock()

@@ -2,7 +2,7 @@ use super::{helpers, publish};
 use crate::{
   job::Job,
   message_exchange::{OrderMessage, ResponseMessage},
-  MessageError, Result, SdkResult,
+  MessageError, Result,
 };
 use amq_protocol_types::FieldTable;
 use async_std::stream::StreamExt;
@@ -24,7 +24,7 @@ impl RabbitmqConsumer {
     sender: Sender<OrderMessage>,
     queue_name: &str,
     consumer_tag: &str,
-  ) -> SdkResult<Self> {
+  ) -> Result<Self> {
     let mut consumer = channel
       .basic_consume(
         queue_name,
