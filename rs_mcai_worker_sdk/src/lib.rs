@@ -104,7 +104,7 @@ pub use schemars::JsonSchema;
 /// Re-export from semver:
 pub use semver::Version;
 
-pub use error::{MessageError, Result};
+pub use error::{MessageError, Result, SdkError, SdkResult};
 #[cfg(feature = "media")]
 pub use message::media::{
   audio::AudioFormat,
@@ -116,8 +116,12 @@ pub use message::media::{
   StreamDescriptor,
 };
 pub use message::publish_job_progression;
+use message_exchange::{
+  ExternalExchange, LocalExchange, OrderMessage, RabbitmqExchange, ResponseMessage,
+};
 pub use parameter::container::ParametersContainer;
 pub use parameter::{Parameter, ParameterValue, Requirement};
+use processor::Processor;
 #[cfg(feature = "media")]
 pub use stainless_ffmpeg::{format_context::FormatContext, frame::Frame};
 
@@ -126,16 +130,19 @@ use chrono::prelude::*;
 use config::*;
 use env_logger::Builder;
 use futures_executor::LocalPool;
-use futures_util::{future::FutureExt, stream::StreamExt, task::LocalSpawnExt};
 use job::JobResult;
-use lapin::{options::*, types::FieldTable, Connection, ConnectionProperties};
 use serde::de::DeserializeOwned;
 #[cfg(feature = "media")]
 use serde::Serialize;
 use std::str::FromStr;
 #[cfg(feature = "media")]
 use std::sync::{mpsc::Sender, Mutex};
-use std::{cell::RefCell, fs, io::Write, rc::Rc, sync::Arc, thread, time};
+use std::{
+  fs,
+  io::Write,
+  sync::{Arc, Mutex},
+  thread, time,
+};
 #[cfg(feature = "media")]
 use yaserde::YaSerialize;
 
@@ -261,9 +268,10 @@ pub trait MessageEvent<P: DeserializeOwned + JsonSchema> {
 }
 
 /// Function to start a worker
-pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(mut message_event: ME)
-where
-  ME: std::marker::Sync,
+pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P>>(
+  mut message_event: ME,
+) where
+  ME: std::marker::Sync + Send,
 {
   let mut builder = Builder::from_default_env();
   let amqp_queue = get_amqp_queue();
@@ -318,34 +326,52 @@ where
     return;
   }
 
-  let message_event_ref = Rc::new(RefCell::new(message_event));
-
+  let shared_message_event = Arc::new(Mutex::new(message_event));
   info!("Worker initialized, ready to receive jobs");
 
   if let Some(source_orders) = get_source_orders() {
     warn!("Worker will process source orders");
+
+    let exchange = LocalExchange::new();
+    let shared_exchange = Arc::new(exchange);
+
+    let cloned_exchange = shared_exchange.clone();
+    async_std::task::spawn(async move {
+      let processor = Processor::new(cloned_exchange);
+      processor.run(shared_message_event.clone()).unwrap();
+    });
+
     for source_order in &source_orders {
       info!("Start to process order: {:?}", source_order);
 
-      let count = None;
-      let channel = None;
       let message_data = fs::read_to_string(source_order).unwrap();
 
-      let result = message::parse_and_process_message(
-        message_event_ref.clone(),
-        &message_data,
-        count,
-        channel,
-        message::publish_job_progression,
-      );
+      let job = job::Job::new(&message_data).unwrap();
 
-      match result {
-        Ok(mut job_result) => {
-          job_result.update_execution_duration();
-          info!(target: &job_result.get_job_id().to_string(), "Process succeeded: {:?}", job_result)
-        }
-        Err(message) => {
-          error!("{:?}", message);
+      log::debug!(target: &job.job_id.to_string(),
+        "received message: {:?}", job);
+
+      let mut local_exchange = shared_exchange.clone();
+      {
+        let local_exchange = Arc::make_mut(&mut local_exchange);
+        local_exchange
+          .send_order(OrderMessage::InitProcess(job.clone()))
+          .unwrap();
+        local_exchange
+          .send_order(OrderMessage::StartProcess(job))
+          .unwrap();
+      }
+
+      let mut local_exchange = shared_exchange.clone();
+      let local_exchange = Arc::make_mut(&mut local_exchange);
+
+      while let Ok(message) = local_exchange.next_response() {
+        info!("{:?}", message);
+        match message {
+          Some(ResponseMessage::Completed(_)) | Some(ResponseMessage::Error(_)) => {
+            break;
+          }
+          _ => {}
         }
       }
     }
@@ -354,77 +380,29 @@ where
   }
 
   loop {
-    let amqp_uri = get_amqp_uri();
     let mut executor = LocalPool::new();
-    let spawner = executor.spawner();
 
     executor.run_until(async {
-      let conn = Connection::connect_uri(
-        amqp_uri,
-        ConnectionProperties::default().with_default_executor(8),
-      )
-      .wait()
-      .unwrap();
+      let mut exchange = RabbitmqExchange::new(&worker_configuration).await.unwrap();
 
-      info!("Connected");
-      let channel = Arc::new(channels::declare_consumer_channel(
-        &conn,
-        &worker_configuration,
-      ));
-
-      let consumer = channel
-        .clone()
-        .basic_consume(
-          &amqp_queue,
-          "amqp_worker",
-          BasicConsumeOptions::default(),
-          FieldTable::default(),
-        )
+      exchange
+        .bind_consumer(&amqp_queue, "amqp_worker")
         .await
         .unwrap();
 
-      let status_consumer = channel
-        .clone()
-        .basic_consume(
+      exchange
+        .bind_consumer(
           &worker_configuration.get_direct_messaging_queue_name(),
           "status_amqp_worker",
-          BasicConsumeOptions::default(),
-          FieldTable::default(),
         )
         .await
         .unwrap();
 
-      let status_response_channel = channel.clone();
-      let status_worker_configuration = worker_configuration.clone();
+      let exchange = Arc::new(exchange);
 
-      let _consumer = spawner.spawn_local(async move {
-        status_consumer
-          .for_each(move |delivery| {
-            let (_channel, delivery) = delivery.expect("error caught in in consumer");
+      let processor = Processor::new(exchange);
 
-            worker::system_information::send_real_time_information(
-              delivery,
-              &status_response_channel,
-              &status_worker_configuration,
-            )
-            .map(|_| ())
-          })
-          .await
-      });
-
-      info!("Start to consume on queue {:?}", amqp_queue);
-
-      let clone_channel = channel.clone();
-      let message_event = message_event_ref.clone();
-
-      consumer
-        .for_each(move |delivery| {
-          let (_channel, delivery) = delivery.expect("error caught in in consumer");
-
-          message::process_message(message_event.clone(), delivery, clone_channel.clone())
-            .map(|_| ())
-        })
-        .await
+      processor.run(shared_message_event.clone()).unwrap();
     });
 
     let sleep_duration = time::Duration::new(1, 0);

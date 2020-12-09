@@ -1,19 +1,16 @@
 #[macro_use]
-#[cfg(not(feature = "media"))]
 extern crate serde_derive;
 
-#[test]
-#[cfg(not(feature = "media"))]
-fn processor() {
-  use mcai_worker_sdk::message_exchange::ResponseMessage;
-  use mcai_worker_sdk::{
-    job::{Job, JobResult},
-    message_exchange::{ExternalExchange, LocalExchange, OrderMessage},
-    processor::Processor,
-    JsonSchema, McaiChannel, MessageEvent, Result,
-  };
-  use std::sync::{Arc, Mutex};
+use mcai_worker_sdk::{
+  job::{Job, JobResult},
+  message_exchange::{ExternalExchange, LocalExchange, OrderMessage},
+  processor::Processor,
+  JsonSchema, McaiChannel, MessageEvent, Result,
+};
+use std::sync::{Arc, Mutex};
 
+#[test]
+fn processor() {
   struct Worker {}
 
   #[derive(Clone, Debug, Deserialize, JsonSchema)]
@@ -36,11 +33,6 @@ fn processor() {
       semver::Version::parse("1.2.3").unwrap()
     }
 
-    fn init(&mut self) -> Result<()> {
-      println!("Initialize processor test worker!");
-      Ok(())
-    }
-
     fn process(
       &self,
       channel: Option<McaiChannel>,
@@ -50,14 +42,15 @@ fn processor() {
     where
       Self: std::marker::Sized,
     {
-      assert!(channel.is_none());
-      Ok(job_result.with_message("OK"))
+      println!("NEW JOB");
+      println!("{}", channel.is_some());
+      Ok(job_result)
     }
   }
 
-  let mut local_exchange = LocalExchange::new();
-  let local_exchange_ref = Arc::new(Mutex::new(local_exchange.clone()));
-  let processor = Processor::new(local_exchange_ref);
+  let local_exchange = LocalExchange::new();
+  let local_exchange = Arc::new(Mutex::new(local_exchange));
+  let processor = Processor::new(local_exchange.clone());
 
   let worker = Worker {};
 
@@ -68,17 +61,16 @@ fn processor() {
   let job = Job::new(r#"{ "job_id": 666, "parameters": [] }"#).unwrap();
 
   local_exchange
-    .send_order(OrderMessage::StartProcess(job.clone()))
+    .lock()
+    .unwrap()
+    .send_order(OrderMessage::Job(job))
     .unwrap();
+
   local_exchange
-    .send_order(OrderMessage::StopProcess(job.clone()))
+    .lock()
+    .unwrap()
+    .send_order(OrderMessage::Stop)
     .unwrap();
 
-  let expected_job_result = JobResult::from(job).with_message("OK");
-
-  let response = local_exchange.next_response().unwrap();
-  assert_eq!(
-    ResponseMessage::Completed(expected_job_result),
-    response.unwrap()
-  );
+  assert!(false);
 }

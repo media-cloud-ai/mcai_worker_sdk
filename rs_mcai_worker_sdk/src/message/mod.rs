@@ -16,10 +16,10 @@ use serde::de::DeserializeOwned;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-static RESPONSE_EXCHANGE: &str = "job_response";
-static QUEUE_JOB_COMPLETED: &str = "job_completed";
-static QUEUE_JOB_ERROR: &str = "job_error";
-static QUEUE_JOB_PROGRESSION: &str = "job_progression";
+pub static RESPONSE_EXCHANGE: &str = "job_response";
+pub static QUEUE_JOB_COMPLETED: &str = "job_completed";
+pub static QUEUE_JOB_ERROR: &str = "job_error";
+pub static QUEUE_JOB_PROGRESSION: &str = "job_progression";
 
 pub fn process_message<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   message_event: Rc<RefCell<ME>>,
@@ -41,6 +41,9 @@ pub fn process_message<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
       publish_job_completed(channel, message, job_result)
     }
     Err(error) => match error {
+      MessageError::Amqp(_lapin_error) => {
+        unimplemented!();
+      }
       MessageError::RequirementsError(details) => {
         publish_missing_requirements(channel, message, &details)
       }

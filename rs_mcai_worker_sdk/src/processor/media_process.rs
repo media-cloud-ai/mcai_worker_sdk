@@ -17,12 +17,10 @@ pub struct MediaProcess {
   output: Option<Output>,
 }
 
-impl Process for MediaProcess {
-  fn init<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
-    &mut self,
-    message_event: Rc<RefCell<ME>>,
-    job: &Job,
-  ) -> Result<()> {
+impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Process<P, ME>
+  for MediaProcess
+{
+  fn init(&mut self, message_event: Rc<RefCell<ME>>, job: &Job) -> Result<()> {
     info!("Initialize job: {:?}", job);
 
     initialize_process(message_event, &job).map(|(source, output)| {
@@ -31,11 +29,7 @@ impl Process for MediaProcess {
     })
   }
 
-  fn start<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
-    &mut self,
-    message_event: Rc<RefCell<ME>>,
-    job: &Job,
-  ) -> Result<JobResult> {
+  fn start(&mut self, message_event: Rc<RefCell<ME>>, job: &Job) -> Result<JobResult> {
     info!("Start processing job: {:?}", job);
 
     let job_result = JobResult::from(job);
@@ -105,11 +99,7 @@ impl Process for MediaProcess {
     ))
   }
 
-  fn stop<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
-    &mut self,
-    message_event: Rc<RefCell<ME>>,
-    job: &Job,
-  ) -> Result<JobResult> {
+  fn stop(&mut self, message_event: Rc<RefCell<ME>>, job: &Job) -> Result<JobResult> {
     info!("Stop job: {:?}", job);
 
     let job_result = JobResult::from(job);
