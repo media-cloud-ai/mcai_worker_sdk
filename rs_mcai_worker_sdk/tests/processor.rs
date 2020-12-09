@@ -1,16 +1,19 @@
 #[macro_use]
+#[cfg(not(feature = "media"))]
 extern crate serde_derive;
 
-use mcai_worker_sdk::{
-  job::{Job, JobResult},
-  message_exchange::{ExternalExchange, LocalExchange, OrderMessage},
-  processor::Processor,
-  JsonSchema, McaiChannel, MessageEvent, Result,
-};
-use std::sync::{Arc, Mutex};
-
 #[test]
+#[cfg(not(feature = "media"))]
 fn processor() {
+  use mcai_worker_sdk::message_exchange::ResponseMessage;
+  use mcai_worker_sdk::{
+    job::{Job, JobResult},
+    message_exchange::{ExternalExchange, LocalExchange, OrderMessage},
+    processor::Processor,
+    JsonSchema, McaiChannel, MessageEvent, Result,
+  };
+  use std::sync::{Arc, Mutex};
+
   struct Worker {}
 
   #[derive(Clone, Debug, Deserialize, JsonSchema)]
@@ -33,6 +36,11 @@ fn processor() {
       semver::Version::parse("1.2.3").unwrap()
     }
 
+    fn init(&mut self) -> Result<()> {
+      println!("Initialize processor test worker!");
+      Ok(())
+    }
+
     fn process(
       &self,
       channel: Option<McaiChannel>,
@@ -42,35 +50,54 @@ fn processor() {
     where
       Self: std::marker::Sized,
     {
-      println!("NEW JOB");
-      println!("{}", channel.is_some());
-      Ok(job_result)
+      assert!(channel.is_none());
+      Ok(job_result.with_message("OK"))
     }
   }
 
   let local_exchange = LocalExchange::new();
-  let local_exchange = Arc::new(Mutex::new(local_exchange));
-  let processor = Processor::new(local_exchange.clone());
+  let mut local_exchange = Arc::new(local_exchange);
 
   let worker = Worker {};
+  let worker = Arc::new(Mutex::new(worker));
 
-  std::thread::spawn(move || {
+  let exchange = local_exchange.clone();
+  async_std::task::spawn(async move {
+    let processor = Processor::new(exchange);
     assert!(processor.run(worker).is_ok());
   });
 
   let job = Job::new(r#"{ "job_id": 666, "parameters": [] }"#).unwrap();
 
+  
+  let local_exchange = Arc::make_mut(&mut local_exchange);
   local_exchange
-    .lock()
-    .unwrap()
-    .send_order(OrderMessage::Job(job))
+    .send_order(OrderMessage::InitProcess(job.clone()))
     .unwrap();
 
   local_exchange
-    .lock()
-    .unwrap()
-    .send_order(OrderMessage::Stop)
+    .send_order(OrderMessage::StartProcess(job.clone()))
     .unwrap();
 
-  assert!(false);
+  local_exchange
+    .send_order(OrderMessage::StopProcess(job.clone()))
+    .unwrap();
+
+  local_exchange
+    .send_order(OrderMessage::StopWorker)
+    .unwrap();
+
+  let expected_job_result = JobResult::from(job).with_message("OK");
+
+  let response = local_exchange.next_response().unwrap();
+  assert_eq!(
+    ResponseMessage::Initialized,
+    response.unwrap()
+  );
+
+  let response = local_exchange.next_response().unwrap();
+  assert_eq!(
+    ResponseMessage::Completed(expected_job_result),
+    response.unwrap()
+  );
 }
