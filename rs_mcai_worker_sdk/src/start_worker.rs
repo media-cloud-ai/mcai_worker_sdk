@@ -1,4 +1,3 @@
-use chrono::prelude::*;
 use crate::{
   config::*,
   job::Job,
@@ -6,9 +5,9 @@ use crate::{
     ExternalExchange, LocalExchange, OrderMessage, RabbitmqExchange, ResponseMessage,
   },
   worker::{docker, WorkerConfiguration},
-  MessageEvent,
-  Processor,
+  MessageEvent, Processor,
 };
+use chrono::prelude::*;
 use env_logger::Builder;
 use futures_executor::LocalPool;
 use schemars::JsonSchema;
@@ -47,8 +46,7 @@ pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent
     })
     .init();
 
-  let worker_configuration =
-    WorkerConfiguration::new(&amqp_queue, &message_event, &instance_id);
+  let worker_configuration = WorkerConfiguration::new(&amqp_queue, &message_event, &instance_id);
   if let Err(configuration_error) = worker_configuration {
     error!("{:?}", configuration_error);
     return;
@@ -137,20 +135,7 @@ pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent
     let mut executor = LocalPool::new();
 
     executor.run_until(async {
-      let mut exchange = RabbitmqExchange::new(&worker_configuration).await.unwrap();
-
-      exchange
-        .bind_consumer(&amqp_queue, "amqp_worker")
-        .await
-        .unwrap();
-
-      exchange
-        .bind_consumer(
-          &worker_configuration.get_direct_messaging_queue_name(),
-          "status_amqp_worker",
-        )
-        .await
-        .unwrap();
+      let exchange = RabbitmqExchange::new(&worker_configuration).await.unwrap();
 
       let exchange = Arc::new(exchange);
 

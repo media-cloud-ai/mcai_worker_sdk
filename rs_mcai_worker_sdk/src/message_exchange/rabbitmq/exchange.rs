@@ -5,14 +5,13 @@ use crate::{
   Result,
 };
 use async_std::{
-  channel::{self, Receiver, Sender},
+  channel::{self, Receiver},
   task,
 };
 use std::sync::{Arc, Mutex};
 
 pub struct RabbitmqExchange {
   connection: Arc<Mutex<RabbitmqConnection>>,
-  order_sender: Sender<OrderMessage>,
   order_receiver: Arc<Mutex<Receiver<OrderMessage>>>,
 }
 
@@ -24,20 +23,30 @@ impl RabbitmqExchange {
 
     let order_receiver = Arc::new(Mutex::new(order_receiver));
 
-    Ok(RabbitmqExchange {
-      connection,
-      order_sender,
-      order_receiver,
-    })
-  }
-
-  pub async fn bind_consumer(&mut self, queue_name: &str, consumer_tag: &str) -> Result<()> {
-    self
-      .connection
+    connection
       .lock()
       .unwrap()
-      .bind_consumer(self.order_sender.clone(), queue_name, consumer_tag)
-      .await
+      .bind_consumer(
+        order_sender.clone(),
+        &worker_configuration.get_queue_name(),
+        "amqp_worker",
+      )
+      .await?;
+
+    connection
+      .lock()
+      .unwrap()
+      .bind_consumer(
+        order_sender,
+        &worker_configuration.get_direct_messaging_queue_name(),
+        "status_amqp_worker",
+      )
+      .await?;
+
+    Ok(RabbitmqExchange {
+      connection,
+      order_receiver,
+    })
   }
 }
 
