@@ -6,14 +6,17 @@ use crate::{
   Result,
 };
 use async_amqp::*;
-use async_std::channel::Sender;
+use async_std::channel::{Receiver, Sender};
 use lapin::{Channel, Connection, ConnectionProperties};
 
 use crate::channels::declare_consumer_channel;
+use crate::message_exchange::rabbitmq::publish::feedback_publisher::FeedbackPublisher;
+use crate::message_exchange::Feedback;
 
 pub struct RabbitmqConnection {
   channel: Channel,
   consumers: Vec<RabbitmqConsumer>,
+  feedback_publisher: Option<FeedbackPublisher>,
 }
 
 impl RabbitmqConnection {
@@ -32,6 +35,7 @@ impl RabbitmqConnection {
     Ok(RabbitmqConnection {
       channel,
       consumers: vec![],
+      feedback_publisher: None,
     })
   }
 
@@ -55,6 +59,12 @@ impl RabbitmqConnection {
       .unwrap()
       .send_response(response)
       .await;
+
+    Ok(())
+  }
+
+  pub fn bind_feedback_publisher(&mut self, receiver: Receiver<Feedback>) -> Result<()> {
+    self.feedback_publisher = Some(FeedbackPublisher::new(&self.channel, receiver)?);
 
     Ok(())
   }

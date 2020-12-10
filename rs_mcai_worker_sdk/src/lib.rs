@@ -135,10 +135,13 @@ pub use stainless_ffmpeg::{format_context::FormatContext, frame::Frame};
 pub use start_worker::start_worker;
 
 use job::JobResult;
+use message_exchange::Feedback;
+
+use async_std::channel::Sender;
 use std::sync::Arc;
 
 /// Exposed Channel type
-pub type McaiChannel = Arc<Channel>;
+pub type McaiChannel = Arc<Sender<Feedback>>;
 
 #[test]
 fn empty_message_event_impl() {

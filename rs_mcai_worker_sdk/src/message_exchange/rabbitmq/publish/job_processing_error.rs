@@ -1,16 +1,17 @@
 use crate::{
   job::JobStatus,
-  message::{QUEUE_JOB_ERROR, RESPONSE_EXCHANGE},
-  JobResult, McaiChannel,
+  message_exchange::rabbitmq::{QUEUE_JOB_ERROR, RESPONSE_EXCHANGE},
+  JobResult,
 };
 use lapin::{
   message::Delivery,
   options::{BasicAckOptions, BasicPublishOptions, BasicRejectOptions},
-  BasicProperties, Promise,
+  BasicProperties, Channel, Promise,
 };
+use std::sync::Arc;
 
 pub fn job_processing_error(
-  channel: McaiChannel,
+  channel: Arc<Channel>,
   message: &Delivery,
   job_result: &JobResult,
 ) -> Promise<()> {

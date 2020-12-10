@@ -1,7 +1,7 @@
 use crate::{
   job::{Job, JobResult},
   processor::Process,
-  MessageEvent, Result,
+  McaiChannel, MessageEvent, Result,
 };
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
@@ -17,11 +17,17 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
     Ok(())
   }
 
-  fn start(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<JobResult> {
-    message_event
-      .lock()
-      .unwrap()
-      .process(None, job.get_parameters().unwrap(), JobResult::from(job))
+  fn start(
+    &mut self,
+    message_event: Arc<Mutex<ME>>,
+    job: &Job,
+    feedback_sender: Option<McaiChannel>,
+  ) -> Result<JobResult> {
+    message_event.lock().unwrap().process(
+      feedback_sender,
+      job.get_parameters().unwrap(),
+      JobResult::from(job),
+    )
   }
 
   fn stop(&mut self, _message_event: Arc<Mutex<ME>>, job: &Job) -> Result<JobResult> {

@@ -1,8 +1,8 @@
-use crate::McaiChannel;
-use lapin::{message::Delivery, options::BasicRejectOptions, Promise};
+use lapin::{message::Delivery, options::BasicRejectOptions, Channel, Promise};
+use std::sync::Arc;
 
 pub fn job_missing_requirements(
-  channel: McaiChannel,
+  channel: Arc<Channel>,
   delivery: &Delivery,
   details: &str,
 ) -> Promise<()> {

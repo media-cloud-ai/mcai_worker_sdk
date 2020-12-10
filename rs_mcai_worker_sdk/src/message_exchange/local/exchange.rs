@@ -2,7 +2,7 @@ use crate::{
   message_exchange::{
     ExternalExchange, InternalExchange, OrderMessage, ResponseMessage, ResponseSender,
   },
-  Result,
+  McaiChannel, Result,
 };
 use async_std::{
   channel::{self, Receiver, Sender},
@@ -56,8 +56,9 @@ impl ExternalExchange for LocalExchange {
 }
 
 impl InternalExchange for LocalExchange {
-  fn get_order_receiver(&self) -> Arc<Mutex<Receiver<OrderMessage>>> {
-    self.order_receiver.clone()
+  fn send_response(&mut self, message: ResponseMessage) -> Result<()> {
+    task::block_on(async move { self.response_sender.send(message).await.unwrap() });
+    Ok(())
   }
 
   fn get_response_sender(&self) -> Arc<Mutex<dyn ResponseSender + Send>> {
@@ -66,9 +67,12 @@ impl InternalExchange for LocalExchange {
     }))
   }
 
-  fn send_response(&mut self, message: ResponseMessage) -> Result<()> {
-    task::block_on(async move { self.response_sender.send(message).await.unwrap() });
-    Ok(())
+  fn get_order_receiver(&self) -> Arc<Mutex<Receiver<OrderMessage>>> {
+    self.order_receiver.clone()
+  }
+
+  fn get_feedback_sender(&self) -> Option<McaiChannel> {
+    None
   }
 }
 

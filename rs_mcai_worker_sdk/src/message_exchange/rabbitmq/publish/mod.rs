@@ -1,8 +1,10 @@
+pub mod feedback_publisher;
 mod job_completed;
 mod job_missing_requirements;
 mod job_not_implemented;
 mod job_parameter_error;
 mod job_processing_error;
+mod job_progression;
 mod job_runtime_error;
 
 pub use job_completed::job_completed;
@@ -12,11 +14,12 @@ pub use job_parameter_error::job_parameter_error;
 pub use job_processing_error::job_processing_error;
 pub use job_runtime_error::job_runtime_error;
 
-use crate::{message_exchange::ResponseMessage, McaiChannel, MessageError, Result};
-use lapin::message::Delivery;
+use crate::{message_exchange::ResponseMessage, MessageError, Result};
+use lapin::{message::Delivery, Channel};
+use std::sync::Arc;
 
 pub async fn response(
-  channel: McaiChannel,
+  channel: Arc<Channel>,
   delivery: &Delivery,
   response: &ResponseMessage,
 ) -> Result<()> {
@@ -33,11 +36,9 @@ pub async fn response(
   }
 }
 
-pub async fn error(channel: McaiChannel, delivery: &Delivery, error: &MessageError) -> Result<()> {
+pub async fn error(channel: Arc<Channel>, delivery: &Delivery, error: &MessageError) -> Result<()> {
   match error {
-    MessageError::Amqp(_lapin_error) => {
-      unimplemented!()
-    }
+    MessageError::Amqp(_lapin_error) => unimplemented!(),
     MessageError::RequirementsError(details) => {
       job_missing_requirements(channel, delivery, &details)
         .await

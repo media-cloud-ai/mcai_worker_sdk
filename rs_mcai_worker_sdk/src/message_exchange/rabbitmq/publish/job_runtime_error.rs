@@ -1,14 +1,12 @@
-use crate::{
-  message::{QUEUE_JOB_ERROR, RESPONSE_EXCHANGE},
-  McaiChannel,
-};
+use crate::message_exchange::rabbitmq::{QUEUE_JOB_ERROR, RESPONSE_EXCHANGE};
 use lapin::{
   message::Delivery,
   options::{BasicAckOptions, BasicPublishOptions, BasicRejectOptions},
-  BasicProperties, Promise,
+  BasicProperties, Channel, Promise,
 };
+use std::sync::Arc;
 
-pub fn job_runtime_error(channel: McaiChannel, message: &Delivery, details: &str) -> Promise<()> {
+pub fn job_runtime_error(channel: Arc<Channel>, message: &Delivery, details: &str) -> Promise<()> {
   log::error!("An error occurred: {:?}", details);
   let content = json!({
     "status": "error",

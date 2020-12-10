@@ -1,14 +1,15 @@
 use lapin::message::Delivery;
 use lapin::options::{BasicAckOptions, BasicPublishOptions, BasicRejectOptions};
-use lapin::{BasicProperties, Promise};
+use lapin::{BasicProperties, Channel, Promise};
 
-use crate::message::QUEUE_JOB_COMPLETED;
-use crate::message::RESPONSE_EXCHANGE;
-use crate::JobResult;
-use crate::McaiChannel;
+use crate::{
+  message_exchange::rabbitmq::{QUEUE_JOB_COMPLETED, RESPONSE_EXCHANGE},
+  JobResult,
+};
+use std::sync::Arc;
 
 pub fn job_completed(
-  channel: McaiChannel,
+  channel: Arc<Channel>,
   delivery: &Delivery,
   job_result: &JobResult,
 ) -> Promise<()> {

@@ -5,15 +5,12 @@ use std::sync::{Arc, Mutex};
 use crate::{
   job::{Job, JobResult},
   message::media::{
-    finish_process,
-    initialize_process,
+    finish_process, initialize_process,
     output::Output,
     source::{DecodeResult, Source},
   },
   processor::Process,
-  MessageError,
-  MessageEvent,
-  Result,
+  publish_job_progression, McaiChannel, MessageError, MessageEvent, Result,
 };
 
 #[derive(Default)]
@@ -34,7 +31,12 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
     })
   }
 
-  fn start(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<JobResult> {
+  fn start(
+    &mut self,
+    message_event: Arc<Mutex<ME>>,
+    job: &Job,
+    feedback_sender: Option<McaiChannel>,
+  ) -> Result<JobResult> {
     info!("Start processing job: {:?}", job);
 
     let job_result = JobResult::from(job);
@@ -70,7 +72,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
               if let Some(duration) = total_duration {
                 let progress = std::cmp::min((count / duration * 100) as u8, 100);
                 if progress > previous_progress {
-                  println!("Progress: {:?}", progress);
+                  publish_job_progression(feedback_sender.clone(), job.job_id, progress)?;
                   previous_progress = progress;
                 }
               }

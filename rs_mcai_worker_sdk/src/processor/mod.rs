@@ -10,7 +10,7 @@ use simple_process::SimpleProcess as ProcessEngine;
 use crate::{
   job::Job,
   message_exchange::{InternalExchange, OrderMessage, ResponseMessage},
-  JobResult, MessageEvent, Result,
+  JobResult, McaiChannel, MessageEvent, Result,
 };
 use async_std::task;
 use schemars::JsonSchema;
@@ -23,7 +23,12 @@ use std::{
 pub trait Process<P, ME> {
   fn init(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<()>;
 
-  fn start(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<JobResult>;
+  fn start(
+    &mut self,
+    message_event: Arc<Mutex<ME>>,
+    job: &Job,
+    feedback_sender: Option<McaiChannel>,
+  ) -> Result<JobResult>;
 
   fn stop(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<JobResult>;
 }
@@ -43,6 +48,7 @@ impl Processor {
   ) -> Result<()> {
     let order_receiver = self.internal_exchange.get_order_receiver();
     let response_sender = self.internal_exchange.get_response_sender();
+    let feedback_sender = self.internal_exchange.get_feedback_sender();
 
     let thread = spawn(move || {
       // Initialize the worker
@@ -67,7 +73,7 @@ impl Processor {
             OrderMessage::StartProcess(job) => {
               info!("Process job: {:?}", job);
               process
-                .start(message_event.clone(), &job)
+                .start(message_event.clone(), &job, feedback_sender.clone())
                 .map(ResponseMessage::Completed)
             }
             OrderMessage::StopProcess(job) => process
