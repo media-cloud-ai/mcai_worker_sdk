@@ -94,9 +94,9 @@ pub mod message;
 pub mod message_event;
 pub mod parameter;
 #[cfg(feature = "media")]
-mod process_result;
-#[cfg(feature = "media")]
 mod process_frame;
+#[cfg(feature = "media")]
+mod process_result;
 mod start_worker;
 pub mod worker;
 
@@ -126,9 +126,9 @@ pub use message_event::MessageEvent;
 pub use parameter::container::ParametersContainer;
 pub use parameter::{Parameter, ParameterValue, Requirement};
 #[cfg(feature = "media")]
-pub use process_result::ProcessResult;
-#[cfg(feature = "media")]
 pub use process_frame::ProcessFrame;
+#[cfg(feature = "media")]
+pub use process_result::ProcessResult;
 use processor::Processor;
 #[cfg(feature = "media")]
 pub use stainless_ffmpeg::{format_context::FormatContext, frame::Frame};

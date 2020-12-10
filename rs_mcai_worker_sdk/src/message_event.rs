@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 #[cfg(feature = "media")]
 use crate::{FormatContext, ProcessFrame, ProcessResult, StreamDescriptor};
 #[cfg(feature = "media")]
-use std::sync::{Arc, Mutex, mpsc::Sender};
+use std::sync::{mpsc::Sender, Arc, Mutex};
 
 /// # Trait to describe a worker
 /// Implement this trait to implement a worker
