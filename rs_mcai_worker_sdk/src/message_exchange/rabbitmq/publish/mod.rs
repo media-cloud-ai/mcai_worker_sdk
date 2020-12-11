@@ -1,4 +1,3 @@
-pub mod feedback_publisher;
 mod job_completed;
 mod job_missing_requirements;
 mod job_not_implemented;
@@ -12,8 +11,10 @@ pub use job_missing_requirements::job_missing_requirements;
 pub use job_not_implemented::job_not_implemented;
 pub use job_parameter_error::job_parameter_error;
 pub use job_processing_error::job_processing_error;
+pub use job_progression::job_progression;
 pub use job_runtime_error::job_runtime_error;
 
+use crate::message_exchange::Feedback;
 use crate::{message_exchange::ResponseMessage, MessageError, Result};
 use lapin::{message::Delivery, Channel};
 use std::sync::Arc;
@@ -32,7 +33,9 @@ pub async fn response(
     }
     ResponseMessage::Error(message_error) => error(channel, delivery, message_error).await,
     ResponseMessage::Initialized => Ok(()),
-    ResponseMessage::Progression(_job_id, _progression) => Ok(()),
+    ResponseMessage::Feedback(feedback) => match feedback {
+      Feedback::Progression(progression) => job_progression(channel, progression.clone()),
+    },
   }
 }
 

@@ -21,10 +21,10 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
     &mut self,
     message_event: Arc<Mutex<ME>>,
     job: &Job,
-    feedback_sender: Option<McaiChannel>,
+    feedback_sender: McaiChannel,
   ) -> Result<JobResult> {
     message_event.lock().unwrap().process(
-      feedback_sender,
+      Some(feedback_sender),
       job.get_parameters().unwrap(),
       JobResult::from(job),
     )

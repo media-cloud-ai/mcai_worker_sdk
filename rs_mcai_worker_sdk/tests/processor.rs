@@ -50,7 +50,7 @@ fn processor() {
     where
       Self: std::marker::Sized,
     {
-      assert!(channel.is_none());
+      assert!(channel.is_some());
       Ok(job_result.with_message("OK"))
     }
   }

@@ -35,7 +35,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
     &mut self,
     message_event: Arc<Mutex<ME>>,
     job: &Job,
-    feedback_sender: Option<McaiChannel>,
+    feedback_sender: McaiChannel,
   ) -> Result<JobResult> {
     info!("Start processing job: {:?}", job);
 
@@ -45,7 +45,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
       output: Some(output),
     } = self
     {
-      println!(
+      info!(
         "{} - Start to process media (start: {} ms, duration: {})",
         job_result.get_str_job_id(),
         source.get_start_offset(),
@@ -65,19 +65,18 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
             stream_index,
             frame,
           } => {
-            println!(">> Frame...");
             if stream_index == source.get_first_stream_index() {
               count += 1;
 
               if let Some(duration) = total_duration {
                 let progress = std::cmp::min((count / duration * 100) as u8, 100);
                 if progress > previous_progress {
-                  publish_job_progression(feedback_sender.clone(), job.job_id, progress)?;
+                  publish_job_progression(Some(feedback_sender.clone()), job.job_id, progress)?;
                   previous_progress = progress;
                 }
               }
             }
-            println!("{} - Process frame {}", job_result.get_str_job_id(), count);
+            info!("{} - Process frame {}", job_result.get_str_job_id(), count);
 
             crate::message::media::process_frame(
               message_event.clone(),
@@ -88,13 +87,10 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
             )?;
           }
           DecodeResult::WaitMore => {
-            println!(">> Wait more...");
           }
           DecodeResult::Nothing => {
-            println!(">> Nothing...");
           }
           DecodeResult::EndOfStream => {
-            println!(">> EndOfStream...");
             return finish_process(message_event, output, job_result);
           }
         }

@@ -27,7 +27,7 @@ pub trait Process<P, ME> {
     &mut self,
     message_event: Arc<Mutex<ME>>,
     job: &Job,
-    feedback_sender: Option<McaiChannel>,
+    feedback_sender: McaiChannel,
   ) -> Result<JobResult>;
 
   fn stop(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<JobResult>;
@@ -48,7 +48,6 @@ impl Processor {
   ) -> Result<()> {
     let order_receiver = self.internal_exchange.get_order_receiver();
     let response_sender = self.internal_exchange.get_response_sender();
-    let feedback_sender = self.internal_exchange.get_feedback_sender();
 
     let thread = spawn(move || {
       // Initialize the worker
@@ -73,7 +72,7 @@ impl Processor {
             OrderMessage::StartProcess(job) => {
               info!("Process job: {:?}", job);
               process
-                .start(message_event.clone(), &job, feedback_sender.clone())
+                .start(message_event.clone(), &job, response_sender.clone())
                 .map(ResponseMessage::Completed)
             }
             OrderMessage::StopProcess(job) => process
