@@ -1,4 +1,7 @@
-use super::RabbitmqConsumer;
+use super::{
+  RabbitmqConsumer,
+  channels::declare_consumer_channel,
+};
 use crate::{
   config,
   message_exchange::{OrderMessage, ResponseMessage},
@@ -8,8 +11,6 @@ use crate::{
 use async_amqp::*;
 use async_std::channel::Sender;
 use lapin::{Channel, Connection, ConnectionProperties};
-
-use crate::channels::declare_consumer_channel;
 
 pub struct RabbitmqConnection {
   channel: Channel,
