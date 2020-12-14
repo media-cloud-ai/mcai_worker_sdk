@@ -8,6 +8,19 @@ pub struct ExchangeDescription {
 }
 
 impl ExchangeDescription {
+  pub fn new(name: &str, kind: ExchangeKind) -> Self {
+    ExchangeDescription {
+      name: name.to_owned(),
+      kind,
+      alternate_exchange: None,
+    }
+  }
+
+  pub fn with_alternate_exchange(mut self, alternate_exchange: &str) -> Self {
+    self.alternate_exchange = Some(alternate_exchange.to_string());
+    self
+  }
+
   pub fn declare(&self, channel: &Channel) {
     let mut exchange_options = ExchangeDeclareOptions::default();
     exchange_options.durable = true;

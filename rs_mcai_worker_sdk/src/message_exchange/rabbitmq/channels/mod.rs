@@ -33,26 +33,16 @@ pub fn declare_consumer_channel(
   let mut exchange_options = ExchangeDeclareOptions::default();
   exchange_options.durable = true;
 
-  let delayed_exchange = ExchangeDescription {
-    name: EXCHANGE_NAME_DELAYED.to_string(),
-    kind: ExchangeKind::Fanout,
-    alternate_exchange: None,
-  };
+  let delayed_exchange = ExchangeDescription::new(EXCHANGE_NAME_DELAYED, ExchangeKind::Fanout);
   delayed_exchange.declare(&channel);
 
-  let submit_exchange = ExchangeDescription {
-    name: EXCHANGE_NAME_SUBMIT.to_string(),
-    kind: ExchangeKind::Topic,
-    alternate_exchange: Some("job_queue_not_found".to_string()),
-  };
-  submit_exchange.declare(&channel);
+  ExchangeDescription::new(EXCHANGE_NAME_SUBMIT, ExchangeKind::Topic)
+    .with_alternate_exchange("job_queue_not_found")
+    .declare(&channel);
 
-  let response_exchange = ExchangeDescription {
-    name: EXCHANGE_NAME_RESPONSE.to_string(),
-    kind: ExchangeKind::Topic,
-    alternate_exchange: Some("job_response_not_found".to_string()),
-  };
-  response_exchange.declare(&channel);
+  ExchangeDescription::new(EXCHANGE_NAME_RESPONSE, ExchangeKind::Topic)
+    .with_alternate_exchange("job_response_not_found")
+    .declare(&channel);
 
   let delayed_queue = QueueDescription {
     name: EXCHANGE_NAME_DELAYED.to_string(),
@@ -73,11 +63,10 @@ pub fn declare_consumer_channel(
   };
   delayed_bind.declare(&channel);
 
-  let direct_messaging_exchange = ExchangeDescription {
-    name: EXCHANGE_NAME_DIRECT_MESSAGING.to_string(),
-    kind: ExchangeKind::Headers,
-    alternate_exchange: Some("direct_messaging_not_found".to_string()),
-  };
+  let direct_messaging_exchange =
+    ExchangeDescription::new(EXCHANGE_NAME_DIRECT_MESSAGING, ExchangeKind::Headers)
+      .with_alternate_exchange("direct_messaging_not_found");
+
   direct_messaging_exchange.declare(&channel);
 
   let direct_messaging_queue = QueueDescription {

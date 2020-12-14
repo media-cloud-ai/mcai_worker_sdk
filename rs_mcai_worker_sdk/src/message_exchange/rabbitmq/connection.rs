@@ -1,7 +1,4 @@
-use super::{
-  RabbitmqConsumer,
-  channels::declare_consumer_channel,
-};
+use super::{channels::declare_consumer_channel, RabbitmqConsumer};
 use crate::{
   config,
   message_exchange::{OrderMessage, ResponseMessage},
