@@ -112,7 +112,7 @@ Do no use in production, just for developments."#
   fn process_frame(
     &mut self,
     job_result: JobResult,
-    _stream_index: usize,
+    stream_index: usize,
     frame: ProcessFrame,
   ) -> Result<ProcessResult> {
     match frame {
@@ -127,7 +127,8 @@ Do no use in production, just for developments."#
           if width != 0 && height != 0 {
             info!(
               target: &job_result.get_str_job_id(),
-              "PTS: {}, image size: {}x{}",
+              "Stream {} - PTS: {}, image size: {}x{}",
+              stream_index,
               frame.get_pts(),
               width,
               height
@@ -135,7 +136,8 @@ Do no use in production, just for developments."#
           } else {
             info!(
               target: &job_result.get_str_job_id(),
-              "PTS: {}, sample_rate: {}Hz, channels: {}, nb_samples: {}",
+              "Stream {} - PTS: {}, sample_rate: {}Hz, channels: {}, nb_samples: {}",
+              stream_index,
               frame.get_pts(),
               sample_rate,
               channels,

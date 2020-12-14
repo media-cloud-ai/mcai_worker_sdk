@@ -14,7 +14,7 @@ use stainless_ffmpeg::{
   format_context::FormatContext, frame::Frame, packet::Packet, tools, video_decoder::VideoDecoder,
 };
 use stainless_ffmpeg_sys::{
-  av_frame_alloc, av_frame_clone, av_seek_frame, av_strerror, avcodec_receive_frame,
+  av_frame_alloc, av_frame_clone, av_q2d, av_seek_frame, av_strerror, avcodec_receive_frame,
   avcodec_send_packet, AVSEEK_FLAG_BACKWARD, AV_ERROR_MAX_STRING_SIZE,
 };
 
@@ -239,6 +239,15 @@ impl Source {
 
   pub fn get_segment_duration(&self) -> Option<u64> {
     self.segment_duration
+  }
+
+  pub fn get_stream_fps(&self, stream_index: usize) -> f64 {
+    let stream = self
+      .format_context
+      .lock()
+      .unwrap()
+      .get_stream(stream_index as isize);
+    unsafe { av_q2d((*stream).avg_frame_rate) }
   }
 
   pub fn get_first_stream_index(&self) -> usize {

@@ -55,9 +55,12 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
           .unwrap_or_else(|| "unknown".to_string())
       );
 
-      let total_duration = source.get_duration();
-      let mut count = 0;
+      let process_duration_ms = source.get_segment_duration();
+
+      let mut processed_frames = 0;
       let mut previous_progress = 0;
+
+      let first_stream_fps = source.get_stream_fps(source.get_first_stream_index()) as f32;
 
       loop {
         match source.next_frame()? {
@@ -66,17 +69,23 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
             frame,
           } => {
             if stream_index == source.get_first_stream_index() {
-              count += 1;
+              processed_frames += 1;
 
-              if let Some(duration) = total_duration {
-                let progress = std::cmp::min((count / duration * 100) as u8, 100);
+              let processed_ms = processed_frames as f32 * 1000.0 / first_stream_fps;
+
+              if let Some(duration) = process_duration_ms {
+                let progress = std::cmp::min((processed_ms / duration as f32 * 100.0) as u8, 100);
                 if progress > previous_progress {
                   publish_job_progression(Some(feedback_sender.clone()), job.job_id, progress)?;
                   previous_progress = progress;
                 }
               }
             }
-            info!("{} - Process frame {}", job_result.get_str_job_id(), count);
+            info!(
+              "{} - Process frame {}",
+              job_result.get_str_job_id(),
+              processed_frames
+            );
 
             crate::message::media::process_frame(
               message_event.clone(),
@@ -86,10 +95,8 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
               frame,
             )?;
           }
-          DecodeResult::WaitMore => {
-          }
-          DecodeResult::Nothing => {
-          }
+          DecodeResult::WaitMore => {}
+          DecodeResult::Nothing => {}
           DecodeResult::EndOfStream => {
             return finish_process(message_event, output, job_result);
           }
