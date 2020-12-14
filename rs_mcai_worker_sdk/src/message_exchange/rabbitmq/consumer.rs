@@ -40,18 +40,23 @@ impl RabbitmqConsumer {
 
     let channel = Arc::new(channel.clone());
 
+    let cloned_response_sender = response_sender.clone();
+
     let handle = Some(task::spawn(async move {
       while let Some(delivery) = consumer.next().await {
         let (_, delivery) = delivery.expect("error in consumer");
 
-        Self::process_delivery(
+        if let Err(error) = Self::process_delivery(
           sender.clone(),
           channel.clone(),
           response_receiver.clone(),
           &delivery,
         )
-        .await
-        .unwrap()
+        .await {
+          if let Err(error) = cloned_response_sender.send(ResponseMessage::Error(error)).await {
+            log::error!("Unable to publish response: {:?}", error);
+          }
+        }
       }
     }));
 

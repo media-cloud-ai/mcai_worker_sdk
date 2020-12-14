@@ -7,15 +7,15 @@ use crate::{
 };
 use async_amqp::*;
 use async_std::channel::Sender;
-use lapin::{Channel, Connection, ConnectionProperties};
+use lapin::{Connection, ConnectionProperties};
 
 pub struct RabbitmqConnection {
-  channel: Channel,
-  consumers: Vec<RabbitmqConsumer>,
+  job_consumer: RabbitmqConsumer,
+  direct_messaging_consumer: RabbitmqConsumer,
 }
 
 impl RabbitmqConnection {
-  pub async fn new(worker_configuration: &WorkerConfiguration) -> Result<Self> {
+  pub async fn new(worker_configuration: &WorkerConfiguration, order_sender: Sender<OrderMessage>) -> Result<Self> {
     let amqp_uri = config::get_amqp_uri();
     let properties = ConnectionProperties::default()
       .with_default_executor(8)
@@ -27,30 +27,26 @@ impl RabbitmqConnection {
 
     let channel = declare_consumer_channel(&connection, worker_configuration);
 
+    let queue_name = worker_configuration.get_queue_name();
+
+    let job_consumer =
+      RabbitmqConsumer::new(&channel, order_sender.clone(), &queue_name, "amqp_worker").await?;
+
+
+    let queue_name = worker_configuration.get_direct_messaging_queue_name();
+
+    let direct_messaging_consumer =
+      RabbitmqConsumer::new(&channel, order_sender, &queue_name, "status_amqp_worker").await?;
+
     Ok(RabbitmqConnection {
-      channel,
-      consumers: vec![],
+      job_consumer,
+      direct_messaging_consumer,
     })
-  }
-
-  pub async fn bind_consumer(
-    &mut self,
-    sender: Sender<OrderMessage>,
-    queue_name: &str,
-    consumer_tag: &str,
-  ) -> Result<()> {
-    let consumer = RabbitmqConsumer::new(&self.channel, sender, queue_name, consumer_tag).await?;
-
-    self.consumers.push(consumer);
-
-    Ok(())
   }
 
   pub async fn send_response(&mut self, response: ResponseMessage) -> Result<()> {
     self
-      .consumers
-      .first()
-      .unwrap()
+      .job_consumer
       .send_response(response)
       .await;
 

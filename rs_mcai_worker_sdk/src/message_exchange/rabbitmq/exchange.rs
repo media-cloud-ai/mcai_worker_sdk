@@ -17,31 +17,12 @@ pub struct RabbitmqExchange {
 
 impl RabbitmqExchange {
   pub async fn new(worker_configuration: &WorkerConfiguration) -> Result<Self> {
-    let connection = RabbitmqConnection::new(worker_configuration).await?;
-    let connection = Arc::new(Mutex::new(connection));
     let (order_sender, order_receiver) = channel::unbounded();
 
+    let connection = RabbitmqConnection::new(worker_configuration, order_sender).await?;
+    let connection = Arc::new(Mutex::new(connection));
+
     let order_receiver = Arc::new(Mutex::new(order_receiver));
-
-    connection
-      .lock()
-      .unwrap()
-      .bind_consumer(
-        order_sender.clone(),
-        &worker_configuration.get_queue_name(),
-        "amqp_worker",
-      )
-      .await?;
-
-    connection
-      .lock()
-      .unwrap()
-      .bind_consumer(
-        order_sender,
-        &worker_configuration.get_direct_messaging_queue_name(),
-        "status_amqp_worker",
-      )
-      .await?;
 
     Ok(RabbitmqExchange {
       connection,
