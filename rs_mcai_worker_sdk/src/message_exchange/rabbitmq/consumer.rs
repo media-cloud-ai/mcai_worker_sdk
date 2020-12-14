@@ -53,9 +53,11 @@ impl RabbitmqConsumer {
           &delivery,
         )
         .await {
-          if let Err(error) = cloned_response_sender.send(ResponseMessage::Error(error)).await {
-            log::error!("Unable to publish response: {:?}", error);
-          }
+          log::error!("{:?}", error);
+          if let Err(error) = publish::error(channel.clone(), &delivery, &error)
+            .await {
+              log::error!("Unable to publish response: {:?}", error);
+            }
         }
       }
     }));
@@ -97,27 +99,17 @@ impl RabbitmqConsumer {
     loop {
       let response = receiver.lock().await.recv().await.map_err(|e| {
         MessageError::RuntimeError(format!("unable to wait response from processor: {:?}", e))
-      });
+      })?;
 
+      log::debug!("Response: {:?}", response);
+      publish::response(channel.clone(), delivery, &response)
+        .await
+        .unwrap();
       match response {
-        Ok(response) => {
-          log::debug!("Response: {:?}", response);
-          publish::response(channel.clone(), delivery, &response)
-            .await
-            .unwrap();
-          match response {
-            ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
-              return Ok(());
-            }
-            _ => {}
-          }
+        ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
+          return Ok(());
         }
-        Err(error) => {
-          log::error!("{:?}", error);
-          publish::error(channel.clone(), delivery, &error)
-            .await
-            .unwrap()
-        }
+        _ => {}
       }
     }
   }
