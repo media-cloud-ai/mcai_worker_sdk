@@ -1,8 +1,13 @@
 use crate::{
-  message_exchange::{ExternalExchange, InternalExchange, OrderMessage, ResponseMessage},
+  message_exchange::{
+    ExternalExchange, InternalExchange, OrderMessage, ResponseMessage, ResponseSender,
+  },
   Result,
 };
-use std::sync::mpsc::{channel, Receiver, Sender};
+use async_std::{
+  channel::{self, Receiver, Sender},
+  task,
+};
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
@@ -15,8 +20,8 @@ pub struct LocalExchange {
 
 impl LocalExchange {
   pub fn new() -> Self {
-    let (order_sender, order_receiver) = channel();
-    let (response_sender, response_receiver) = channel();
+    let (order_sender, order_receiver) = channel::unbounded();
+    let (response_sender, response_receiver) = channel::unbounded();
 
     LocalExchange {
       order_sender,
@@ -24,6 +29,10 @@ impl LocalExchange {
       response_sender,
       response_receiver: Arc::new(Mutex::new(response_receiver)),
     }
+  }
+
+  pub fn new_safe() -> Arc<Mutex<Self>> {
+    Arc::new(Mutex::new(Self::new()))
   }
 }
 
@@ -35,22 +44,41 @@ impl Default for LocalExchange {
 
 impl ExternalExchange for LocalExchange {
   fn send_order(&mut self, message: OrderMessage) -> Result<()> {
-    self.order_sender.send(message).unwrap();
+    task::block_on(async move { self.order_sender.send(message).await.unwrap() });
     Ok(())
   }
 
   fn next_response(&mut self) -> Result<Option<ResponseMessage>> {
-    Ok(self.response_receiver.lock().unwrap().recv().ok())
+    Ok(task::block_on(async move {
+      self.response_receiver.lock().unwrap().recv().await.ok()
+    }))
   }
 }
 
 impl InternalExchange for LocalExchange {
-  fn next_order(&mut self) -> Result<Option<OrderMessage>> {
-    Ok(self.order_receiver.lock().unwrap().recv().ok())
+  fn send_response(&mut self, message: ResponseMessage) -> Result<()> {
+    task::block_on(async move { self.response_sender.send(message).await.unwrap() });
+    Ok(())
   }
 
-  fn send_response(&mut self, message: ResponseMessage) -> Result<()> {
-    self.response_sender.send(message).unwrap();
+  fn get_response_sender(&self) -> Arc<Mutex<dyn ResponseSender + Send>> {
+    Arc::new(Mutex::new(LocalResponseSender {
+      response_sender: self.response_sender.clone(),
+    }))
+  }
+
+  fn get_order_receiver(&self) -> Arc<Mutex<Receiver<OrderMessage>>> {
+    self.order_receiver.clone()
+  }
+}
+
+struct LocalResponseSender {
+  response_sender: Sender<ResponseMessage>,
+}
+
+impl ResponseSender for LocalResponseSender {
+  fn send_response(&'_ self, message: ResponseMessage) -> Result<()> {
+    task::block_on(async move { self.response_sender.send(message).await.unwrap() });
     Ok(())
   }
 }

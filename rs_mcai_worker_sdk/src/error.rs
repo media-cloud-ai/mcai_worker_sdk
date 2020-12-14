@@ -1,8 +1,9 @@
 use crate::job::{JobResult, JobStatus};
 
 /// Internal error status to manage process errors
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MessageError {
+  Amqp(lapin::Error),
   RuntimeError(String),
   ParameterValueError(String),
   ProcessingError(JobResult),
@@ -17,6 +18,12 @@ impl MessageError {
       .with_message(&format!("IO Error: {}", error.to_string()));
 
     MessageError::ProcessingError(result)
+  }
+}
+
+impl From<lapin::Error> for MessageError {
+  fn from(error: lapin::Error) -> Self {
+    MessageError::Amqp(error)
   }
 }
 

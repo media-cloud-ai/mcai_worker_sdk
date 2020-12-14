@@ -1,12 +1,12 @@
 use crate::worker::docker::get_instance_id;
 use chrono::prelude::*;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct JobProgression {
   datetime: DateTime<Utc>,
   docker_container_id: String,
-  job_id: u64,
-  progression: u8,
+  pub job_id: u64,
+  pub progression: u8,
 }
 
 impl JobProgression {

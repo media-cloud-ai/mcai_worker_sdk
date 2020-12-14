@@ -1,38 +1,36 @@
-use crate::job::{Job, JobResult};
-use crate::processor::Process;
-use crate::{MessageEvent, Result};
-use failure::_core::cell::RefCell;
+use crate::{
+  job::{Job, JobResult},
+  processor::Process,
+  McaiChannel, MessageEvent, Result,
+};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
 pub struct SimpleProcess {}
 
-impl Process for SimpleProcess {
-  fn init<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
-    &mut self,
-    _message_event: Rc<RefCell<ME>>,
-    _job: &Job,
-  ) -> Result<()> {
+impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Process<P, ME>
+  for SimpleProcess
+{
+  fn init(&mut self, _message_event: Arc<Mutex<ME>>, _job: &Job) -> Result<()> {
     Ok(())
   }
 
-  fn start<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
+  fn start(
     &mut self,
-    message_event: Rc<RefCell<ME>>,
+    message_event: Arc<Mutex<ME>>,
     job: &Job,
+    feedback_sender: McaiChannel,
   ) -> Result<JobResult> {
-    message_event
-      .borrow_mut()
-      .process(None, job.get_parameters().unwrap(), JobResult::from(job))
+    message_event.lock().unwrap().process(
+      Some(feedback_sender),
+      job.get_parameters().unwrap(),
+      JobResult::from(job),
+    )
   }
 
-  fn stop<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
-    &mut self,
-    _message_event: Rc<RefCell<ME>>,
-    job: &Job,
-  ) -> Result<JobResult> {
+  fn stop(&mut self, _message_event: Arc<Mutex<ME>>, job: &Job) -> Result<JobResult> {
     Ok(JobResult::from(job))
   }
 }

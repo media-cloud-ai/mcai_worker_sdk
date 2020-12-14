@@ -3,7 +3,7 @@ use std::sync::{
   mpsc::{Receiver, Sender},
   Arc, Mutex,
 };
-use std::{cell::RefCell, collections::HashMap, io::Cursor, rc::Rc, thread};
+use std::{collections::HashMap, io::Cursor, thread};
 
 use ringbuf::RingBuffer;
 use schemars::JsonSchema;
@@ -57,7 +57,7 @@ pub struct Source {
 
 impl Source {
   pub fn new<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
-    message_event: Rc<RefCell<ME>>,
+    message_event: Arc<Mutex<ME>>,
     job_result: &JobResult,
     parameters: P,
     source_url: &str,
@@ -315,7 +315,7 @@ impl Source {
   }
 
   fn get_decoders<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
-    message_event: Rc<RefCell<ME>>,
+    message_event: Arc<Mutex<ME>>,
     job_id: &str,
     parameters: P,
     format_context: Arc<Mutex<FormatContext>>,
@@ -324,7 +324,8 @@ impl Source {
   ) -> Result<HashMap<usize, Decoder>> {
     let selected_streams =
       message_event
-        .borrow_mut()
+        .lock()
+        .unwrap()
         .init_process(parameters, format_context.clone(), sender)?;
 
     info!(
