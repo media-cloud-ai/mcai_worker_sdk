@@ -40,8 +40,6 @@ impl RabbitmqConsumer {
 
     let channel = Arc::new(channel.clone());
 
-    let cloned_response_sender = response_sender.clone();
-
     let handle = Some(task::spawn(async move {
       while let Some(delivery) = consumer.next().await {
         let (_, delivery) = delivery.expect("error in consumer");
@@ -93,8 +91,15 @@ impl RabbitmqConsumer {
     sender
       .send(OrderMessage::InitProcess(job.clone()))
       .await
-      .unwrap();
-    sender.send(OrderMessage::StartProcess(job)).await.unwrap();
+      .map_err(|e| {
+        MessageError::RuntimeError(format!("unable to send init process order: {:?}", e))
+      })?;
+
+    sender.send(OrderMessage::StartProcess(job))
+      .await
+      .map_err(|e| {
+        MessageError::RuntimeError(format!("unable to send start process order: {:?}", e))
+      })?;
 
     loop {
       let response = receiver.lock().await.recv().await.map_err(|e| {
@@ -103,8 +108,8 @@ impl RabbitmqConsumer {
 
       log::debug!("Response: {:?}", response);
       publish::response(channel.clone(), delivery, &response)
-        .await
-        .unwrap();
+        .await?;
+
       match response {
         ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
           return Ok(());

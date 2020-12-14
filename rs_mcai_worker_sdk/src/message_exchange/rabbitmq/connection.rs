@@ -11,7 +11,6 @@ use lapin::{Connection, ConnectionProperties};
 
 pub struct RabbitmqConnection {
   job_consumer: RabbitmqConsumer,
-  direct_messaging_consumer: RabbitmqConsumer,
 }
 
 impl RabbitmqConnection {
@@ -35,12 +34,10 @@ impl RabbitmqConnection {
 
     let queue_name = worker_configuration.get_direct_messaging_queue_name();
 
-    let direct_messaging_consumer =
-      RabbitmqConsumer::new(&channel, order_sender, &queue_name, "status_amqp_worker").await?;
+    RabbitmqConsumer::new(&channel, order_sender, &queue_name, "status_amqp_worker").await?;
 
     Ok(RabbitmqConnection {
       job_consumer,
-      direct_messaging_consumer,
     })
   }
 
