@@ -8,9 +8,8 @@ use media_process::MediaProcess as ProcessEngine;
 use simple_process::SimpleProcess as ProcessEngine;
 
 use crate::{
-  job::Job,
   message_exchange::{InternalExchange, OrderMessage, ResponseMessage},
-  JobResult, McaiChannel, MessageEvent, Result,
+  McaiChannel, MessageEvent, Result,
 };
 use async_std::task;
 use schemars::JsonSchema;
@@ -21,16 +20,13 @@ use std::{
 };
 
 pub trait Process<P, ME> {
-  fn init(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<()>;
+  fn new(message_event: Arc<Mutex<ME>>, response_sender: McaiChannel) -> Self;
 
-  fn start(
+  fn handle(
     &mut self,
     message_event: Arc<Mutex<ME>>,
-    job: &Job,
-    feedback_sender: McaiChannel,
-  ) -> Result<JobResult>;
-
-  fn stop(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<JobResult>;
+    order_message: OrderMessage,
+  ) -> ResponseMessage;
 }
 
 pub struct Processor {
@@ -56,7 +52,7 @@ impl Processor {
       }
 
       // Create Simple or Media Process
-      let mut process = ProcessEngine::default();
+      let mut process = ProcessEngine::new(message_event.clone(), response_sender.clone());
 
       loop {
         let order_receiver = order_receiver.clone();
@@ -65,30 +61,11 @@ impl Processor {
           task::block_on(async move { order_receiver.lock().unwrap().recv().await });
 
         if let Ok(message) = next_message {
-          let response = match message {
-            OrderMessage::InitProcess(job) => process
-              .init(message_event.clone(), &job)
-              .map(|_| ResponseMessage::Initialized),
-            OrderMessage::StartProcess(job) => {
-              info!("Process job: {:?}", job);
-              process
-                .start(message_event.clone(), &job, response_sender.clone())
-                .map(ResponseMessage::Completed)
-            }
-            OrderMessage::StopProcess(job) => process
-              .stop(message_event.clone(), &job)
-              .map(ResponseMessage::Completed),
-            OrderMessage::StopWorker => {
-              break None;
-            }
-          };
+          if message == OrderMessage::StopWorker {
+            break None;
+          }
 
-          let response = response.map_err(ResponseMessage::Error);
-
-          let response = match response {
-            Ok(re) => re,
-            Err(re) => re,
-          };
+          let response = process.handle(message_event.clone(), message);
 
           response_sender
             .lock()
