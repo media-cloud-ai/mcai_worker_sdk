@@ -1,3 +1,4 @@
+mod channels;
 mod connection;
 mod consumer;
 mod exchange;

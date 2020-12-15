@@ -44,14 +44,19 @@ impl RabbitmqConsumer {
       while let Some(delivery) = consumer.next().await {
         let (_, delivery) = delivery.expect("error in consumer");
 
-        Self::process_delivery(
+        if let Err(error) = Self::process_delivery(
           sender.clone(),
           channel.clone(),
           response_receiver.clone(),
           &delivery,
         )
-        .await
-        .unwrap()
+        .await {
+          log::error!("{:?}", error);
+          if let Err(error) = publish::error(channel.clone(), &delivery, &error)
+            .await {
+              log::error!("Unable to publish response: {:?}", error);
+            }
+        }
       }
     }));
 
@@ -86,33 +91,30 @@ impl RabbitmqConsumer {
     sender
       .send(OrderMessage::InitProcess(job.clone()))
       .await
-      .unwrap();
-    sender.send(OrderMessage::StartProcess(job)).await.unwrap();
+      .map_err(|e| {
+        MessageError::RuntimeError(format!("unable to send init process order: {:?}", e))
+      })?;
+
+    sender.send(OrderMessage::StartProcess(job))
+      .await
+      .map_err(|e| {
+        MessageError::RuntimeError(format!("unable to send start process order: {:?}", e))
+      })?;
 
     loop {
       let response = receiver.lock().await.recv().await.map_err(|e| {
         MessageError::RuntimeError(format!("unable to wait response from processor: {:?}", e))
-      });
+      })?;
+
+      log::debug!("Response: {:?}", response);
+      publish::response(channel.clone(), delivery, &response)
+        .await?;
 
       match response {
-        Ok(response) => {
-          log::debug!("Response: {:?}", response);
-          publish::response(channel.clone(), delivery, &response)
-            .await
-            .unwrap();
-          match response {
-            ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
-              return Ok(());
-            }
-            _ => {}
-          }
+        ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
+          return Ok(());
         }
-        Err(error) => {
-          log::error!("{:?}", error);
-          publish::error(channel.clone(), delivery, &error)
-            .await
-            .unwrap()
-        }
+        _ => {}
       }
     }
   }
