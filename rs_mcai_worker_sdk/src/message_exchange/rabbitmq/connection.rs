@@ -14,7 +14,10 @@ pub struct RabbitmqConnection {
 }
 
 impl RabbitmqConnection {
-  pub async fn new(worker_configuration: &WorkerConfiguration, order_sender: Sender<OrderMessage>) -> Result<Self> {
+  pub async fn new(
+    worker_configuration: &WorkerConfiguration,
+    order_sender: Sender<OrderMessage>,
+  ) -> Result<Self> {
     let amqp_uri = config::get_amqp_uri();
     let properties = ConnectionProperties::default()
       .with_default_executor(8)
@@ -31,21 +34,15 @@ impl RabbitmqConnection {
     let job_consumer =
       RabbitmqConsumer::new(&channel, order_sender.clone(), &queue_name, "amqp_worker").await?;
 
-
     let queue_name = worker_configuration.get_direct_messaging_queue_name();
 
     RabbitmqConsumer::new(&channel, order_sender, &queue_name, "status_amqp_worker").await?;
 
-    Ok(RabbitmqConnection {
-      job_consumer,
-    })
+    Ok(RabbitmqConnection { job_consumer })
   }
 
   pub async fn send_response(&mut self, response: ResponseMessage) -> Result<()> {
-    self
-      .job_consumer
-      .send_response(response)
-      .await;
+    self.job_consumer.send_response(response).await;
 
     Ok(())
   }

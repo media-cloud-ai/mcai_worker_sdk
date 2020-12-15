@@ -50,12 +50,12 @@ impl RabbitmqConsumer {
           response_receiver.clone(),
           &delivery,
         )
-        .await {
+        .await
+        {
           log::error!("{:?}", error);
-          if let Err(error) = publish::error(channel.clone(), &delivery, &error)
-            .await {
-              log::error!("Unable to publish response: {:?}", error);
-            }
+          if let Err(error) = publish::error(channel.clone(), &delivery, &error).await {
+            log::error!("Unable to publish response: {:?}", error);
+          }
         }
       }
     }));
@@ -95,7 +95,8 @@ impl RabbitmqConsumer {
         MessageError::RuntimeError(format!("unable to send init process order: {:?}", e))
       })?;
 
-    sender.send(OrderMessage::StartProcess(job))
+    sender
+      .send(OrderMessage::StartProcess(job))
       .await
       .map_err(|e| {
         MessageError::RuntimeError(format!("unable to send start process order: {:?}", e))
@@ -107,8 +108,7 @@ impl RabbitmqConsumer {
       })?;
 
       log::debug!("Response: {:?}", response);
-      publish::response(channel.clone(), delivery, &response)
-        .await?;
+      publish::response(channel.clone(), delivery, &response).await?;
 
       match response {
         ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
