@@ -67,9 +67,10 @@ impl RabbitmqPublisher {
       ResponseMessage::Feedback(Feedback::Progression(progression)) => {
         return publish::job_progression(channel, progression);
       }
-      ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
-        current_orders.lock().unwrap().get_process_deliveries()
-      }
+      ResponseMessage::Initialized(_)
+      | ResponseMessage::Started(_)
+      | ResponseMessage::Completed(_)
+      | ResponseMessage::Error(_) => current_orders.lock().unwrap().get_process_deliveries(),
       ResponseMessage::Feedback(_) | ResponseMessage::StatusError(_) => {
         current_orders.lock().unwrap().get_status_deliveries()
       }
@@ -90,7 +91,10 @@ impl RabbitmqPublisher {
     }
 
     match response {
-      ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
+      ResponseMessage::Initialized(_)
+      | ResponseMessage::Started(_)
+      | ResponseMessage::Completed(_)
+      | ResponseMessage::Error(_) => {
         current_orders.lock().unwrap().reset_process_deliveries();
       }
       ResponseMessage::Feedback(_) | ResponseMessage::StatusError(_) => {

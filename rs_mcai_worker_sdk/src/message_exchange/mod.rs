@@ -11,6 +11,8 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResponseMessage {
+  Initialized(JobResult),
+  Started(JobResult),
   Completed(JobResult),
   Feedback(Feedback),
   Error(MessageError),

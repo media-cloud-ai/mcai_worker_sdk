@@ -1,20 +1,24 @@
 mod job_completed;
+mod job_initialized;
 mod job_missing_requirements;
 mod job_not_implemented;
 mod job_parameter_error;
 mod job_processing_error;
 mod job_progression;
 mod job_runtime_error;
-mod job_status;
+mod job_started;
+mod worker_status;
 
 pub use job_completed::job_completed;
+pub use job_initialized::job_initialized;
 pub use job_missing_requirements::job_missing_requirements;
 pub use job_not_implemented::job_not_implemented;
 pub use job_parameter_error::job_parameter_error;
 pub use job_processing_error::job_processing_error;
 pub use job_progression::job_progression;
 pub use job_runtime_error::job_runtime_error;
-pub use job_status::job_status;
+pub use job_started::job_started;
+pub use worker_status::worker_status;
 
 use crate::{
   message_exchange::{Feedback, ResponseMessage},
@@ -29,16 +33,19 @@ pub async fn response(
   response: &ResponseMessage,
 ) -> Result<()> {
   match response {
-    ResponseMessage::Completed(job_result) => {
-      log::info!(target: &job_result.get_str_job_id(), "Response: {:?}", job_result);
-      job_completed(channel, delivery, job_result)
-        .await
-        .map_err(|e| e.into())
-    }
+    ResponseMessage::Initialized(job_result) => job_initialized(channel, delivery, job_result)
+      .await
+      .map_err(|e| e.into()),
+    ResponseMessage::Started(job_result) => job_started(channel, delivery, job_result)
+      .await
+      .map_err(|e| e.into()),
+    ResponseMessage::Completed(job_result) => job_completed(channel, delivery, job_result)
+      .await
+      .map_err(|e| e.into()),
     ResponseMessage::Error(message_error) => error(channel, delivery, message_error).await,
     ResponseMessage::Feedback(feedback) => match feedback {
       Feedback::Progression(progression) => job_progression(channel, progression.clone()),
-      Feedback::Status(process_status) => job_status(channel, delivery, process_status.clone())
+      Feedback::Status(process_status) => worker_status(channel, delivery, process_status.clone())
         .await
         .map_err(|e| e.into()),
     },

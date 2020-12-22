@@ -3,7 +3,7 @@ mod exchange_description;
 mod queue_description;
 
 use crate::message_exchange::rabbitmq::{
-  EXCHANGE_NAME_DELAYED, EXCHANGE_NAME_DIRECT_MESSAGING, EXCHANGE_NAME_RESPONSE,
+  EXCHANGE_NAME_DELAYED, EXCHANGE_NAME_DIRECT_MESSAGING, EXCHANGE_NAME_JOB_RESPONSE,
   EXCHANGE_NAME_RESPONSE_DELAYED, EXCHANGE_NAME_SUBMIT, QUEUE_WORKER_DISCOVERY,
 };
 use crate::worker::WorkerConfiguration;
@@ -36,7 +36,7 @@ pub fn declare_consumer_channel(
     .with_alternate_exchange("job_queue_not_found")
     .declare(&channel);
 
-  ExchangeDescription::new(EXCHANGE_NAME_RESPONSE, ExchangeKind::Topic)
+  ExchangeDescription::new(EXCHANGE_NAME_JOB_RESPONSE, ExchangeKind::Topic)
     .with_alternate_exchange("job_response_not_found")
     .declare(&channel);
 

@@ -1,6 +1,6 @@
 use crate::{
   job::JobStatus,
-  message_exchange::rabbitmq::{EXCHANGE_NAME_RESPONSE, QUEUE_JOB_ERROR},
+  message_exchange::rabbitmq::{EXCHANGE_NAME_JOB_RESPONSE, ROUTING_KEY_JOB_ERROR},
   JobResult,
 };
 use lapin::{
@@ -24,8 +24,8 @@ pub fn job_processing_error(
 
   if channel
     .basic_publish(
-      EXCHANGE_NAME_RESPONSE,
-      QUEUE_JOB_ERROR,
+      EXCHANGE_NAME_JOB_RESPONSE,
+      ROUTING_KEY_JOB_ERROR,
       BasicPublishOptions::default(),
       content.as_bytes().to_vec(),
       BasicProperties::default(),

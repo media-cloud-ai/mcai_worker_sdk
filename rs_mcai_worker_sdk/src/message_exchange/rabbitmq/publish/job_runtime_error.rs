@@ -1,4 +1,4 @@
-use crate::message_exchange::rabbitmq::{EXCHANGE_NAME_RESPONSE, QUEUE_JOB_ERROR};
+use crate::message_exchange::rabbitmq::{EXCHANGE_NAME_JOB_RESPONSE, ROUTING_KEY_JOB_ERROR};
 use lapin::{
   message::Delivery,
   options::{BasicAckOptions, BasicPublishOptions, BasicRejectOptions},
@@ -16,8 +16,8 @@ pub fn job_runtime_error(channel: Arc<Channel>, message: &Delivery, details: &st
 
   if channel
     .basic_publish(
-      EXCHANGE_NAME_RESPONSE,
-      QUEUE_JOB_ERROR,
+      EXCHANGE_NAME_JOB_RESPONSE,
+      ROUTING_KEY_JOB_ERROR,
       BasicPublishOptions::default(),
       content.as_bytes().to_vec(),
       BasicProperties::default(),
