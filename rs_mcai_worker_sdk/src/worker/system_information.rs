@@ -6,18 +6,18 @@ use lapin::{
 };
 use sysinfo::SystemExt;
 
-#[derive(Debug, Serialize)]
-struct SystemInformation {
-  docker_container_id: String,
-  total_memory: u64,
-  used_memory: u64,
-  total_swap: u64,
-  used_swap: u64,
-  number_of_processors: usize,
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SystemInformation {
+  pub docker_container_id: String,
+  pub total_memory: u64,
+  pub used_memory: u64,
+  pub total_swap: u64,
+  pub used_swap: u64,
+  pub number_of_processors: usize,
 }
 
 impl SystemInformation {
-  fn new(worker_configuration: &WorkerConfiguration) -> Self {
+  pub(crate) fn new(worker_configuration: &WorkerConfiguration) -> Self {
     let mut system = sysinfo::System::new_all();
     system.refresh_all();
 

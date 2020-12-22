@@ -89,7 +89,7 @@ pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent
 
     let cloned_exchange = shared_exchange.clone();
     async_std::task::spawn(async move {
-      let processor = Processor::new(cloned_exchange);
+      let processor = Processor::new(cloned_exchange, worker_configuration.clone());
       processor.run(shared_message_event.clone()).unwrap();
     });
 
@@ -139,7 +139,7 @@ pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent
 
       let exchange = Arc::new(exchange);
 
-      let processor = Processor::new(exchange);
+      let processor = Processor::new(exchange, worker_configuration.clone());
 
       processor.run(shared_message_event.clone()).unwrap();
     });

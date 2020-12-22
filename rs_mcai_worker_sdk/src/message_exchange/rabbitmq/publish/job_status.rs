@@ -1,24 +1,22 @@
-use lapin::message::Delivery;
 use lapin::options::{BasicAckOptions, BasicPublishOptions, BasicRejectOptions};
 use lapin::{BasicProperties, Channel, Promise};
 
-use crate::{
-  message_exchange::rabbitmq::{EXCHANGE_NAME_RESPONSE, QUEUE_JOB_COMPLETED},
-  JobResult,
-};
+use crate::message_exchange::rabbitmq::{EXCHANGE_NAME_RESPONSE, ROUTING_KEY_JOB_STATUS};
+use crate::processor::ProcessStatus;
+use lapin::message::Delivery;
 use std::sync::Arc;
 
-pub fn job_completed(
+pub fn job_status(
   channel: Arc<Channel>,
   delivery: &Delivery,
-  job_result: &JobResult,
+  process_status: ProcessStatus,
 ) -> Promise<()> {
-  let msg = json!(job_result).to_string();
+  let msg = json!(process_status).to_string();
 
   let result = channel
     .basic_publish(
       EXCHANGE_NAME_RESPONSE,
-      QUEUE_JOB_COMPLETED,
+      ROUTING_KEY_JOB_STATUS,
       BasicPublishOptions::default(),
       msg.as_bytes().to_vec(),
       BasicProperties::default(),

@@ -1,10 +1,10 @@
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum JobStatus {
-  #[serde(rename = "unknown")]
   Unknown,
-  #[serde(rename = "completed")]
+  Initialized,
+  Running,
   Completed,
-  #[serde(rename = "error")]
   Error,
 }
 

@@ -1,13 +1,12 @@
 use crate::{
   job::{Job, JobResult, JobStatus},
-  message::{media::output::Output, media::source::Source, publish_job_progression},
+  message::{media::output::Output, media::source::Source},
   parameter::container::ParametersContainer,
-  AudioFilter, McaiChannel, MessageEvent, ProcessFrame, Result,
+  AudioFilter, MessageEvent, ProcessFrame, Result,
 };
 use filters::VideoFilter;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use source::DecodeResult;
 use std::sync::{Arc, Mutex};
 
 pub mod audio;
@@ -125,64 +124,4 @@ pub fn process_frame<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
   output.push(result);
 
   Ok(())
-}
-
-pub fn process<P: DeserializeOwned + JsonSchema, ME: MessageEvent<P>>(
-  message_event: Arc<Mutex<ME>>,
-  channel: Option<McaiChannel>,
-  job: &Job,
-  _parameters: P,
-  job_result: JobResult,
-) -> Result<JobResult> {
-  let str_job_id = job.job_id.to_string();
-  let (mut source, mut output) = initialize_process(message_event.clone(), job)?;
-
-  debug!(
-    target: &str_job_id,
-    "Start to process media (start: {} ms, duration: {})",
-    source.get_start_offset(),
-    source
-      .get_segment_duration()
-      .map(|duration| format!("{} ms", duration))
-      .unwrap_or_else(|| "unknown".to_string())
-  );
-
-  let total_duration = source.get_duration();
-  let mut count = 0;
-  let mut previous_progress = 0;
-
-  loop {
-    match source.next_frame()? {
-      DecodeResult::Frame {
-        stream_index,
-        frame,
-      } => {
-        if stream_index == source.get_first_stream_index() {
-          count += 1;
-
-          if let Some(duration) = total_duration {
-            let progress = std::cmp::min((count / duration * 100) as u8, 100);
-            if progress > previous_progress {
-              publish_job_progression(channel.clone(), job.job_id, progress)?;
-              previous_progress = progress;
-            }
-          }
-        }
-        trace!(target: &job_result.get_str_job_id(), "Process frame {}", count);
-
-        process_frame(
-          message_event.clone(),
-          &mut output,
-          job_result.clone(),
-          stream_index,
-          frame,
-        )?;
-      }
-      DecodeResult::WaitMore => {}
-      DecodeResult::Nothing => {}
-      DecodeResult::EndOfStream => {
-        return finish_process(message_event, &mut output, job_result);
-      }
-    }
-  }
 }

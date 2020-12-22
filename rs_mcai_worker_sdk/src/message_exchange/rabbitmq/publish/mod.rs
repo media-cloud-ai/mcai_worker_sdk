@@ -5,6 +5,7 @@ mod job_parameter_error;
 mod job_processing_error;
 mod job_progression;
 mod job_runtime_error;
+mod job_status;
 
 pub use job_completed::job_completed;
 pub use job_missing_requirements::job_missing_requirements;
@@ -13,9 +14,12 @@ pub use job_parameter_error::job_parameter_error;
 pub use job_processing_error::job_processing_error;
 pub use job_progression::job_progression;
 pub use job_runtime_error::job_runtime_error;
+pub use job_status::job_status;
 
-use crate::message_exchange::Feedback;
-use crate::{message_exchange::ResponseMessage, MessageError, Result};
+use crate::{
+  message_exchange::{Feedback, ResponseMessage},
+  MessageError, Result,
+};
 use lapin::{message::Delivery, Channel};
 use std::sync::Arc;
 
@@ -32,10 +36,13 @@ pub async fn response(
         .map_err(|e| e.into())
     }
     ResponseMessage::Error(message_error) => error(channel, delivery, message_error).await,
-    ResponseMessage::Initialized => Ok(()),
     ResponseMessage::Feedback(feedback) => match feedback {
       Feedback::Progression(progression) => job_progression(channel, progression.clone()),
+      Feedback::Status(process_status) => job_status(channel, delivery, process_status.clone())
+        .await
+        .map_err(|e| e.into()),
     },
+    ResponseMessage::StatusError(message_error) => error(channel, delivery, message_error).await,
   }
 }
 

@@ -2,23 +2,19 @@ mod bind_description;
 mod exchange_description;
 mod queue_description;
 
+use crate::message_exchange::rabbitmq::{
+  EXCHANGE_NAME_DELAYED, EXCHANGE_NAME_DIRECT_MESSAGING, EXCHANGE_NAME_RESPONSE,
+  EXCHANGE_NAME_RESPONSE_DELAYED, EXCHANGE_NAME_SUBMIT, QUEUE_WORKER_DISCOVERY,
+};
 use crate::worker::WorkerConfiguration;
-use bind_description::BindDescription;
+pub use bind_description::BindDescription;
 use exchange_description::ExchangeDescription;
 use lapin::{
   options::{BasicPublishOptions, BasicQosOptions, ExchangeDeclareOptions},
   BasicProperties, Channel, Connection, ExchangeKind,
 };
-use queue_description::QueueDescription;
+pub use queue_description::QueueDescription;
 use std::collections::HashMap;
-
-static EXCHANGE_NAME_SUBMIT: &str = "job_submit";
-static EXCHANGE_NAME_RESPONSE: &str = "job_response";
-static EXCHANGE_NAME_DELAYED: &str = "job_delayed";
-static EXCHANGE_NAME_DIRECT_MESSAGING: &str = "direct_messaging";
-static EXCHANGE_NAME_RESPONSE_DELAYED: &str = "job_response_delayed";
-
-static QUEUE_NAME_WORKER_DISCOVERY: &str = "worker_discovery";
 
 pub fn declare_consumer_channel(
   conn: &Connection,
@@ -117,11 +113,11 @@ pub fn declare_consumer_channel(
   delayed_bind.declare(&channel);
 
   let worker_discovery_queue = QueueDescription {
-    name: QUEUE_NAME_WORKER_DISCOVERY.to_string(),
+    name: QUEUE_WORKER_DISCOVERY.to_string(),
     durable: true,
     auto_delete: false,
     dead_letter_exchange: Some(EXCHANGE_NAME_RESPONSE_DELAYED.to_string()),
-    dead_letter_routing_key: Some(QUEUE_NAME_WORKER_DISCOVERY.to_string()),
+    dead_letter_routing_key: Some(QUEUE_WORKER_DISCOVERY.to_string()),
     max_priority: None,
     message_ttl: None,
   };
@@ -132,7 +128,7 @@ pub fn declare_consumer_channel(
   if let Err(msg) = channel
     .basic_publish(
       "",
-      QUEUE_NAME_WORKER_DISCOVERY,
+      QUEUE_WORKER_DISCOVERY,
       BasicPublishOptions::default(),
       payload.as_bytes().to_vec(),
       BasicProperties::default(),
@@ -141,7 +137,7 @@ pub fn declare_consumer_channel(
   {
     error!(
       "Impossible to send message on {} queue: {:?}",
-      QUEUE_NAME_WORKER_DISCOVERY, msg
+      QUEUE_WORKER_DISCOVERY, msg
     );
   }
 
