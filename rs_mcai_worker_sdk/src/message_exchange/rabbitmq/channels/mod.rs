@@ -4,7 +4,8 @@ mod queue_description;
 
 use crate::message_exchange::rabbitmq::{
   EXCHANGE_NAME_DELAYED, EXCHANGE_NAME_DIRECT_MESSAGING, EXCHANGE_NAME_JOB_RESPONSE,
-  EXCHANGE_NAME_RESPONSE_DELAYED, EXCHANGE_NAME_SUBMIT, QUEUE_WORKER_DISCOVERY,
+  EXCHANGE_NAME_RESPONSE_DELAYED, EXCHANGE_NAME_SUBMIT, EXCHANGE_NAME_WORKER_RESPONSE,
+  QUEUE_WORKER_DISCOVERY,
 };
 use crate::worker::WorkerConfiguration;
 pub use bind_description::BindDescription;
@@ -38,6 +39,10 @@ pub fn declare_consumer_channel(
 
   ExchangeDescription::new(EXCHANGE_NAME_JOB_RESPONSE, ExchangeKind::Topic)
     .with_alternate_exchange("job_response_not_found")
+    .declare(&channel);
+
+  ExchangeDescription::new(EXCHANGE_NAME_WORKER_RESPONSE, ExchangeKind::Topic)
+    .with_alternate_exchange("worker_response_not_found")
     .declare(&channel);
 
   let delayed_queue = QueueDescription {
