@@ -1,12 +1,11 @@
 pub mod local;
+mod order_message;
 pub mod rabbitmq;
 
-use crate::{
-  job::{Job, JobProgression},
-  processor::ProcessStatus,
-  JobResult, MessageError, Result
-};
+pub use order_message::OrderMessage;
+
 use crate::worker::WorkerConfiguration;
+use crate::{job::JobProgression, processor::ProcessStatus, JobResult, MessageError, Result};
 use async_std::channel::Receiver;
 pub use local::LocalExchange;
 pub use rabbitmq::RabbitmqExchange;
@@ -18,20 +17,9 @@ pub enum ResponseMessage {
   Feedback(Feedback),
   Error(MessageError),
   StatusError(MessageError),
-  WorkerCreated(WorkerConfiguration),
+  WorkerCreated(Box<WorkerConfiguration>),
   WorkerInitialized(JobResult),
   WorkerStarted(JobResult),
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum OrderMessage {
-  Job(Job),
-  InitProcess(Job),
-  StartProcess(Job),
-  StopProcess(Job),
-  StopWorker,
-  Status,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

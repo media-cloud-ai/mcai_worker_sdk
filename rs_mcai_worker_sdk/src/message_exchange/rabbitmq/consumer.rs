@@ -1,14 +1,20 @@
 use super::{helpers, publish, CurrentOrders};
-use crate::{job::Job, message_exchange::OrderMessage, MessageError, Result};
+use crate::{message_exchange::OrderMessage, MessageError, Result};
 use amq_protocol_types::FieldTable;
-use async_std::stream::StreamExt;
 use async_std::{
   channel::Sender,
+  stream::StreamExt,
   task::{self, JoinHandle},
 };
-use lapin::options::BasicRejectOptions;
-use lapin::{message::Delivery, options::BasicConsumeOptions, Channel};
-use std::sync::{Arc, Mutex};
+use lapin::{
+  message::Delivery,
+  options::{BasicConsumeOptions, BasicRejectOptions},
+  Channel,
+};
+use std::{
+  convert::TryFrom,
+  sync::{Arc, Mutex},
+};
 
 pub struct RabbitmqConsumer {
   handle: Option<JoinHandle<()>>,
@@ -70,12 +76,7 @@ impl RabbitmqConsumer {
       MessageError::RuntimeError(format!("unable to retrieve raw message: {:?}", e))
     })?;
 
-    let order_message = if let Ok(job) = Job::new(message_data) {
-      OrderMessage::Job(job)
-    } else {
-      serde_json::from_str::<OrderMessage>(message_data)
-        .map_err(|e| MessageError::RuntimeError(e.to_string()))?
-    };
+    let order_message = OrderMessage::try_from(message_data)?;
 
     log::debug!(
       "RabbitMQ consumer on {:?} queue received message: {:?} (iteration: {})",

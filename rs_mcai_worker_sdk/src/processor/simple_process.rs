@@ -38,7 +38,9 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
     let response = match order_message {
       OrderMessage::InitProcess(job) => {
         self.status = JobStatus::Initialized;
-        ResponseMessage::WorkerInitialized(JobResult::new(job.job_id).with_status(JobStatus::Initialized))
+        ResponseMessage::WorkerInitialized(
+          JobResult::new(job.job_id).with_status(JobStatus::Initialized),
+        )
       }
       OrderMessage::Job(job) | OrderMessage::StartProcess(job) => {
         info!("Process job: {:?}", job);

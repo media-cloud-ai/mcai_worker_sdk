@@ -338,7 +338,7 @@ fn compare_time_expressions() {
     hours: 0,
     minutes: 0,
     seconds: 56,
-    frames: Frames::Frames { value: 08 },
+    frames: Frames::Frames { value: 8 },
   };
 
   let src2 = TimeExpression::OffsetTime {
@@ -354,6 +354,6 @@ fn compare_time_expressions() {
   };
 
   println!("{} {}", src1.to_frames(), src2.to_frames());
-  assert_eq!(src1.to_frames(), src2.to_frames());
+  assert!((src1.to_frames() - src2.to_frames()).abs() < f32::EPSILON);
   assert!(src1.to_frames() - src3.to_frames() < 0.1);
 }

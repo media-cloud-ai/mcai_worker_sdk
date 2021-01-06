@@ -103,7 +103,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
             (*status.lock().unwrap().deref_mut()) = JobStatus::Running;
 
             let response = if let Some(media_process_parameters) = &process_parameters {
-              let current_job_id = media_process_parameters.borrow().job.job_id.clone();
+              let current_job_id = media_process_parameters.borrow().job.job_id;
               if job.job_id != current_job_id {
                 ResponseMessage::Error(MessageError::RuntimeError( // TODO use ProcessError
                   format!("Process cannot be started since another job has been initialized before (id: {})!", current_job_id),
@@ -259,6 +259,13 @@ impl MediaProcessParameters {
     worker_configuration: WorkerConfiguration,
   ) -> ResponseMessage {
     let job = self.job.clone();
+    let job_result = JobResult::from(job.clone());
+
+    response_sender
+      .lock()
+      .unwrap()
+      .send_response(ResponseMessage::WorkerStarted(job_result.clone()))
+      .unwrap();
 
     info!("Start processing job: {:?}", job);
 
@@ -270,8 +277,6 @@ impl MediaProcessParameters {
         JobProgression::new(job.job_id, 0),
       )))
       .unwrap();
-
-    let job_result = JobResult::from(job.clone());
 
     info!(
       "{} - Start to process media (start: {} ms, duration: {})",

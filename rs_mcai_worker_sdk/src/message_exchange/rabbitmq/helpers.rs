@@ -47,7 +47,7 @@ fn header_information() {
 
   map.insert(
     "x-death".into(),
-    AMQPValue::FieldArray(vec![AMQPValue::FieldTable(properties).into()].into()),
+    AMQPValue::FieldArray(vec![AMQPValue::FieldTable(properties)].into()),
   );
   let header = Some(map);
   let count = get_count_from_header(&header);

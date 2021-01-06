@@ -5,15 +5,15 @@ extern crate serde_derive;
 #[test]
 #[cfg(not(feature = "media"))]
 fn processor() {
+  use assert_matches::assert_matches;
   use mcai_worker_sdk::{
     job::{Job, JobResult, JobStatus},
     message_exchange::{ExternalExchange, Feedback, LocalExchange, OrderMessage, ResponseMessage},
     processor::{ProcessStatus, Processor},
+    worker::WorkerConfiguration,
     JsonSchema, McaiChannel, MessageEvent, Result,
-    worker::WorkerConfiguration
   };
   use std::sync::{Arc, Mutex};
-  use assert_matches::assert_matches;
 
   struct Worker {}
 
@@ -116,4 +116,3 @@ fn processor() {
     }))
   );
 }
-

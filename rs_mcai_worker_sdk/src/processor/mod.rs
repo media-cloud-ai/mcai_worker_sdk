@@ -86,7 +86,9 @@ impl Processor {
       response_sender_to_exchange
         .lock()
         .unwrap()
-        .send_response(ResponseMessage::WorkerCreated(cloned_worker_configuration.clone()))
+        .send_response(ResponseMessage::WorkerCreated(
+          Box::new(cloned_worker_configuration.clone()),
+        ))
         .unwrap();
 
       loop {
