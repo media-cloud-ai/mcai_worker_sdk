@@ -83,6 +83,12 @@ impl Processor {
         cloned_worker_configuration.clone(),
       );
 
+      response_sender_to_exchange
+        .lock()
+        .unwrap()
+        .send_response(ResponseMessage::WorkerCreated(cloned_worker_configuration.clone()))
+        .unwrap();
+
       loop {
         let order_receiver = order_receiver_from_exchange.clone();
 

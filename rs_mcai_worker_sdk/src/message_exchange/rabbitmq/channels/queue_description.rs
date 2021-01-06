@@ -1,6 +1,7 @@
 use amq_protocol_types::AMQPValue;
 use lapin::{options::QueueDeclareOptions, types::FieldTable, Channel};
 
+#[derive(Default)]
 pub struct QueueDescription {
   pub name: String,
   pub durable: bool,

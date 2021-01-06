@@ -1,6 +1,6 @@
 use crate::{
   job::{JobProgression, JobResult, JobStatus},
-  message_exchange::rabbitmq::{EXCHANGE_NAME_JOB_RESPONSE, ROUTING_KEY_JOB_PROGRESSION},
+  message_exchange::rabbitmq::{EXCHANGE_NAME_JOB_RESPONSE, QUEUE_JOB_PROGRESSION},
   MessageError, Result,
 };
 use lapin::{options::BasicPublishOptions, BasicProperties, Channel};
@@ -15,7 +15,7 @@ pub fn job_progression(channel: Arc<Channel>, job_progression: JobProgression) -
   channel
     .basic_publish(
       EXCHANGE_NAME_JOB_RESPONSE,
-      ROUTING_KEY_JOB_PROGRESSION,
+      QUEUE_JOB_PROGRESSION,
       BasicPublishOptions::default(),
       msg.as_bytes().to_vec(),
       BasicProperties::default(),

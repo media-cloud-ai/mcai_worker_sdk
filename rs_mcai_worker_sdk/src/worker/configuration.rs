@@ -8,7 +8,7 @@ use schemars::schema_for;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct WorkerConfiguration {
   instance_id: String,
   queue_name: String,

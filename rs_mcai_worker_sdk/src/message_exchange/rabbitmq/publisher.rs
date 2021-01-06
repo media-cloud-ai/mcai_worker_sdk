@@ -1,5 +1,4 @@
-use super::publish;
-use crate::message_exchange::rabbitmq::connection::CurrentOrders;
+use super::{publish, CurrentOrders};
 use crate::message_exchange::Feedback;
 use crate::{message_exchange::ResponseMessage, MessageError, Result};
 use async_std::{
@@ -67,8 +66,9 @@ impl RabbitmqPublisher {
       ResponseMessage::Feedback(Feedback::Progression(progression)) => {
         return publish::job_progression(channel, progression);
       }
-      ResponseMessage::Initialized(_)
-      | ResponseMessage::Started(_)
+      ResponseMessage::WorkerCreated(_)
+      | ResponseMessage::WorkerInitialized(_)
+      | ResponseMessage::WorkerStarted(_)
       | ResponseMessage::Completed(_)
       | ResponseMessage::Error(_) => current_orders.lock().unwrap().get_process_deliveries(),
       ResponseMessage::Feedback(_) | ResponseMessage::StatusError(_) => {
@@ -91,8 +91,9 @@ impl RabbitmqPublisher {
     }
 
     match response {
-      ResponseMessage::Initialized(_)
-      | ResponseMessage::Started(_)
+      ResponseMessage::WorkerCreated(_)
+      | ResponseMessage::WorkerInitialized(_)
+      | ResponseMessage::WorkerStarted(_)
       | ResponseMessage::Completed(_)
       | ResponseMessage::Error(_) => {
         current_orders.lock().unwrap().reset_process_deliveries();

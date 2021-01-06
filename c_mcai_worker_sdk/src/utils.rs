@@ -28,7 +28,7 @@ macro_rules! get_c_string {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Handler {
   pub job_id: Option<u64>,
   pub parameters: Option<CWorkerParameters>,

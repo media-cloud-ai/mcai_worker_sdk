@@ -6,10 +6,14 @@ use crate::message_exchange::rabbitmq::{
   EXCHANGE_NAME_DELAYED, EXCHANGE_NAME_DIRECT_MESSAGING, EXCHANGE_NAME_JOB_RESPONSE,
   EXCHANGE_NAME_RESPONSE_DELAYED, EXCHANGE_NAME_SUBMIT, EXCHANGE_NAME_WORKER_RESPONSE,
   QUEUE_WORKER_DISCOVERY,
+  JOB_QUEUE_NOT_FOUND,
+JOB_RESPONSE_NOT_FOUND,
+WORKER_RESPONSE_NOT_FOUND,
+DIRECT_MESSAGING_NOT_FOUND,
 };
 use crate::worker::WorkerConfiguration;
 pub use bind_description::BindDescription;
-use exchange_description::ExchangeDescription;
+pub use exchange_description::ExchangeDescription;
 use lapin::{
   options::{BasicPublishOptions, BasicQosOptions, ExchangeDeclareOptions},
   BasicProperties, Channel, Connection, ExchangeKind,
@@ -34,25 +38,23 @@ pub fn declare_consumer_channel(
   delayed_exchange.declare(&channel);
 
   ExchangeDescription::new(EXCHANGE_NAME_SUBMIT, ExchangeKind::Topic)
-    .with_alternate_exchange("job_queue_not_found")
+    .with_alternate_exchange(JOB_QUEUE_NOT_FOUND)
     .declare(&channel);
 
   ExchangeDescription::new(EXCHANGE_NAME_JOB_RESPONSE, ExchangeKind::Topic)
-    .with_alternate_exchange("job_response_not_found")
+    .with_alternate_exchange(JOB_RESPONSE_NOT_FOUND)
     .declare(&channel);
 
   ExchangeDescription::new(EXCHANGE_NAME_WORKER_RESPONSE, ExchangeKind::Topic)
-    .with_alternate_exchange("worker_response_not_found")
+    .with_alternate_exchange(WORKER_RESPONSE_NOT_FOUND)
     .declare(&channel);
 
   let delayed_queue = QueueDescription {
     name: EXCHANGE_NAME_DELAYED.to_string(),
     durable: true,
-    auto_delete: false,
     dead_letter_exchange: Some("".to_string()),
-    dead_letter_routing_key: None,
-    max_priority: None,
     message_ttl: Some(5000),
+    .. Default::default()
   };
   delayed_queue.declare(&channel);
 
@@ -66,7 +68,7 @@ pub fn declare_consumer_channel(
 
   let direct_messaging_exchange =
     ExchangeDescription::new(EXCHANGE_NAME_DIRECT_MESSAGING, ExchangeKind::Headers)
-      .with_alternate_exchange("direct_messaging_not_found");
+      .with_alternate_exchange(DIRECT_MESSAGING_NOT_FOUND);
 
   direct_messaging_exchange.declare(&channel);
 
@@ -74,10 +76,7 @@ pub fn declare_consumer_channel(
     name: worker_configuration.get_direct_messaging_queue_name(),
     durable: false,
     auto_delete: true,
-    dead_letter_exchange: None,
-    dead_letter_routing_key: None,
-    max_priority: None,
-    message_ttl: None,
+    .. Default::default()
   };
   direct_messaging_queue.declare(&channel);
 
@@ -120,11 +119,9 @@ pub fn declare_consumer_channel(
   let worker_discovery_queue = QueueDescription {
     name: QUEUE_WORKER_DISCOVERY.to_string(),
     durable: true,
-    auto_delete: false,
     dead_letter_exchange: Some(EXCHANGE_NAME_RESPONSE_DELAYED.to_string()),
     dead_letter_routing_key: Some(QUEUE_WORKER_DISCOVERY.to_string()),
-    max_priority: None,
-    message_ttl: None,
+    .. Default::default()
   };
   worker_discovery_queue.declare(&channel);
 
@@ -132,7 +129,7 @@ pub fn declare_consumer_channel(
 
   if let Err(msg) = channel
     .basic_publish(
-      "",
+      EXCHANGE_NAME_JOB_RESPONSE,
       QUEUE_WORKER_DISCOVERY,
       BasicPublishOptions::default(),
       payload.as_bytes().to_vec(),
@@ -149,11 +146,10 @@ pub fn declare_consumer_channel(
   let job_queue = QueueDescription {
     name: worker_configuration.get_queue_name(),
     durable: true,
-    auto_delete: false,
     dead_letter_exchange: Some(EXCHANGE_NAME_DELAYED.to_string()),
     dead_letter_routing_key: Some(worker_configuration.get_queue_name()),
     max_priority: Some(100),
-    message_ttl: None,
+    .. Default::default()
   };
   job_queue.declare(&channel);
 
@@ -164,6 +160,23 @@ pub fn declare_consumer_channel(
     headers: HashMap::new(),
   };
   delayed_bind.declare(&channel);
+
+
+  let worker_response_not_found = QueueDescription {
+    name: WORKER_RESPONSE_NOT_FOUND.to_string(),
+    durable: true,
+    .. Default::default()
+  };
+  worker_response_not_found.declare(&channel);
+
+  let worker_response_not_found_bind = BindDescription {
+    exchange: EXCHANGE_NAME_WORKER_RESPONSE.to_string(),
+    queue: WORKER_RESPONSE_NOT_FOUND.to_string(),
+    routing_key: "*".to_string(),
+    headers: HashMap::new(),
+  };
+  worker_response_not_found_bind.declare(&channel);
+
 
   info!("Exchanges and Queues are configured.");
   channel

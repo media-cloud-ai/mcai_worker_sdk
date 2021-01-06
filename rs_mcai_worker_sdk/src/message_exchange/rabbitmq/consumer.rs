@@ -1,5 +1,4 @@
-use super::{helpers, publish};
-use crate::message_exchange::rabbitmq::connection::CurrentOrders;
+use super::{helpers, publish, CurrentOrders};
 use crate::{job::Job, message_exchange::OrderMessage, MessageError, Result};
 use amq_protocol_types::FieldTable;
 use async_std::stream::StreamExt;

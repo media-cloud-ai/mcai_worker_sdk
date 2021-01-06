@@ -94,7 +94,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
               (*status.lock().unwrap().deref_mut()) = JobStatus::Initialized;
               process_parameters = Some(Rc::new(RefCell::new(initialization_result.unwrap())));
 
-              ResponseMessage::Initialized(
+              ResponseMessage::WorkerInitialized(
                 JobResult::new(job.job_id).with_status(JobStatus::Initialized),
               )
             }

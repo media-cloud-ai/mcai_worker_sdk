@@ -1,9 +1,12 @@
 pub mod local;
 pub mod rabbitmq;
 
-use crate::job::JobProgression;
-use crate::processor::ProcessStatus;
-use crate::{job::Job, JobResult, MessageError, Result};
+use crate::{
+  job::{Job, JobProgression},
+  processor::ProcessStatus,
+  JobResult, MessageError, Result
+};
+use crate::worker::WorkerConfiguration;
 use async_std::channel::Receiver;
 pub use local::LocalExchange;
 pub use rabbitmq::RabbitmqExchange;
@@ -11,12 +14,13 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResponseMessage {
-  Initialized(JobResult),
-  Started(JobResult),
   Completed(JobResult),
   Feedback(Feedback),
   Error(MessageError),
   StatusError(MessageError),
+  WorkerCreated(WorkerConfiguration),
+  WorkerInitialized(JobResult),
+  WorkerStarted(JobResult),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

@@ -1,26 +1,26 @@
-use lapin::message::Delivery;
-use lapin::options::{BasicAckOptions, BasicPublishOptions, BasicRejectOptions};
-use lapin::{BasicProperties, Channel, Promise};
-
+use lapin::{
+  message::Delivery,
+  options::{BasicAckOptions, BasicPublishOptions, BasicRejectOptions},
+  BasicProperties, Channel
+};
 use crate::{
-  message_exchange::rabbitmq::{EXCHANGE_NAME_WORKER_RESPONSE, ROUTING_KEY_WORKER_INITIALIZED},
-  JobResult,
+  message_exchange::rabbitmq::EXCHANGE_NAME_WORKER_RESPONSE,
+  Result,
 };
 use std::sync::Arc;
 
-pub fn job_initialized(
+pub async fn publish_worker_response(
   channel: Arc<Channel>,
   delivery: &Delivery,
-  job_result: &JobResult,
-) -> Promise<()> {
-  let msg = json!(job_result).to_string();
-
+  queue_name: &str,
+  payload: &str,
+) -> Result<()> {
   let result = channel
     .basic_publish(
       EXCHANGE_NAME_WORKER_RESPONSE,
-      ROUTING_KEY_WORKER_INITIALIZED,
+      queue_name,
       BasicPublishOptions::default(),
-      msg.as_bytes().to_vec(),
+      payload.as_bytes().to_vec(),
       BasicProperties::default(),
     )
     .wait()
@@ -30,11 +30,11 @@ pub fn job_initialized(
     channel.basic_ack(
       delivery.delivery_tag,
       BasicAckOptions::default(), /*not requeue*/
-    )
+    ).await.map_err(|e| e.into())
   } else {
     channel.basic_reject(
       delivery.delivery_tag,
       BasicRejectOptions { requeue: true }, /*requeue*/
-    )
+    ).await.map_err(|e| e.into())
   }
 }
