@@ -142,3 +142,19 @@ impl RabbitmqConnection {
     Ok(())
   }
 }
+
+impl Drop for RabbitmqConnection {
+  fn drop(&mut self) {
+    // TODO close consumer/publisher connections
+    self
+      ._current_orders
+      .lock()
+      .unwrap()
+      .reset_process_deliveries();
+    self
+      ._current_orders
+      .lock()
+      .unwrap()
+      .reset_status_deliveries();
+  }
+}
