@@ -2,9 +2,10 @@ use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use std::sync::{Arc, Mutex};
 
-use crate::job::{Job, JobStatus};
+use crate::job::{Job, JobProgression, JobStatus};
 use crate::message_exchange::{Feedback, OrderMessage, ResponseMessage};
 use crate::processor::ProcessStatus;
+use crate::worker::status::{WorkerActivity, WorkerStatus};
 use crate::worker::system_information::SystemInformation;
 use crate::worker::WorkerConfiguration;
 use crate::{
@@ -39,8 +40,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
     let status = Arc::new(Mutex::new(JobStatus::Unknown));
 
     let _join_handle = std::thread::spawn(move || {
-      let process_source: &mut Option<Rc<RefCell<Source>>> = &mut None;
-      let process_output: &mut Option<Rc<RefCell<Output>>> = &mut None;
+      let mut process_parameters: Option<Rc<RefCell<MediaProcessParameters>>> = None;
 
       let mut keep_running = true;
 
@@ -51,28 +51,28 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
         let response = match message {
           OrderMessage::Job(job) => {
             info!("Process job: {:?}", job);
-            let initialization_response = Self::initialize_process(
-              message_event.clone(),
-              process_source,
-              process_output,
-              job.clone(),
-            );
+            let initialization_result =
+              MediaProcessParameters::initialize_process(message_event.clone(), job.clone());
 
-            if matches!(initialization_response, ResponseMessage::Error(_)) {
+            if let Err(error) = initialization_result {
               (*status.lock().unwrap().deref_mut()) = JobStatus::Error;
-              initialization_response
+              ResponseMessage::Error(error)
             } else {
+              process_parameters = Some(Rc::new(RefCell::new(initialization_result.unwrap())));
+
+              // TODO send worker response Initialized
+
               (*status.lock().unwrap().deref_mut()) = JobStatus::Running;
-              let response = Self::start_process(
-                message_event.clone(),
-                process_source,
-                process_output,
-                job.clone(),
-                &mut keep_running,
-                &order_receiver,
-                response_sender.clone(),
-                worker_configuration.clone(),
-              );
+              let response = process_parameters
+                .clone()
+                .unwrap()
+                .borrow_mut()
+                .start_process(
+                  message_event.clone(),
+                  &order_receiver,
+                  response_sender.clone(),
+                  worker_configuration.clone(),
+                );
 
               if matches!(response, ResponseMessage::Error(_)) {
                 (*status.lock().unwrap().deref_mut()) = JobStatus::Error;
@@ -84,34 +84,44 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
             }
           }
           OrderMessage::InitProcess(job) => {
-            let response = Self::initialize_process(
-              message_event.clone(),
-              process_source,
-              process_output,
-              job.clone(),
-            );
+            let initialization_result =
+              MediaProcessParameters::initialize_process(message_event.clone(), job.clone());
 
-            if matches!(response, ResponseMessage::Error(_)) {
+            if let Err(error) = initialization_result {
               (*status.lock().unwrap().deref_mut()) = JobStatus::Error;
+              ResponseMessage::Error(error)
             } else {
               (*status.lock().unwrap().deref_mut()) = JobStatus::Initialized;
-            }
+              process_parameters = Some(Rc::new(RefCell::new(initialization_result.unwrap())));
 
-            response
+              ResponseMessage::Initialized(
+                JobResult::new(job.job_id).with_status(JobStatus::Initialized),
+              )
+            }
           }
           OrderMessage::StartProcess(job) => {
             (*status.lock().unwrap().deref_mut()) = JobStatus::Running;
 
-            let response = Self::start_process(
-              message_event.clone(),
-              process_source,
-              process_output,
-              job.clone(),
-              &mut keep_running,
-              &order_receiver,
-              response_sender.clone(),
-              worker_configuration.clone(),
-            );
+            let response = if let Some(media_process_parameters) = &process_parameters {
+              let current_job_id = media_process_parameters.borrow().job.job_id.clone();
+              if job.job_id != current_job_id {
+                ResponseMessage::Error(MessageError::RuntimeError( // TODO use ProcessError
+                  format!("Process cannot be started since another job has been initialized before (id: {})!", current_job_id),
+                ))
+              } else {
+                media_process_parameters.borrow_mut().start_process(
+                  message_event.clone(),
+                  &order_receiver,
+                  response_sender.clone(),
+                  worker_configuration.clone(),
+                )
+              }
+            } else {
+              ResponseMessage::Error(MessageError::RuntimeError(
+                // TODO use ProcessError
+                "Process cannot be started, it must be initialized before!".to_string(),
+              ))
+            };
 
             info!("Finished response: {:?}", response);
 
@@ -123,15 +133,30 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
 
             response
           }
-          OrderMessage::StopProcess(job) => ResponseMessage::Error(MessageError::RuntimeError(
-            format!("Cannot stop a non-running job: {}", job.job_id),
-          )),
-          OrderMessage::Status => {
-            Self::get_status_feedback(status.lock().unwrap().clone(), worker_configuration.clone())
+          OrderMessage::StopProcess(job) => {
+            // TODO check job id is same as store in process_paramaters
+            // if job.job_id != process_parameters.unwrap().borrow().job.job_id {
+            //
+            // }
+
+            ResponseMessage::Error(MessageError::ProcessingError(
+              JobResult::new(job.job_id)
+                .with_status(JobStatus::Error)
+                .with_message("Cannot stop a non-running job."),
+            ))
           }
+          OrderMessage::Status => Self::get_status_feedback(
+            status.lock().unwrap().clone(),
+            process_parameters.clone(),
+            worker_configuration.clone(),
+          ),
           OrderMessage::StopWorker => {
             keep_running = false;
-            Self::get_status_feedback(status.lock().unwrap().clone(), worker_configuration.clone())
+            Self::get_status_feedback(
+              status.lock().unwrap().clone(),
+              process_parameters.clone(),
+              worker_configuration.clone(),
+            )
           }
         };
 
@@ -158,7 +183,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
 
   fn handle(&mut self, _message_event: Arc<Mutex<ME>>, order_message: OrderMessage) -> Result<()> {
     if let Err(error) = self.order_sender.send(order_message) {
-      return Err(MessageError::RuntimeError(error.to_string()));
+      return Err(MessageError::RuntimeError(error.to_string())); // TODO use ProcessError
     }
     Ok(())
   }
@@ -167,79 +192,112 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
 impl MediaProcess {
   fn get_status_feedback(
     status: JobStatus,
+    process_parameters: Option<Rc<RefCell<MediaProcessParameters>>>,
     worker_configuration: WorkerConfiguration,
   ) -> ResponseMessage {
-    ResponseMessage::Feedback(Feedback::Status(ProcessStatus::new_with_info(
-      status,
-      SystemInformation::new(&worker_configuration),
-    )))
-  }
+    let job_result = process_parameters
+      .map(|param| JobResult::new(param.borrow().job.job_id).with_status(status.clone()));
 
+    get_status_feedback(status, job_result, worker_configuration)
+  }
+}
+
+fn get_status_feedback(
+  status: JobStatus,
+  job_result: Option<JobResult>,
+  worker_configuration: WorkerConfiguration,
+) -> ResponseMessage {
+  let activity = match &status {
+    JobStatus::Initialized | JobStatus::Running => WorkerActivity::Busy,
+    JobStatus::Completed | JobStatus::Error | JobStatus::Unknown => WorkerActivity::Idle,
+  };
+  let system_info = SystemInformation::new(&worker_configuration);
+
+  ResponseMessage::Feedback(Feedback::Status(ProcessStatus::new(
+    WorkerStatus::new(activity, system_info),
+    job_result,
+  )))
+}
+
+pub struct MediaProcessParameters {
+  source: Source,
+  output: Output,
+  keep_running: bool,
+  job: Job,
+}
+
+impl MediaProcessParameters {
   fn initialize_process<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
     message_event: Arc<Mutex<ME>>,
-    process_source: &mut Option<Rc<RefCell<Source>>>,
-    process_output: &mut Option<Rc<RefCell<Output>>>,
     job: Job,
-  ) -> ResponseMessage {
+  ) -> Result<Self> {
     info!("Initialize job: {:?}", job);
 
-    initialize_process(message_event, &job)
-      .map(|(source, output)| {
-        (*process_source) = Some(Rc::new(RefCell::new(source)));
-        (*process_output) = Some(Rc::new(RefCell::new(output)));
-        ResponseMessage::Feedback(Feedback::Status(ProcessStatus::new(JobStatus::Initialized)))
-      })
-      .unwrap_or_else(ResponseMessage::Error)
+    initialize_process(message_event, &job).map(|(source, output)| MediaProcessParameters {
+      source,
+      output,
+      keep_running: false,
+      job,
+    })
+  }
+
+  fn get_status_feedback(
+    &self,
+    status: JobStatus,
+    worker_configuration: WorkerConfiguration,
+  ) -> ResponseMessage {
+    let job_result = JobResult::new(self.job.job_id).with_status(status.clone());
+
+    get_status_feedback(status, Some(job_result), worker_configuration)
   }
 
   fn start_process<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
+    &mut self,
     message_event: Arc<Mutex<ME>>,
-    process_source: &mut Option<Rc<RefCell<Source>>>,
-    process_output: &mut Option<Rc<RefCell<Output>>>,
-    job: Job,
-    keep_running: &mut bool,
     order_receiver: &Receiver<OrderMessage>,
     response_sender: McaiChannel,
     worker_configuration: WorkerConfiguration,
   ) -> ResponseMessage {
-    if process_source.clone().is_none() || process_output.clone().is_none() {
-      ResponseMessage::Error(MessageError::RuntimeError(
-        "Process cannot be started, it must be initialized before!".to_string(),
-      ))
-    } else {
-      info!("Start processing job: {:?}", job);
+    let job = self.job.clone();
 
-      let job_result = JobResult::from(job.clone());
+    info!("Start processing job: {:?}", job);
 
-      let cloned_process_source = process_source.clone().unwrap();
-      let cloned_process_output = process_output.clone().unwrap();
+    // start publishing progression
+    response_sender
+      .lock()
+      .unwrap()
+      .send_response(ResponseMessage::Feedback(Feedback::Progression(
+        JobProgression::new(job.job_id, 0),
+      )))
+      .unwrap();
 
-      let mut source = cloned_process_source.borrow_mut();
-      let mut output = cloned_process_output.borrow_mut();
+    let job_result = JobResult::from(job.clone());
 
-      info!(
-        "{} - Start to process media (start: {} ms, duration: {})",
-        job_result.get_str_job_id(),
-        source.get_start_offset(),
-        source
-          .get_segment_duration()
-          .map(|duration| format!("{} ms", duration))
-          .unwrap_or_else(|| "unknown".to_string())
-      );
+    info!(
+      "{} - Start to process media (start: {} ms, duration: {})",
+      job_result.get_str_job_id(),
+      self.source.get_start_offset(),
+      self
+        .source
+        .get_segment_duration()
+        .map(|duration| format!("{} ms", duration))
+        .unwrap_or_else(|| "unknown".to_string())
+    );
 
-      let process_duration_ms = source.get_segment_duration();
+    let process_duration_ms = self.source.get_segment_duration();
 
-      let mut processed_frames = 0;
-      let mut previous_progress = 0;
+    let mut processed_frames = 0;
+    let mut previous_progress = 0;
 
-      let first_stream_fps = source.get_stream_fps(source.get_first_stream_index()) as f32;
+    let first_stream_fps = self
+      .source
+      .get_stream_fps(self.source.get_first_stream_index()) as f32;
 
-      loop {
-        // Process next frame
-        let response = Self::process_frame(
+    loop {
+      // Process next frame
+      let response = self
+        .process_frame(
           message_event.clone(),
-          &mut source,
-          &mut output,
           job_result.clone(),
           response_sender.clone(),
           first_stream_fps,
@@ -249,52 +307,54 @@ impl MediaProcess {
         )
         .unwrap_or_else(|error| Some(ResponseMessage::Error(error)));
 
-        // If a message is returned, stop looping and forward the message
-        if let Some(message) = response {
-          break message;
-        }
+      // If a message is returned, stop looping and forward the message
+      if let Some(message) = response {
+        break message;
+      }
 
-        // Otherwise check whether an order message as been sent to this thread
-        // FIXME!
-        if let Ok(message) = order_receiver.try_recv() {
-          let resp = match message {
-            OrderMessage::Job(_) => ResponseMessage::Error(MessageError::RuntimeError(
-              "Cannot handle a job while a process is running".to_string(),
-            )),
-            OrderMessage::InitProcess(_) => ResponseMessage::Error(MessageError::RuntimeError(
-              "Cannot initialize a running process".to_string(),
-            )),
-            OrderMessage::StartProcess(_) => ResponseMessage::Error(MessageError::RuntimeError(
-              "Cannot start a running process".to_string(),
-            )),
-            OrderMessage::StopProcess(_) => {
-              break finish_process(
-                message_event,
-                &mut process_output.clone().unwrap().borrow_mut(),
-                JobResult::from(job),
-              )
+      // Otherwise check whether an order message as been sent to this thread
+      if let Ok(message) = order_receiver.try_recv() {
+        let resp = match message {
+          OrderMessage::Job(_) => ResponseMessage::Error(MessageError::ProcessingError(
+            job_result
+              .clone()
+              .with_status(JobStatus::Running)
+              .with_message("Cannot handle a job while a process is running"),
+          )),
+          OrderMessage::InitProcess(_) => ResponseMessage::Error(MessageError::ProcessingError(
+            job_result
+              .clone()
+              .with_status(JobStatus::Running)
+              .with_message("Cannot initialize a running process"),
+          )),
+          OrderMessage::StartProcess(_) => ResponseMessage::Error(MessageError::ProcessingError(
+            job_result
+              .clone()
+              .with_status(JobStatus::Running)
+              .with_message("Cannot start a running process"),
+          )),
+          OrderMessage::StopProcess(_) => {
+            break finish_process(message_event, &mut self.output, JobResult::from(job))
               .map(ResponseMessage::Completed)
               .unwrap_or_else(ResponseMessage::Error);
-            }
-            OrderMessage::Status => {
-              Self::get_status_feedback(JobStatus::Running, worker_configuration.clone())
-            }
-            OrderMessage::StopWorker => {
-              (*keep_running) = false;
-              Self::get_status_feedback(JobStatus::Running, worker_configuration.clone())
-            }
-          };
+          }
+          OrderMessage::Status => {
+            self.get_status_feedback(JobStatus::Running, worker_configuration.clone())
+          }
+          OrderMessage::StopWorker => {
+            self.keep_running = false;
+            self.get_status_feedback(JobStatus::Running, worker_configuration.clone())
+          }
+        };
 
-          response_sender.lock().unwrap().send_response(resp).unwrap();
-        }
+        response_sender.lock().unwrap().send_response(resp).unwrap();
       }
     }
   }
 
   fn process_frame<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
+    &mut self,
     message_event: Arc<Mutex<ME>>,
-    source: &mut Source,
-    output: &mut Output,
     job_result: JobResult,
     response_sender: McaiChannel,
     first_stream_fps: f32,
@@ -302,12 +362,12 @@ impl MediaProcess {
     processed_frames: &mut usize,
     previous_progress: &mut u8,
   ) -> Result<Option<ResponseMessage>> {
-    let response = match source.next_frame()? {
+    let response = match self.source.next_frame()? {
       DecodeResult::Frame {
         stream_index,
         frame,
       } => {
-        if stream_index == source.get_first_stream_index() {
+        if stream_index == self.source.get_first_stream_index() {
           (*processed_frames) += 1;
 
           let processed_ms = (*processed_frames) as f32 * 1000.0 / first_stream_fps;
@@ -328,7 +388,7 @@ impl MediaProcess {
 
         crate::message::media::process_frame(
           message_event,
-          output,
+          &mut self.output,
           job_result,
           stream_index,
           frame,
@@ -338,8 +398,8 @@ impl MediaProcess {
       DecodeResult::WaitMore => None,
       DecodeResult::Nothing => None,
       DecodeResult::EndOfStream => {
-        let response =
-          finish_process(message_event, output, job_result).map(ResponseMessage::Completed)?;
+        let response = finish_process(message_event, &mut self.output, job_result)
+          .map(ResponseMessage::Completed)?;
         Some(response)
       }
     };

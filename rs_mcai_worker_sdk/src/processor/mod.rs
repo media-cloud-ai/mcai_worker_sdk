@@ -7,11 +7,9 @@ use media_process::MediaProcess as ProcessEngine;
 #[cfg(not(feature = "media"))]
 use simple_process::SimpleProcess as ProcessEngine;
 
-use crate::job::JobStatus;
-use crate::worker::system_information::SystemInformation;
-use crate::worker::WorkerConfiguration;
 use crate::{
   message_exchange::{InternalExchange, OrderMessage, ResponseMessage},
+  worker::{status::WorkerStatus, WorkerConfiguration},
   JobResult, McaiChannel, MessageEvent, Result,
 };
 use async_std::task;
@@ -34,33 +32,15 @@ pub trait Process<P, ME> {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ProcessStatus {
-  pub job_status: JobStatus,
-  pub job_result: Option<JobResult>,
-  pub worker_status: Option<SystemInformation>,
+  pub job: Option<JobResult>, // Contains job_status
+  pub worker: WorkerStatus,
 }
 
 impl ProcessStatus {
-  pub fn new(job_status: JobStatus) -> Self {
+  pub fn new(worker_status: WorkerStatus, job_result: Option<JobResult>) -> Self {
     ProcessStatus {
-      job_status,
-      job_result: None,
-      worker_status: None,
-    }
-  }
-
-  pub fn new_with_result(job_status: JobStatus, job_result: JobResult) -> Self {
-    ProcessStatus {
-      job_status,
-      job_result: Some(job_result),
-      worker_status: None,
-    }
-  }
-
-  pub fn new_with_info(job_status: JobStatus, system_info: SystemInformation) -> Self {
-    ProcessStatus {
-      job_status,
-      job_result: None,
-      worker_status: Some(system_info),
+      job: job_result,
+      worker: worker_status,
     }
   }
 }
