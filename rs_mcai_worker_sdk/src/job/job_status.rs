@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum JobStatus {
@@ -11,6 +13,12 @@ pub enum JobStatus {
 impl Default for JobStatus {
   fn default() -> Self {
     JobStatus::Unknown
+  }
+}
+
+impl fmt::Display for JobStatus {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{:?}", self)
   }
 }
 
