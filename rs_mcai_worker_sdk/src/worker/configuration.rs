@@ -1,17 +1,21 @@
 #[cfg(feature = "media")]
-use crate::message::{DESTINATION_PATH_PARAMETER, SOURCE_PATH_PARAMETER};
-#[cfg(feature = "media")]
-use crate::MessageError;
+use crate::{
+  message::{DESTINATION_PATH_PARAMETER, SOURCE_PATH_PARAMETER},
+  MessageError,
+};
 use crate::{MessageEvent, Version};
-use schemars::schema::RootSchema;
-use schemars::schema_for;
-use schemars::JsonSchema;
+use schemars::{
+  schema::RootSchema,
+  schema_for,
+  JsonSchema,
+};
 use serde::de::DeserializeOwned;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct WorkerConfiguration {
   instance_id: String,
   queue_name: String,
+  direct_messaging_queue_name: String,
   label: String,
   short_description: String,
   description: String,
@@ -32,9 +36,15 @@ impl WorkerConfiguration {
 
     let parameters = WorkerConfiguration::get_parameter_schema::<P>()?;
 
+    let identifier = std::env::var("DIRECT_MESSAGING_IDENTIFIER")
+      .unwrap_or(instance_id.to_string());
+
+    let direct_messaging_queue_name = format!("direct_messaging_{}", identifier);
+
     Ok(WorkerConfiguration {
       instance_id: instance_id.to_string(),
       queue_name: queue_name.to_string(),
+      direct_messaging_queue_name,
       label: message_event.get_name(),
       sdk_version,
       version: message_event.get_version(),
@@ -102,6 +112,6 @@ impl WorkerConfiguration {
   }
 
   pub fn get_direct_messaging_queue_name(&self) -> String {
-    format!("direct_messaging_{}", self.instance_id)
+    self.direct_messaging_queue_name.clone()
   }
 }
