@@ -1,0 +1,22 @@
+{
+  "job_id": 1234,
+  "parameters": [
+    {
+      "id": "source_path",
+      "type": "string",
+      "store": "environment",
+      "value": "SOURCE_PATH"
+    },
+    {
+      "id": "destination_path",
+      "type": "string",
+      "store": "environment",
+      "value": "DESTINATION_PATH"
+    },
+    {
+      "id": "sleep",
+      "type": "number",
+      "value": 2000
+    }
+  ]
+}
