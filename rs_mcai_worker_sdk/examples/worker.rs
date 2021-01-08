@@ -19,6 +19,8 @@ use stainless_ffmpeg_sys::AVMediaType;
 use std::{
   ops::Deref,
   sync::{mpsc::Sender, Arc, Mutex},
+  time::Duration,
+  thread::sleep,
 };
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -26,12 +28,16 @@ struct WorkerParameters {
   action: Option<String>,
   source_path: Option<String>,
   destination_path: Option<String>,
+  /// Option sleep time in milliseconds between each frames
+  sleep: Option<u64>,
 }
 
 #[derive(Debug, Default)]
 struct WorkerContext {
   #[cfg(feature = "media")]
   result: Option<Arc<Mutex<Sender<ProcessResult>>>>,
+  #[cfg(feature = "media")]
+  sleep: Option<u64>,
 }
 
 impl MessageEvent<WorkerParameters> for WorkerContext {
@@ -60,11 +66,12 @@ Do no use in production, just for developments."#
   #[cfg(feature = "media")]
   fn init_process(
     &mut self,
-    _parameters: WorkerParameters,
+    parameters: WorkerParameters,
     format_context: Arc<Mutex<FormatContext>>,
     result: Arc<Mutex<Sender<ProcessResult>>>,
   ) -> Result<Vec<StreamDescriptor>> {
     self.result = Some(result);
+    self.sleep = parameters.sleep;
 
     let mut stream_descriptors = vec![];
 
@@ -145,6 +152,11 @@ Do no use in production, just for developments."#
             );
           }
         }
+
+        if let Some(duration) = self.sleep {
+          sleep(Duration::from_millis(duration));
+        }
+
         Ok(ProcessResult::new_json(""))
       }
       ProcessFrame::EbuTtmlLive(ebu_ttml_live) => {
