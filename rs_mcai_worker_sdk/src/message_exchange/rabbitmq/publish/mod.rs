@@ -26,7 +26,7 @@ use crate::{
 use lapin::{message::Delivery, Channel};
 use std::sync::Arc;
 
-pub async fn response(
+pub async fn response_with_delivery(
   channel: Arc<Channel>,
   delivery: &Delivery,
   response: &ResponseMessage,
@@ -35,17 +35,17 @@ pub async fn response(
     ResponseMessage::WorkerCreated(worker_configuration) => {
       let payload = json!(worker_configuration).to_string();
 
-      publish_worker_response(channel, delivery, QUEUE_WORKER_CREATED, &payload).await
+      publish_worker_response(channel, Some(delivery), QUEUE_WORKER_CREATED, &payload).await
     }
     ResponseMessage::WorkerInitialized(job_result) => {
       let payload = json!(job_result).to_string();
 
-      publish_worker_response(channel, delivery, QUEUE_WORKER_INITIALIZED, &payload).await
+      publish_worker_response(channel, Some(delivery), QUEUE_WORKER_INITIALIZED, &payload).await
     }
     ResponseMessage::WorkerStarted(job_result) => {
       let payload = json!(job_result).to_string();
 
-      publish_worker_response(channel, delivery, QUEUE_WORKER_STARTED, &payload).await
+      publish_worker_response(channel, Some(delivery), QUEUE_WORKER_STARTED, &payload).await
     }
     ResponseMessage::Completed(job_result) => {
       let payload = json!(job_result).to_string();
@@ -58,7 +58,7 @@ pub async fn response(
       Feedback::Status(process_status) => {
         let payload = json!(process_status).to_string();
 
-        publish_worker_response(channel, delivery, QUEUE_WORKER_STATUS, &payload).await
+        publish_worker_response(channel, Some(delivery), QUEUE_WORKER_STATUS, &payload).await
       }
     },
     ResponseMessage::StatusError(message_error) => error(channel, delivery, message_error).await,

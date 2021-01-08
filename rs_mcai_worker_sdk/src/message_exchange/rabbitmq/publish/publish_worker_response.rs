@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 pub async fn publish_worker_response(
   channel: Arc<Channel>,
-  delivery: &Delivery,
+  delivery: Option<&Delivery>,
   queue_name: &str,
   payload: &str,
 ) -> Result<()> {
@@ -23,21 +23,25 @@ pub async fn publish_worker_response(
     .wait()
     .is_ok();
 
-  if result {
-    channel
-      .basic_ack(
-        delivery.delivery_tag,
-        BasicAckOptions::default(), /*not requeue*/
-      )
-      .await
-      .map_err(|e| e.into())
+  if let Some(delivery) = delivery {
+    if result {
+      channel
+        .basic_ack(
+          delivery.delivery_tag,
+          BasicAckOptions::default(), /*not requeue*/
+        )
+        .await
+        .map_err(|e| e.into())
+    } else {
+      channel
+        .basic_reject(
+          delivery.delivery_tag,
+          BasicRejectOptions { requeue: true }, /*requeue*/
+        )
+        .await
+        .map_err(|e| e.into())
+    }
   } else {
-    channel
-      .basic_reject(
-        delivery.delivery_tag,
-        BasicRejectOptions { requeue: true }, /*requeue*/
-      )
-      .await
-      .map_err(|e| e.into())
+    Ok(())
   }
 }

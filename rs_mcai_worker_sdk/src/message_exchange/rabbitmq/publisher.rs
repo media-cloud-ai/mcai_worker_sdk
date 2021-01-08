@@ -1,6 +1,16 @@
 use super::{publish, CurrentOrders};
-use crate::message_exchange::Feedback;
-use crate::{message_exchange::ResponseMessage, MessageError, Result};
+use crate::{
+  message_exchange::{
+    rabbitmq::{
+      QUEUE_WORKER_CREATED,
+      publish::publish_worker_response,
+    },
+    Feedback,
+    ResponseMessage,
+  },
+  MessageError,
+  Result,
+};
 use async_std::{
   channel::{self, Receiver, Sender},
   sync::{Arc, Mutex as AsyncMutex},
@@ -66,8 +76,13 @@ impl RabbitmqPublisher {
       ResponseMessage::Feedback(Feedback::Progression(progression)) => {
         return publish::job_progression(channel, progression);
       }
-      ResponseMessage::WorkerCreated(_)
-      | ResponseMessage::WorkerInitialized(_)
+      ResponseMessage::WorkerCreated(worker_configuration) => {
+        // return publish::job_progression(channel, progression);
+        // unimplemented!();
+        let payload = json!(worker_configuration).to_string();
+        return publish_worker_response(channel, None, QUEUE_WORKER_CREATED, &payload).await;
+      },
+      ResponseMessage::WorkerInitialized(_)
       | ResponseMessage::WorkerStarted(_)
       | ResponseMessage::Completed(_)
       | ResponseMessage::Error(_) => current_orders.lock().unwrap().get_process_deliveries(),
@@ -83,7 +98,7 @@ impl RabbitmqPublisher {
     }
 
     for delivery in deliveries {
-      if let Err(error) = publish::response(channel.clone(), &delivery, &response).await {
+      if let Err(error) = publish::response_with_delivery(channel.clone(), &delivery, &response).await {
         if let Err(error) = publish::error(channel.clone(), &delivery, &error).await {
           log::error!("Unable to publish response: {:?}", error);
         }
