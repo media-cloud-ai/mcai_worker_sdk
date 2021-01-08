@@ -1,0 +1,5 @@
+{
+  "job_id": 1234,
+  "type": "stop_process",
+  "parameters": []
+}
