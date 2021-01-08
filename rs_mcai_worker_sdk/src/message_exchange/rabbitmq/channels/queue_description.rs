@@ -1,6 +1,7 @@
 use amq_protocol_types::AMQPValue;
 use lapin::{options::QueueDeclareOptions, types::FieldTable, Channel};
 
+#[derive(Default)]
 pub struct QueueDescription {
   pub name: String,
   pub durable: bool,
@@ -72,8 +73,8 @@ pub fn test_queue_description() {
     auto_delete,
     dead_letter_exchange: dead_letter_exchange.clone(),
     dead_letter_routing_key: dead_letter_routing_key.clone(),
-    max_priority: max_priority.clone(),
-    message_ttl: message_ttl.clone(),
+    max_priority,
+    message_ttl,
   };
 
   let field_table = queue_description.get_field_table();
@@ -92,11 +93,11 @@ pub fn test_queue_description() {
     tree_map.get("x-dead-letter-routing-key").unwrap()
   );
   assert_eq!(
-    &AMQPValue::ShortInt(max_priority.unwrap().into()),
+    &AMQPValue::ShortInt(max_priority.unwrap()),
     tree_map.get("x-max-priority").unwrap()
   );
   assert_eq!(
-    &AMQPValue::ShortInt(message_ttl.unwrap().into()),
+    &AMQPValue::ShortInt(message_ttl.unwrap()),
     tree_map.get("x-message-ttl").unwrap()
   );
 }

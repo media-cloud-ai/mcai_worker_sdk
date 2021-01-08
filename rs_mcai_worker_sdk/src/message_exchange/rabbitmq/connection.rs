@@ -1,4 +1,6 @@
-use super::{channels::declare_consumer_channel, RabbitmqConsumer};
+use super::{
+  channels::declare_consumer_channel, CurrentOrders, RabbitmqConsumer, RabbitmqPublisher,
+};
 use crate::{
   config,
   message_exchange::{OrderMessage, ResponseMessage},
@@ -8,13 +10,20 @@ use crate::{
 use async_amqp::*;
 use async_std::channel::Sender;
 use lapin::{Connection, ConnectionProperties};
+use std::sync::{Arc, Mutex};
 
 pub struct RabbitmqConnection {
-  job_consumer: RabbitmqConsumer,
+  _job_consumer: RabbitmqConsumer,
+  _order_consumer: RabbitmqConsumer,
+  response_publisher: RabbitmqPublisher,
+  _current_orders: Arc<Mutex<CurrentOrders>>,
 }
 
 impl RabbitmqConnection {
-  pub async fn new(worker_configuration: &WorkerConfiguration, order_sender: Sender<OrderMessage>) -> Result<Self> {
+  pub async fn new(
+    worker_configuration: &WorkerConfiguration,
+    order_sender: Sender<OrderMessage>,
+  ) -> Result<Self> {
     let amqp_uri = config::get_amqp_uri();
     let properties = ConnectionProperties::default()
       .with_default_executor(8)
@@ -28,25 +37,61 @@ impl RabbitmqConnection {
 
     let queue_name = worker_configuration.get_queue_name();
 
-    let job_consumer =
-      RabbitmqConsumer::new(&channel, order_sender.clone(), &queue_name, "amqp_worker").await?;
+    let current_orders = CurrentOrders::default();
+    let current_orders = Arc::new(Mutex::new(current_orders));
 
+    let job_consumer = RabbitmqConsumer::new(
+      &channel,
+      order_sender.clone(),
+      &queue_name,
+      "amqp_worker",
+      current_orders.clone(),
+    )
+    .await?;
 
     let queue_name = worker_configuration.get_direct_messaging_queue_name();
 
-    RabbitmqConsumer::new(&channel, order_sender, &queue_name, "status_amqp_worker").await?;
+    let order_consumer = RabbitmqConsumer::new(
+      &channel,
+      order_sender,
+      &queue_name,
+      "status_amqp_worker",
+      current_orders.clone(),
+    )
+    .await?;
+
+    let response_publisher = RabbitmqPublisher::new(&channel, current_orders.clone()).await?;
 
     Ok(RabbitmqConnection {
-      job_consumer,
+      _job_consumer: job_consumer,
+      _order_consumer: order_consumer,
+      response_publisher,
+      _current_orders: current_orders,
     })
   }
 
   pub async fn send_response(&mut self, response: ResponseMessage) -> Result<()> {
     self
-      .job_consumer
-      .send_response(response)
+      .response_publisher
+      .send_response(response.clone())
       .await;
 
     Ok(())
+  }
+}
+
+impl Drop for RabbitmqConnection {
+  fn drop(&mut self) {
+    // TODO close consumer/publisher connections
+    self
+      ._current_orders
+      .lock()
+      .unwrap()
+      .reset_process_deliveries();
+    self
+      ._current_orders
+      .lock()
+      .unwrap()
+      .reset_status_deliveries();
   }
 }

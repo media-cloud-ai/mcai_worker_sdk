@@ -1,8 +1,11 @@
-mod local;
-mod rabbitmq;
+pub mod local;
+mod order_message;
+pub mod rabbitmq;
 
-use crate::job::JobProgression;
-use crate::{job::Job, JobResult, MessageError, Result};
+pub use order_message::OrderMessage;
+
+use crate::worker::WorkerConfiguration;
+use crate::{job::JobProgression, processor::ProcessStatus, JobResult, MessageError, Result};
 use async_std::channel::Receiver;
 pub use local::LocalExchange;
 pub use rabbitmq::RabbitmqExchange;
@@ -10,23 +13,20 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResponseMessage {
-  Initialized,
   Completed(JobResult),
   Feedback(Feedback),
   Error(MessageError),
+  StatusError(MessageError),
+  WorkerCreated(Box<WorkerConfiguration>),
+  WorkerInitialized(JobResult),
+  WorkerStarted(JobResult),
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum OrderMessage {
-  InitProcess(Job),
-  StartProcess(Job),
-  StopProcess(Job),
-  StopWorker,
-}
-
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum Feedback {
   Progression(JobProgression),
+  Status(ProcessStatus),
 }
 
 pub type SharedExternalExchange = Arc<Mutex<dyn ExternalExchange + Send>>;

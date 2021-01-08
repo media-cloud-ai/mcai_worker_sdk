@@ -8,8 +8,8 @@ use media_process::MediaProcess as ProcessEngine;
 use simple_process::SimpleProcess as ProcessEngine;
 
 use crate::{
-  job::Job,
   message_exchange::{InternalExchange, OrderMessage, ResponseMessage},
+  worker::{status::WorkerStatus, WorkerConfiguration},
   JobResult, McaiChannel, MessageEvent, Result,
 };
 use async_std::task;
@@ -21,33 +21,54 @@ use std::{
 };
 
 pub trait Process<P, ME> {
-  fn init(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<()>;
-
-  fn start(
-    &mut self,
+  fn new(
     message_event: Arc<Mutex<ME>>,
-    job: &Job,
-    feedback_sender: McaiChannel,
-  ) -> Result<JobResult>;
+    response_sender: McaiChannel,
+    worker_configuration: WorkerConfiguration,
+  ) -> Self;
 
-  fn stop(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<JobResult>;
+  fn handle(&mut self, message_event: Arc<Mutex<ME>>, order_message: OrderMessage) -> Result<()>;
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ProcessStatus {
+  pub job: Option<JobResult>, // Contains job_status
+  pub worker: WorkerStatus,
+}
+
+impl ProcessStatus {
+  pub fn new(worker_status: WorkerStatus, job_result: Option<JobResult>) -> Self {
+    ProcessStatus {
+      job: job_result,
+      worker: worker_status,
+    }
+  }
 }
 
 pub struct Processor {
   internal_exchange: Arc<dyn InternalExchange>,
+  worker_configuration: WorkerConfiguration,
 }
 
 impl Processor {
-  pub fn new(internal_exchange: Arc<dyn InternalExchange>) -> Self {
-    Processor { internal_exchange }
+  pub fn new(
+    internal_exchange: Arc<dyn InternalExchange>,
+    worker_configuration: WorkerConfiguration,
+  ) -> Self {
+    Processor {
+      internal_exchange,
+      worker_configuration,
+    }
   }
 
   pub fn run<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
     self,
     message_event: Arc<Mutex<ME>>,
   ) -> Result<()> {
-    let order_receiver = self.internal_exchange.get_order_receiver();
-    let response_sender = self.internal_exchange.get_response_sender();
+    let order_receiver_from_exchange = self.internal_exchange.get_order_receiver();
+    let response_sender_to_exchange = self.internal_exchange.get_response_sender();
+
+    let cloned_worker_configuration = self.worker_configuration.clone();
 
     let thread = spawn(move || {
       // Initialize the worker
@@ -56,45 +77,43 @@ impl Processor {
       }
 
       // Create Simple or Media Process
-      let mut process = ProcessEngine::default();
+      let mut process = ProcessEngine::new(
+        message_event.clone(),
+        response_sender_to_exchange.clone(),
+        cloned_worker_configuration.clone(),
+      );
+
+      response_sender_to_exchange
+        .lock()
+        .unwrap()
+        .send_response(ResponseMessage::WorkerCreated(
+          Box::new(cloned_worker_configuration.clone()),
+        ))
+        .unwrap();
 
       loop {
-        let order_receiver = order_receiver.clone();
+        let order_receiver = order_receiver_from_exchange.clone();
 
         let next_message =
           task::block_on(async move { order_receiver.lock().unwrap().recv().await });
 
         if let Ok(message) = next_message {
-          let response = match message {
-            OrderMessage::InitProcess(job) => process
-              .init(message_event.clone(), &job)
-              .map(|_| ResponseMessage::Initialized),
-            OrderMessage::StartProcess(job) => {
-              info!("Process job: {:?}", job);
-              process
-                .start(message_event.clone(), &job, response_sender.clone())
-                .map(ResponseMessage::Completed)
-            }
-            OrderMessage::StopProcess(job) => process
-              .stop(message_event.clone(), &job)
-              .map(ResponseMessage::Completed),
-            OrderMessage::StopWorker => {
-              break None;
-            }
-          };
+          debug!("Processor received an order message: {:?}", message);
 
-          let response = response.map_err(ResponseMessage::Error);
+          if let Err(error) = process.handle(message_event.clone(), message) {
+            let response = ResponseMessage::Error(error);
+            debug!(
+              "Processor send the process response message: {:?}",
+              response
+            );
+            response_sender_to_exchange
+              .lock()
+              .unwrap()
+              .send_response(response)
+              .unwrap();
 
-          let response = match response {
-            Ok(re) => re,
-            Err(re) => re,
-          };
-
-          response_sender
-            .lock()
-            .unwrap()
-            .send_response(response)
-            .unwrap();
+            debug!("Process response message sent!");
+          }
         }
       }
     });
