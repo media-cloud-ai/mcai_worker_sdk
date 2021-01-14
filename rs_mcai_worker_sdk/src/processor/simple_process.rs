@@ -15,7 +15,7 @@ pub struct SimpleProcess {
   response_sender: McaiChannel,
   status: JobStatus,
   worker_configuration: WorkerConfiguration,
-  last_job_id: Option<u64>,
+  current_job_id: Option<u64>,
 }
 
 impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Process<P, ME>
@@ -30,17 +30,43 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
       response_sender,
       status: JobStatus::Unknown,
       worker_configuration,
-      last_job_id: None,
+      current_job_id: None,
     }
   }
 
   fn handle(&mut self, message_event: Arc<Mutex<ME>>, order_message: OrderMessage) -> Result<()> {
-    let response = match order_message {
+    let response = self.handle_message(message_event, order_message)?;
+    self.response_sender.lock().unwrap().send_response(response)
+  }
+
+  fn get_current_job_id(&self, _message_event: Arc<Mutex<ME>>) -> Option<u64> {
+    self.current_job_id.clone()
+  }
+}
+
+impl SimpleProcess {
+  fn get_worker_status(&self) -> WorkerStatus {
+    let activity = self.get_worker_activity();
+    let system_info = SystemInformation::new(&self.worker_configuration.clone());
+    WorkerStatus::new(activity, system_info)
+  }
+
+  fn get_worker_activity(&self) -> WorkerActivity {
+    match self.status {
+      JobStatus::Initialized | JobStatus::Running => WorkerActivity::Busy,
+      JobStatus::Completed | JobStatus::Error | JobStatus::Unknown => WorkerActivity::Idle,
+    }
+  }
+
+  fn handle_message<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(&mut self, message_event: Arc<Mutex<ME>>, order_message: OrderMessage) -> Result<ResponseMessage> {
+    match order_message {
       OrderMessage::InitProcess(job) => {
         self.status = JobStatus::Initialized;
-        ResponseMessage::WorkerInitialized(
+        self.current_job_id = Some(job.job_id);
+
+        Ok(ResponseMessage::WorkerInitialized(
           JobResult::new(job.job_id).with_status(JobStatus::Initialized),
-        )
+        ))
       }
       OrderMessage::Job(job) | OrderMessage::StartProcess(job) => {
         info!("Process job: {:?}", job);
@@ -66,61 +92,36 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
           .map(ResponseMessage::Completed)
           .unwrap_or_else(ResponseMessage::Error);
 
-        match response {
-          ResponseMessage::Completed(_) => {
-            self.status = JobStatus::Completed;
-          }
-          ResponseMessage::Error(_) => {
-            self.status = JobStatus::Error;
-          }
-          _ => {
-            self.status = JobStatus::Unknown;
-          }
-        }
+        self.status = match response {
+            ResponseMessage::Completed(_) => JobStatus::Completed,
+            ResponseMessage::Error(_) => JobStatus::Error,
+            _ => JobStatus::Unknown,
+          };
 
-        response
+        self.current_job_id = None;
+
+        Ok(response)
       }
       OrderMessage::StopProcess(job) => {
         self.status = JobStatus::Completed;
-        self.last_job_id = Some(job.job_id);
+        self.current_job_id = None;
 
         // TODO return ResponseMessage::Completed with JobResult when on started on thread
         // ResponseMessage::Completed(JobResult::new(job.job_id).with_status(JobStatus::Initialized))
-        ResponseMessage::Error(MessageError::ProcessingError(
+        Ok(ResponseMessage::Error(MessageError::ProcessingError(
           JobResult::new(job.job_id)
             .with_status(JobStatus::Error)
             .with_message("Cannot stop a non-running job."),
-        ))
-      }
-      OrderMessage::Status | OrderMessage::StopWorker => {
-        ResponseMessage::Feedback(Feedback::Status(ProcessStatus::new(
-          self.get_worker_status(),
-          self.get_last_job_result(),
         )))
       }
-    };
+      OrderMessage::Status | OrderMessage::StopWorker => {
+        let current_job_result = self.current_job_id.map(|job_id| JobResult::new(job_id).with_status(self.status.clone()));
 
-    self.response_sender.lock().unwrap().send_response(response)
-  }
-}
-
-impl SimpleProcess {
-  fn get_last_job_result(&self) -> Option<JobResult> {
-    self
-      .last_job_id
-      .map(|job_id| JobResult::new(job_id).with_status(self.status.clone()))
-  }
-
-  fn get_worker_status(&self) -> WorkerStatus {
-    let activity = self.get_worker_activity();
-    let system_info = SystemInformation::new(&self.worker_configuration.clone());
-    WorkerStatus::new(activity, system_info)
-  }
-
-  fn get_worker_activity(&self) -> WorkerActivity {
-    match self.status {
-      JobStatus::Initialized | JobStatus::Running => WorkerActivity::Busy,
-      JobStatus::Completed | JobStatus::Error | JobStatus::Unknown => WorkerActivity::Idle,
+        Ok(ResponseMessage::Feedback(Feedback::Status(ProcessStatus::new(
+          self.get_worker_status(),
+          current_job_result,
+        ))))
+      }
     }
   }
 }

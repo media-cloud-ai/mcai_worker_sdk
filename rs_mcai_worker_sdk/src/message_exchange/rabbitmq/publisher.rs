@@ -77,8 +77,6 @@ impl RabbitmqPublisher {
         return publish::job_progression(channel, progression);
       }
       ResponseMessage::WorkerCreated(worker_configuration) => {
-        // return publish::job_progression(channel, progression);
-        // unimplemented!();
         let payload = json!(worker_configuration).to_string();
         return publish_worker_response(channel, None, QUEUE_WORKER_CREATED, &payload).await;
       },

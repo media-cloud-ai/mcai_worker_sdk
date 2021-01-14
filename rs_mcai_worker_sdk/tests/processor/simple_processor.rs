@@ -1,19 +1,15 @@
-#[macro_use]
-#[cfg(not(feature = "media"))]
-extern crate serde_derive;
+use assert_matches::assert_matches;
+use mcai_worker_sdk::{
+  job::{Job, JobResult},
+  message_exchange::{ExternalExchange, Feedback, LocalExchange, OrderMessage, ResponseMessage},
+  processor::Processor,
+  worker::WorkerConfiguration,
+  JsonSchema, McaiChannel, MessageEvent, Result,
+};
+use std::sync::{Arc, Mutex};
 
 #[test]
-#[cfg(not(feature = "media"))]
 fn processor() {
-  use assert_matches::assert_matches;
-  use mcai_worker_sdk::{
-    job::{Job, JobResult},
-    message_exchange::{ExternalExchange, Feedback, LocalExchange, OrderMessage, ResponseMessage},
-    processor::Processor,
-    worker::WorkerConfiguration,
-    JsonSchema, McaiChannel, MessageEvent, Result,
-  };
-  use std::sync::{Arc, Mutex};
 
   struct Worker {}
 

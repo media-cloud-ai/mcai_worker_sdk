@@ -1,20 +1,15 @@
-#[macro_use]
-#[cfg(not(feature = "media"))]
-extern crate serde_derive;
+use assert_matches::assert_matches;
+use mcai_worker_sdk::{
+  job::{Job, JobResult},
+  message_exchange::{ExternalExchange, Feedback, LocalExchange, OrderMessage, ResponseMessage},
+  processor::Processor,
+  worker::WorkerConfiguration,
+  JsonSchema, McaiChannel, MessageEvent, Result,
+};
+use std::sync::{Arc, Mutex};
 
 #[test]
-#[cfg(not(feature = "media"))]
 fn processor() {
-  use assert_matches::assert_matches;
-  use mcai_worker_sdk::{
-    job::{Job, JobResult},
-    message_exchange::{ExternalExchange, Feedback, LocalExchange, OrderMessage, ResponseMessage},
-    processor::Processor,
-    worker::WorkerConfiguration,
-    JsonSchema, McaiChannel, MessageEvent, Result,
-  };
-  use std::sync::{Arc, Mutex};
-
   struct Worker {}
 
   #[derive(Clone, Debug, Deserialize, JsonSchema)]
@@ -52,6 +47,7 @@ fn processor() {
       Self: std::marker::Sized,
     {
       assert!(channel.is_some());
+      std::thread::sleep(std::time::Duration::from_secs(99999));
       Ok(job_result.with_message("OK"))
     }
   }
@@ -91,6 +87,10 @@ fn processor() {
 
   let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::Feedback(Feedback::Progression{..}));
+
+  local_exchange
+    .send_order(OrderMessage::StopProcess(job.clone()))
+    .unwrap();
 
   let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::Completed(_));

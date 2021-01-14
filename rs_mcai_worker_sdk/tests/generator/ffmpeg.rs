@@ -1,27 +1,15 @@
-extern crate mcai_worker_sdk;
-#[cfg(feature = "media")]
-extern crate stainless_ffmpeg_sys;
 
-#[cfg(feature = "media")]
 use std::{
-  collections::HashMap,
-  ffi::CString,
-  sync::{Arc, Mutex},
-};
-
-#[cfg(feature = "media")]
+    collections::HashMap,
+    ffi::CString,
+  };
 use stainless_ffmpeg::{
-  check_result, format_context::FormatContext, frame::Frame, order::output::OutputStream,
-  order::ParameterValue, packet::Packet, tools, tools::rational::Rational,
-  video_encoder::VideoEncoder,
-};
-#[cfg(feature = "media")]
+    check_result, format_context::FormatContext, frame::Frame, order::output::OutputStream,
+    order::ParameterValue, packet::Packet, tools, tools::rational::Rational,
+    video_encoder::VideoEncoder,
+  };
 use stainless_ffmpeg_sys::*;
 
-#[cfg(feature = "media")]
-use mcai_worker_sdk::message::media::source::Source;
-
-#[cfg(feature = "media")]
 unsafe fn write_header(format_context: &FormatContext) -> Result<(), String> {
   let path = CString::new(format_context.filename.as_str()).unwrap();
 
@@ -39,7 +27,6 @@ unsafe fn write_header(format_context: &FormatContext) -> Result<(), String> {
   Ok(())
 }
 
-#[cfg(feature = "media")]
 unsafe fn get_black_frame(pixel_format: &str, width: i32, height: i32) -> Result<Frame, String> {
   let mut av_frame = av_frame_alloc();
 
@@ -65,7 +52,6 @@ unsafe fn get_black_frame(pixel_format: &str, width: i32, height: i32) -> Result
   })
 }
 
-#[cfg(feature = "media")]
 unsafe fn write_frame(
   format_context: &FormatContext,
   video_encoder: &mut VideoEncoder,
@@ -97,7 +83,6 @@ unsafe fn write_frame(
   Ok(())
 }
 
-#[cfg(feature = "media")]
 unsafe fn flush_encoder(
   format_context: &FormatContext,
   video_encoder: &VideoEncoder,
@@ -136,14 +121,12 @@ unsafe fn flush_encoder(
   Ok(())
 }
 
-#[cfg(feature = "media")]
 unsafe fn close_file(format_context: &FormatContext) -> Result<(), String> {
   check_result!(av_write_trailer(format_context.format_context));
   Ok(())
 }
 
-#[cfg(feature = "media")]
-fn create_xdcam_sample_file(file_path: &str, nb_frames: i32) -> Result<(), String> {
+pub fn create_xdcam_sample_file(file_path: &str, nb_frames: i32) -> Result<(), String> {
   let xdcam_profile = [
     ("gop_size", ParameterValue::Int64(12)),
     ("max_b_frames", ParameterValue::Int64(2)),
@@ -195,59 +178,4 @@ fn create_xdcam_sample_file(file_path: &str, nb_frames: i32) -> Result<(), Strin
     close_file(&format_context)?;
   }
   Ok(())
-}
-
-#[test]
-#[cfg(feature = "media")]
-pub fn test_media_source_seek() {
-  let file_path = "./test_gop.mxf";
-  let nb_frames = 50;
-
-  create_xdcam_sample_file(file_path, nb_frames).unwrap();
-
-  let mut format_context = FormatContext::new(file_path).unwrap();
-  format_context.open_input().unwrap();
-
-  let time_base = Source::get_stream_time_base(0, &format_context);
-  assert_eq!(Rational { num: 1, den: 25 }, time_base);
-
-  let format_context_ref = Arc::new(Mutex::new(format_context));
-
-  let packet = format_context_ref.lock().unwrap().next_packet().unwrap();
-  let pts = unsafe { (*packet.packet).pts };
-  assert_eq!(0, pts);
-
-  let frame_index = 7;
-  let milliseconds = Source::get_milliseconds_from_pts(frame_index, &time_base);
-  assert_eq!(280, milliseconds);
-
-  let result = Source::seek_in_stream_at(
-    0,
-    milliseconds as i64,
-    format_context_ref.clone(),
-    AVSEEK_FLAG_ANY | AVSEEK_FLAG_FRAME,
-  );
-  assert!(result.is_ok());
-
-  let packet = format_context_ref.lock().unwrap().next_packet().unwrap();
-  let pts = unsafe { (*packet.packet).pts };
-  assert_eq!(7, pts);
-
-  let frame_index = 9;
-  let milliseconds = Source::get_milliseconds_from_pts(frame_index, &time_base);
-  assert_eq!(360, milliseconds);
-
-  let result = Source::seek_in_stream_at(
-    0,
-    milliseconds as i64,
-    format_context_ref.clone(),
-    AVSEEK_FLAG_BACKWARD,
-  );
-  assert!(result.is_ok());
-
-  let packet = format_context_ref.lock().unwrap().next_packet().unwrap();
-  let pts = unsafe { (*packet.packet).pts };
-  assert_eq!(0, pts);
-
-  std::fs::remove_file(file_path).unwrap();
 }

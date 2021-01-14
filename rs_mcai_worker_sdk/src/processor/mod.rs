@@ -10,7 +10,7 @@ use simple_process::SimpleProcess as ProcessEngine;
 use crate::{
   message_exchange::{InternalExchange, OrderMessage, ResponseMessage},
   worker::{status::WorkerStatus, WorkerConfiguration},
-  JobResult, McaiChannel, MessageEvent, Result,
+  job::{Job, JobResult, JobStatus}, McaiChannel, MessageError, MessageEvent, Result,
 };
 use async_std::task;
 use schemars::JsonSchema;
@@ -28,6 +28,8 @@ pub trait Process<P, ME> {
   ) -> Self;
 
   fn handle(&mut self, message_event: Arc<Mutex<ME>>, order_message: OrderMessage) -> Result<()>;
+
+  fn get_current_job_id(&self, message_event: Arc<Mutex<ME>>) -> Option<u64>;
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -100,6 +102,24 @@ impl Processor {
         if let Ok(message) = next_message {
           debug!("Processor received an order message: {:?}", message);
 
+          let current_job_id = process.get_current_job_id(message_event.clone());
+
+          if let Err(error) = validate_message(&message, current_job_id) {
+            let response = ResponseMessage::Error(error);
+            debug!(
+              "Processor send the process response message: {:?}",
+              response
+            );
+            response_sender_to_exchange
+              .lock()
+              .unwrap()
+              .send_response(response)
+              .unwrap();
+
+            debug!("Process response message sent!");
+            continue;
+          }
+
           if let Err(error) = process.handle(message_event.clone(), message) {
             let response = ResponseMessage::Error(error);
             debug!(
@@ -124,4 +144,40 @@ impl Processor {
       Ok(())
     }
   }
+}
+
+fn validate_message(message: &OrderMessage, current_job_id: Option<u64>) -> Result<()> {
+  match message {
+    OrderMessage::InitProcess(job) => {
+      if current_job_id.is_some() {
+        build_error(job, "Cannot initialize this job, an another job is already in progress.")?;
+      }
+    }
+    OrderMessage::Job(job) | OrderMessage::StartProcess(job) => {
+      if current_job_id.is_none() {
+        build_error(job, "Cannot start a not initialized job.")?;
+      }
+      if current_job_id != Some(job.job_id) {
+        build_error(job, "The Job ID is not the same as the initialized job.")?;
+      }
+    }
+    OrderMessage::StopProcess(job) => {
+      if current_job_id.is_none() {
+        build_error(job, "Cannot stop a non-running job.")?;
+      }
+      if current_job_id != Some(job.job_id) {
+        build_error(job, "The Job ID is not the same as the current job.")?;
+      }
+    }
+    _ => {}
+  }
+  Ok(())
+}
+
+fn build_error(job: &Job, message: &str) -> Result<()> {
+  Err(MessageError::ProcessingError(
+    JobResult::new(job.job_id)
+      .with_status(JobStatus::Error)
+      .with_message(message),
+  ))
 }
