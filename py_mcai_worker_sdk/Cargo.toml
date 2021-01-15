@@ -22,9 +22,9 @@ media = [
 ]
 
 [dependencies]
-dict_derive = "0.2.0"
-mcai_worker_sdk = { version = "0.11.10", path = "../rs_mcai_worker_sdk" }
-pyo3 = "0.11"
+dict_derive = { version = "0.3.0", git = 'https://github.com/media-io/dict-derive' }
+mcai_worker_sdk = { version = "1.0.0-alpha1", path = "../rs_mcai_worker_sdk" }
+pyo3 = "0.13"
 schemars = "0.8.0"
 serde = "^1.0"
 serde_derive = "^1.0"

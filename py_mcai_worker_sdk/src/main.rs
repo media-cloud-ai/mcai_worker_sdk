@@ -102,8 +102,7 @@ impl PythonWorkerEvent {
         let value = kind
           .downcast::<PyString>()
           .expect("not a python string")
-          .to_string()
-          .unwrap();
+          .to_string();
         let parameter_type: ParameterType = serde_json::from_str(&format!("{:?}", value)).unwrap();
         parameter_types.push(parameter_type);
       }
@@ -267,7 +266,7 @@ fn call_module_function<'a>(
   python_module
     .call1(function_name, args)
     .map_err(move |error| {
-      let ptraceback = &error.ptraceback;
+      let ptraceback = &error.ptraceback(py);
       let stacktrace = ptraceback
         .as_ref()
         .map(|tb| {
