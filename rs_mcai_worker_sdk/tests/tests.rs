@@ -5,8 +5,9 @@ extern crate stainless_ffmpeg_sys;
 
 #[cfg(not(feature = "media"))]
 mod processor {
+  mod simple_job_processor;
   mod simple_processor;
-  mod simple_stop_job;
+  // mod simple_stop_job;
 }
 
 #[cfg(feature = "media")]

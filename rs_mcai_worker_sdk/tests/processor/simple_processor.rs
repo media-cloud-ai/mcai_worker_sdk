@@ -34,7 +34,7 @@ fn processor() {
     }
 
     fn init(&mut self) -> Result<()> {
-      println!("Initialize processor test worker!");
+      log::info!("Initialize processor test worker!");
       Ok(())
     }
 

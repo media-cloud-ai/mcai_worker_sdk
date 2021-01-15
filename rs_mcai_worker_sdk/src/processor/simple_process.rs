@@ -1,7 +1,7 @@
 use crate::job::JobProgression;
 use crate::worker::status::{WorkerActivity, WorkerStatus};
 use crate::{
-  job::{JobResult, JobStatus},
+  job::{Job, JobResult, JobStatus},
   message_exchange::{Feedback, OrderMessage, ResponseMessage},
   processor::{Process, ProcessStatus},
   worker::{system_information::SystemInformation, WorkerConfiguration},
@@ -68,8 +68,48 @@ impl SimpleProcess {
           JobResult::new(job.job_id).with_status(JobStatus::Initialized),
         ))
       }
-      OrderMessage::Job(job) | OrderMessage::StartProcess(job) => {
-        info!("Process job: {:?}", job);
+      OrderMessage::Job(job) => {
+        self.status = JobStatus::Initialized;
+        self.current_job_id = Some(job.job_id);
+
+        self
+          .response_sender
+          .lock()
+          .unwrap()
+          .send_response(ResponseMessage::WorkerInitialized(
+            JobResult::new(job.job_id).with_status(JobStatus::Initialized)
+          ))?;
+
+        self.start_job(message_event, &job)
+      }
+      OrderMessage::StartProcess(job) => {
+        self.start_job(message_event, &job)
+      }
+      OrderMessage::StopProcess(job) => {
+        self.status = JobStatus::Completed;
+        self.current_job_id = None;
+
+        // TODO return ResponseMessage::Completed with JobResult when on started on thread
+        // ResponseMessage::Completed(JobResult::new(job.job_id).with_status(JobStatus::Initialized))
+        Ok(ResponseMessage::Error(MessageError::ProcessingError(
+          JobResult::new(job.job_id)
+            .with_status(JobStatus::Error)
+            .with_message("Cannot stop a non-running job."),
+        )))
+      }
+      OrderMessage::Status | OrderMessage::StopWorker => {
+        let current_job_result = self.current_job_id.map(|job_id| JobResult::new(job_id).with_status(self.status.clone()));
+
+        Ok(ResponseMessage::Feedback(Feedback::Status(ProcessStatus::new(
+          self.get_worker_status(),
+          current_job_result,
+        ))))
+      }
+    }
+  }
+
+  fn start_job<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<ResponseMessage> {
+    info!("Process job: {:?}", job);
         self.status = JobStatus::Running;
 
         // start publishing progression
@@ -101,28 +141,6 @@ impl SimpleProcess {
         self.current_job_id = None;
 
         Ok(response)
-      }
-      OrderMessage::StopProcess(job) => {
-        self.status = JobStatus::Completed;
-        self.current_job_id = None;
-
-        // TODO return ResponseMessage::Completed with JobResult when on started on thread
-        // ResponseMessage::Completed(JobResult::new(job.job_id).with_status(JobStatus::Initialized))
-        Ok(ResponseMessage::Error(MessageError::ProcessingError(
-          JobResult::new(job.job_id)
-            .with_status(JobStatus::Error)
-            .with_message("Cannot stop a non-running job."),
-        )))
-      }
-      OrderMessage::Status | OrderMessage::StopWorker => {
-        let current_job_result = self.current_job_id.map(|job_id| JobResult::new(job_id).with_status(self.status.clone()));
-
-        Ok(ResponseMessage::Feedback(Feedback::Status(ProcessStatus::new(
-          self.get_worker_status(),
-          current_job_result,
-        ))))
-      }
-    }
   }
 }
 

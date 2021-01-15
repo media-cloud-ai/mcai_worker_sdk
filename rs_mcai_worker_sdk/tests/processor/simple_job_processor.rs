@@ -4,23 +4,17 @@ use mcai_worker_sdk::{
   message_exchange::{ExternalExchange, Feedback, LocalExchange, OrderMessage, ResponseMessage},
   processor::Processor,
   worker::WorkerConfiguration,
-  JsonSchema, MessageEvent, ProcessFrame, ProcessResult, Result,
+  JsonSchema, McaiChannel, MessageEvent, Result,
 };
 use std::sync::{Arc, Mutex};
 
 #[test]
 fn processor() {
-  let file_path = "./test_media_processor.mxf";
-  let nb_frames = 50;
-  super::ffmpeg::create_xdcam_sample_file(file_path, nb_frames).unwrap();
 
   struct Worker {}
 
   #[derive(Clone, Debug, Deserialize, JsonSchema)]
-  pub struct WorkerParameters {
-    source_path: String,
-    destination_path: String,
-  }
+  pub struct WorkerParameters {}
 
   impl MessageEvent<WorkerParameters> for Worker {
     fn get_name(&self) -> String {
@@ -44,23 +38,24 @@ fn processor() {
       Ok(())
     }
 
-    fn process_frame(
-      &mut self,
-      _job_result: JobResult,
-      _stream_index: usize,
-      _frame: ProcessFrame,
-    ) -> Result<ProcessResult> {
-      assert!(false);
-      log::info!("Process frame");
-      Ok(ProcessResult::new_json(""))
+    fn process(
+      &self,
+      channel: Option<McaiChannel>,
+      _parameters: WorkerParameters,
+      job_result: JobResult,
+    ) -> Result<JobResult>
+    where
+      Self: std::marker::Sized,
+    {
+      assert!(channel.is_some());
+      Ok(job_result.with_message("OK"))
     }
   }
 
   let local_exchange = LocalExchange::new();
   let mut local_exchange = Arc::new(local_exchange);
 
-  let worker = Worker {
-  };
+  let worker = Worker {};
   let worker_configuration = WorkerConfiguration::new("", &worker, "instance_id").unwrap();
   let cloned_worker_configuration = worker_configuration.clone();
 
@@ -77,49 +72,17 @@ fn processor() {
   let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::WorkerCreated(_));
 
-  let job = Job::new(r#"{
-    "job_id": 999,
-    "parameters": [
-      {
-        "id": "source_path",
-        "type": "string",
-        "value": "./test_media_processor.mxf"
-      },
-      {
-        "id": "destination_path",
-        "type": "string",
-        "value": "/test_media_processor.mp4"
-      }
-    ]
-  }"#).unwrap();
+  let job = Job::new(r#"{ "job_id": 666, "parameters": [] }"#).unwrap();
 
   local_exchange
-    .send_order(OrderMessage::InitProcess(job.clone()))
+    .send_order(OrderMessage::Job(job.clone()))
     .unwrap();
 
   let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::WorkerInitialized(_));
 
-  local_exchange
-    .send_order(OrderMessage::StartProcess(job.clone()))
-    .unwrap();
-
-  let response = local_exchange.next_response().unwrap();
-  assert_matches!(response.unwrap(), ResponseMessage::WorkerStarted(JobResult{..}));
-
   let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::Feedback(Feedback::Progression{..}));
-
-  local_exchange
-    .send_order(OrderMessage::Status)
-    .unwrap();
-
-  let response = local_exchange.next_response().unwrap();
-  assert_matches!(response.unwrap(), ResponseMessage::Feedback(Feedback::Status{..}));
-
-  local_exchange
-    .send_order(OrderMessage::StopProcess(job.clone()))
-    .unwrap();
 
   let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::Completed(_));

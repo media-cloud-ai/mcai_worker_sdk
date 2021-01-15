@@ -148,12 +148,12 @@ impl Processor {
 
 fn validate_message(message: &OrderMessage, current_job_id: Option<u64>) -> Result<()> {
   match message {
-    OrderMessage::InitProcess(job) => {
+    OrderMessage::Job(job) | OrderMessage::InitProcess(job) => {
       if current_job_id.is_some() {
         build_error(job, "Cannot initialize this job, an another job is already in progress.")?;
       }
     }
-    OrderMessage::Job(job) | OrderMessage::StartProcess(job) => {
+    OrderMessage::StartProcess(job) => {
       if current_job_id.is_none() {
         build_error(job, "Cannot start a not initialized job.")?;
       }
