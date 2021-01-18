@@ -31,8 +31,6 @@ pub fn get_destination_paths(response: &PyAny) -> Option<Vec<String>> {
                 .map(|item| item.downcast::<PyString>())
                 .filter(|downcast| downcast.is_ok())
                 .map(|value| value.unwrap().to_string())
-                // .filter(|extract| extract.is_ok())
-                // .map(|string_value| string_value.unwrap().to_string())
                 .collect();
 
               Some(destination_paths)
