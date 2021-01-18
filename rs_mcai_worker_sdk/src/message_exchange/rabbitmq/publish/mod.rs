@@ -40,12 +40,12 @@ pub async fn response_with_delivery(
     ResponseMessage::WorkerInitialized(job_result) => {
       let payload = json!(job_result).to_string();
 
-      publish_worker_response(channel, Some(delivery), QUEUE_WORKER_INITIALIZED, &payload).await
+      publish_worker_response(channel, None, QUEUE_WORKER_INITIALIZED, &payload).await
     }
     ResponseMessage::WorkerStarted(job_result) => {
       let payload = json!(job_result).to_string();
 
-      publish_worker_response(channel, Some(delivery), QUEUE_WORKER_STARTED, &payload).await
+      publish_worker_response(channel, None, QUEUE_WORKER_STARTED, &payload).await
     }
     ResponseMessage::Completed(job_result) => {
       let payload = json!(job_result).to_string();
