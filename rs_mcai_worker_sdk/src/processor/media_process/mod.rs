@@ -49,7 +49,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
         // Process the received order message
         let response = match message {
           OrderMessage::Job(job) => {
-            info!("Process job: {:?}", job);
+            log::info!("Process job: {:?}", job);
             let initialization_result =
               ThreadedMediaProcess::initialize_process(message_event.clone(), job.clone());
 
@@ -122,7 +122,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
               ))
             };
 
-            info!("Finished response: {:?}", response);
+            log::info!("Finished response: {:?}", response);
 
             if matches!(response, ResponseMessage::Error(_)) {
               *status.lock().unwrap() = JobStatus::Error;
@@ -153,7 +153,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
         };
 
         // Send the action response
-        trace!("Send the action response message...");
+        log::trace!("Send the action response message...");
         response_sender
           .lock()
           .unwrap()
@@ -184,7 +184,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
   }
 
   fn get_current_job_id(&self, _message_event: Arc<Mutex<ME>>) -> Option<u64> {
-    self.current_job_id.lock().unwrap().clone()
+    *self.current_job_id.lock().unwrap()
   }
 }
 

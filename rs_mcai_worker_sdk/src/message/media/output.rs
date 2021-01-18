@@ -42,7 +42,7 @@ impl Output {
             json_content: Some(content),
             ..
           } => {
-            info!("[Output] Json message {}", content);
+            log::info!("[Output] Json message {}", content);
             if let Some(srt_stream) = &mut srt_stream {
               let data = Bytes::from(content);
               srt_stream.send(data);
@@ -60,7 +60,7 @@ impl Output {
             xml_content: Some(content),
             ..
           } => {
-            info!("[Output] XML message {}", content);
+            log::info!("[Output] XML message {}", content);
             if let Some(srt_stream) = &mut srt_stream {
               let data = Bytes::from(content);
               srt_stream.send(data);
@@ -86,7 +86,7 @@ impl Output {
         srt_stream.close();
       }
 
-      info!("End of output thread");
+      log::info!("End of output thread");
     }));
     let sender = Arc::new(Mutex::new(sender));
 

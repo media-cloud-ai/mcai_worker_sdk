@@ -1,4 +1,3 @@
-use log::{info, trace};
 use ringbuf::Consumer;
 use stainless_ffmpeg::{audio_decoder::AudioDecoder, filter_graph::FilterGraph};
 use stainless_ffmpeg_sys::*;
@@ -59,7 +58,7 @@ pub struct Decoder {
 }
 
 unsafe extern "C" fn read_data(opaque: *mut c_void, raw_buffer: *mut u8, buf_size: i32) -> i32 {
-  trace!("Read more data: {} bytes", buf_size);
+  log::trace!("Read more data: {} bytes", buf_size);
   let consumer: &mut Consumer<u8> = &mut *(opaque as *mut Consumer<u8>);
 
   if consumer.is_empty() {
@@ -92,7 +91,7 @@ impl MediaStream {
 
       let cformat = CString::new(format).unwrap();
       let av_input_format = av_find_input_format(cformat.as_ptr());
-      info!("[FFMpeg] Open dynamic buffer");
+      log::info!("[FFMpeg] Open dynamic buffer");
 
       let writable_buffer = 0;
       let opaque = Box::new(consumer);
@@ -108,7 +107,7 @@ impl MediaStream {
       );
       (*format_context).pb = avio_context;
 
-      info!("[FFMpeg] Open Input");
+      log::info!("[FFMpeg] Open Input");
       check_result!(avformat_open_input(
         &mut format_context,
         null_mut(),
@@ -117,7 +116,7 @@ impl MediaStream {
       ));
     }
 
-    info!("MediaStream created");
+    log::info!("MediaStream created");
 
     Ok(MediaStream {
       decoders: HashMap::new(),
@@ -129,7 +128,7 @@ impl MediaStream {
   }
 
   pub fn stream_info(&self) -> Result<()> {
-    info!("[FFMpeg] Find stream info");
+    log::info!("[FFMpeg] Find stream info");
     unsafe {
       check_result!(avformat_find_stream_info(self.format_context, null_mut()));
       Ok(())

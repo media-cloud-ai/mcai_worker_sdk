@@ -65,7 +65,7 @@ impl Source {
     start_index_ms: Option<i64>,
     stop_index_ms: Option<i64>,
   ) -> Result<Self> {
-    info!(target: &job_result.get_str_job_id(), "Opening source: {}", source_url);
+    log::info!(target: &job_result.get_str_job_id(), "Opening source: {}", source_url);
 
     if SrtStream::is_srt_stream(source_url) {
       let (tx, rx): AsyncChannelSenderReceiver = mpsc::channel();
@@ -81,9 +81,9 @@ impl Source {
           .expect("Could not get the first bytes from SRT stream.");
 
         let size = bytes.len();
-        debug!("Get first {} bytes to define stream format.", size);
+        log::debug!("Get first {} bytes to define stream format.", size);
 
-        trace!("First {} bytes of the SRT stream: {:?}", size, bytes);
+        log::trace!("First {} bytes of the SRT stream: {:?}", size, bytes);
         let mut cursor = Cursor::new(bytes);
         let first_byte = cursor.get_u8();
 
@@ -97,7 +97,7 @@ impl Source {
         };
 
         let media_stream = MediaStream::new(format, consumer).unwrap();
-        debug!(
+        log::debug!(
           "Initializing media stream with format {:?}: {:?}",
           format, media_stream
         );
@@ -106,7 +106,7 @@ impl Source {
 
         loop {
           if let Some((_instant, bytes)) = srt_stream.receive() {
-            trace!("{:?}", bytes);
+            log::trace!("{:?}", bytes);
             let size = bytes.len();
             let mut cursor = Cursor::new(bytes);
 
@@ -200,7 +200,7 @@ impl Source {
       let format_context = format_context.lock().unwrap();
       let time_base = Self::get_stream_time_base(stream_index as isize, &format_context);
       let time_stamp = Self::get_pts_from_milliseconds(milliseconds, &time_base);
-      debug!(
+      log::debug!(
         "Seek in source stream {}, at position {} (with time base: {}/{})",
         stream_index, time_stamp, time_base.num, time_base.den
       );
@@ -295,7 +295,7 @@ impl Source {
               let start_pts = Self::get_pts_from_milliseconds(self.start_offset as i64, &time_base);
 
               if frame.get_pts() < start_pts {
-                trace!(
+                log::trace!(
                   "Need to decode more frames to reach the expected start PTS: {}/{}",
                   frame.get_pts(),
                   start_pts
@@ -337,7 +337,7 @@ impl Source {
         .unwrap()
         .init_process(parameters, format_context.clone(), sender)?;
 
-    info!(
+    log::info!(
       target: job_id,
       "Selected stream IDs: {:?}", selected_streams
     );
@@ -453,7 +453,7 @@ impl Source {
         .map_err(RuntimeError)?;
 
       let mut filter = filters.remove(0);
-      trace!(
+      log::trace!(
         "Connect video graph input to filter {}...",
         filter.get_label()
       );
@@ -463,7 +463,7 @@ impl Source {
 
       while !filters.is_empty() {
         let next_filter = filters.remove(0);
-        trace!(
+        log::trace!(
           "Connect filter {} to filter {}...",
           filter.get_label(),
           next_filter.get_label()
@@ -474,7 +474,7 @@ impl Source {
         filter = next_filter;
       }
 
-      trace!(
+      log::trace!(
         "Connect filter {} to video graph output...",
         filter.get_label()
       );
@@ -528,7 +528,7 @@ impl Source {
         .map_err(RuntimeError)?;
 
       let mut filter = filters.remove(0);
-      trace!(
+      log::trace!(
         "Connect audio graph input to filter {}...",
         filter.get_label()
       );
@@ -538,7 +538,7 @@ impl Source {
 
       while !filters.is_empty() {
         let next_filter = filters.remove(0);
-        trace!(
+        log::trace!(
           "Connect filter {} to filter {}...",
           filter.get_label(),
           next_filter.get_label()
@@ -549,7 +549,7 @@ impl Source {
         filter = next_filter;
       }
 
-      trace!(
+      log::trace!(
         "Connect filter {} to audio graph output...",
         filter.get_label()
       );
@@ -577,7 +577,7 @@ struct Decoder {
 impl Decoder {
   fn decode(&mut self, packet: &Packet) -> std::result::Result<Option<ProcessFrame>, String> {
     if let Some(audio_decoder) = &self.audio_decoder {
-      trace!("[FFmpeg] Send packet to audio decoder");
+      log::trace!("[FFmpeg] Send packet to audio decoder");
 
       let av_frame = unsafe {
         let ret_code = avcodec_send_packet(audio_decoder.codec_context, packet.packet);
@@ -595,7 +595,7 @@ impl Decoder {
 
         if let Some(graph) = &self.graph {
           if let Ok((audio_frames, _video_frames)) = graph.process(&[frame], &[]) {
-            trace!("[FFmpeg] Output graph count {} frames", audio_frames.len());
+            log::trace!("[FFmpeg] Output graph count {} frames", audio_frames.len());
             let frame = audio_frames.first().unwrap();
             av_frame_clone((*frame).frame)
           } else {
@@ -614,7 +614,7 @@ impl Decoder {
 
       Ok(Some(ProcessFrame::AudioVideo(frame)))
     } else if let Some(video_decoder) = &self.video_decoder {
-      trace!("[FFmpeg] Send packet to video decoder");
+      log::trace!("[FFmpeg] Send packet to video decoder");
 
       let av_frame = unsafe {
         let ret_code = avcodec_send_packet(video_decoder.codec_context, packet.packet);
@@ -632,7 +632,7 @@ impl Decoder {
 
         if let Some(graph) = &self.graph {
           if let Ok((_audio_frames, video_frames)) = graph.process(&[], &[frame]) {
-            trace!("[FFmpeg] Output graph count {} frames", video_frames.len());
+            log::trace!("[FFmpeg] Output graph count {} frames", video_frames.len());
             let frame = video_frames.first().unwrap();
             av_frame_clone((*frame).frame)
           } else {

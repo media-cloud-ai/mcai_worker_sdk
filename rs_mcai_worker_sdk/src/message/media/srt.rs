@@ -37,7 +37,7 @@ impl SrtStream {
 
     let socket = Rc::new(RefCell::new(socket));
 
-    info!("SRT connected");
+    log::info!("SRT connected");
     Ok(SrtStream { socket, runtime })
   }
 

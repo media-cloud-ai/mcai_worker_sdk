@@ -34,7 +34,7 @@ impl ThreadedMediaProcess {
     message_event: Arc<Mutex<ME>>,
     job: Job,
   ) -> Result<Self> {
-    info!("Initialize job: {:?}", job);
+    log::info!("Initialize job: {:?}", job);
 
     initialize_process(message_event, &job).map(|(source, output)| ThreadedMediaProcess {
       source,
@@ -70,7 +70,7 @@ impl ThreadedMediaProcess {
       .send_response(ResponseMessage::WorkerStarted(job_result.clone()))
       .unwrap();
 
-    info!("Start processing job: {:?}", job);
+    log::info!("Start processing job: {:?}", job);
 
     // start publishing progression
     response_sender
@@ -81,7 +81,7 @@ impl ThreadedMediaProcess {
       )))
       .unwrap();
 
-    info!(
+    log::info!(
       "{} - Start to process media (start: {} ms, duration: {})",
       job_result.get_str_job_id(),
       self.source.get_start_offset(),
@@ -188,7 +188,7 @@ impl ThreadedMediaProcess {
             }
           }
         }
-        info!(
+        log::info!(
           "{} - Process frame {}",
           job_result.get_str_job_id(),
           processed_frames

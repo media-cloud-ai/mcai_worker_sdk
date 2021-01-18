@@ -40,7 +40,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
   }
 
   fn get_current_job_id(&self, _message_event: Arc<Mutex<ME>>) -> Option<u64> {
-    self.current_job_id.clone()
+    self.current_job_id
   }
 }
 

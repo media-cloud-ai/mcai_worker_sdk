@@ -20,10 +20,10 @@ impl EbuTtmlLiveDecoder {
   pub fn decode(&mut self, packet: &Packet) -> Result<Option<EbuTtmlLive>, String> {
     let data_size = unsafe { (*packet.packet).size as usize };
     let data = unsafe { (*packet.packet).data as *mut u8 };
-    debug!("Decoding {} bytes EBU TTML live content", data_size);
+    log::debug!("Decoding {} bytes EBU TTML live content", data_size);
 
     let ttml_content = unsafe { String::from_raw_parts(data, data_size, data_size) };
-    trace!("Try decoding: {}", ttml_content);
+    log::trace!("Try decoding: {}", ttml_content);
 
     let ebu_ttml_live_content = self.decode_content(&ttml_content)?;
 
@@ -37,23 +37,23 @@ impl EbuTtmlLiveDecoder {
       if ttml_content.starts_with("<?xml version") && ttml_content.ends_with("tt>") {
         Some(yaserde::de::from_str::<EbuTtmlLive>(ttml_content)?)
       } else if ttml_content.starts_with("<?xml version") {
-        debug!(
+        log::debug!(
           "Add incomplete TTML content to buffer (buffer size: {})",
           self.buffer.len()
         );
         self.buffer.push_back(ttml_content.to_string());
 
-        trace!("Incomplete TTML content added to buffer: {}", ttml_content);
+        log::trace!("Incomplete TTML content added to buffer: {}", ttml_content);
         None
       } else if ttml_content.ends_with("tt>") {
         if let Some(previous_content) = self.buffer.pop_front() {
-          debug!(
+          log::debug!(
             "Get a previous TTML content from buffer to complete the new one (buffer size: {})",
             self.buffer.len()
           );
           let complete_ttml = format!("{}{}", previous_content, ttml_content);
 
-          trace!("Concatenated TTML content: {}", complete_ttml);
+          log::trace!("Concatenated TTML content: {}", complete_ttml);
           return self.decode_content(&complete_ttml);
         } else {
           return Err(format!("Incomplete TTML content: {}", ttml_content));
