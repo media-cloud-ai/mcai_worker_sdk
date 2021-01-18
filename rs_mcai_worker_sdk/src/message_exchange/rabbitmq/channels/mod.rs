@@ -25,7 +25,7 @@ pub fn declare_consumer_channel(
   let channel = conn.create_channel().wait().unwrap();
   let prefetch_count = 1;
 
-  info!("Initialise Exchanges and Queues");
+  log::info!("Initialise Exchanges and Queues");
   set_qos(&channel, prefetch_count);
 
   let mut exchange_options = ExchangeDeclareOptions::default();
@@ -134,7 +134,7 @@ pub fn declare_consumer_channel(
     )
     .wait()
   {
-    error!(
+    log::error!(
       "Impossible to send message on {} queue: {:?}",
       QUEUE_WORKER_DISCOVERY, msg
     );
@@ -165,7 +165,7 @@ pub fn declare_consumer_channel(
   }
   .declare(&channel);
 
-  info!("Exchanges and Queues are configured.");
+  log::info!("Exchanges and Queues are configured.");
   channel
 }
 
@@ -174,6 +174,6 @@ fn set_qos(channel: &Channel, prefetch_count: u16) {
     .basic_qos(prefetch_count, BasicQosOptions::default())
     .wait()
   {
-    error!("Unable to set QoS on channels: {:?}", msg);
+    log::error!("Unable to set QoS on channels: {:?}", msg);
   }
 }

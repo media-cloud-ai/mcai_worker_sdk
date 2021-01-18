@@ -67,7 +67,7 @@ impl Job {
         .or_else(|| parameter.default.clone())
       {
         let value = if let Some(store_code) = &parameter.store {
-          debug!(
+          log::debug!(
             "Retrieve credential value {} from store {}",
             value.to_string(),
             store_code

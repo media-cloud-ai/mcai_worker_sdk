@@ -70,7 +70,7 @@ impl RabbitmqPublisher {
     })?;
 
     log::debug!("Response: {:?}", response);
-    log::trace!("Current orders: {}", current_orders.lock().unwrap());
+    log::debug!("Current orders: {}", current_orders.lock().unwrap());
 
     let deliveries: Vec<Delivery> = match response {
       ResponseMessage::Feedback(Feedback::Progression(progression)) => {
@@ -106,8 +106,8 @@ impl RabbitmqPublisher {
     match response {
       ResponseMessage::WorkerCreated(_)
       | ResponseMessage::WorkerInitialized(_)
-      | ResponseMessage::WorkerStarted(_)
-      | ResponseMessage::Completed(_)
+      | ResponseMessage::WorkerStarted(_) => {}
+      ResponseMessage::Completed(_)
       | ResponseMessage::Error(_) => {
         current_orders.lock().unwrap().reset_process_deliveries();
       }

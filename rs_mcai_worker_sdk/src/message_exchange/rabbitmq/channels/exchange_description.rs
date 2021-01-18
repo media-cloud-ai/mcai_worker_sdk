@@ -36,7 +36,7 @@ impl ExchangeDescription {
       )
       .wait()
     {
-      error!("Unable to create exchange {}: {:?}", self.name, msg);
+      log::error!("Unable to create exchange {}: {:?}", self.name, msg);
     }
   }
 

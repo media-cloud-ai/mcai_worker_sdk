@@ -26,7 +26,7 @@ impl QueueDescription {
       .queue_declare(&self.name.to_string(), declare_options, queue_fields)
       .wait()
     {
-      error!("Unable to create queue {}: {:?}", self.name, msg);
+      log::error!("Unable to create queue {}: {:?}", self.name, msg);
     }
   }
 

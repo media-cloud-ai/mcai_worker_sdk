@@ -67,13 +67,13 @@ pub fn get_amqp_uri() -> AMQPUri {
   let amqp_vhost = get_amqp_vhost();
   let amqp_queue = get_amqp_queue();
 
-  info!("Start connection with configuration:");
-  info!("AMQP TLS: {}", amqp_tls);
-  info!("AMQP HOSTNAME: {}", amqp_hostname);
-  info!("AMQP PORT: {}", amqp_port);
-  info!("AMQP USERNAME: {}", amqp_username);
-  info!("AMQP VIRTUAL HOST: {}", amqp_vhost);
-  info!("AMQP QUEUE: {}", amqp_queue);
+  log::info!("Start connection with configuration:");
+  log::info!("AMQP TLS: {}", amqp_tls);
+  log::info!("AMQP HOSTNAME: {}", amqp_hostname);
+  log::info!("AMQP PORT: {}", amqp_port);
+  log::info!("AMQP USERNAME: {}", amqp_username);
+  log::info!("AMQP VIRTUAL HOST: {}", amqp_vhost);
+  log::info!("AMQP QUEUE: {}", amqp_queue);
 
   let scheme = if amqp_tls {
     AMQPScheme::AMQPS

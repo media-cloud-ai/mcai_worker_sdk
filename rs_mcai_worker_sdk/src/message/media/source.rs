@@ -114,7 +114,7 @@ impl Source {
 
             if !got_stream_info && producer.len() > threshold {
               match media_stream.stream_info() {
-                Err(error) => error!("{}", error),
+                Err(error) => log::error!("{}", error),
                 Ok(()) => {
                   got_stream_info = true;
                   tx.send(Arc::new(Mutex::new(FormatContext::from(

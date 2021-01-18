@@ -13,7 +13,7 @@ pub trait ParameterValue {
     Self: Sized + DeserializeOwned,
   {
     let content = if let Some(store_code) = store {
-      debug!(
+      log::debug!(
         "Retrieve credential value {} from store {}",
         content.to_string(),
         store_code

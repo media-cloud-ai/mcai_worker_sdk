@@ -48,13 +48,13 @@ pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent
 
   let worker_configuration = WorkerConfiguration::new(&amqp_queue, &message_event, &instance_id);
   if let Err(configuration_error) = worker_configuration {
-    error!("{:?}", configuration_error);
+    log::error!("{:?}", configuration_error);
     return;
   }
 
   let worker_configuration = worker_configuration.unwrap();
 
-  info!(
+  log::info!(
     "Worker: {}, version: {} (MCAI Worker SDK {})",
     worker_configuration.get_worker_name(),
     worker_configuration.get_worker_version(),
@@ -68,21 +68,21 @@ pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent
           println!("{}", serialized_configuration);
           return;
         }
-        Err(error) => error!("Could not serialize worker configuration: {:?}", error),
+        Err(error) => log::error!("Could not serialize worker configuration: {:?}", error),
       }
     }
   }
 
   if let Err(message) = message_event.init() {
-    error!("{:?}", message);
+    log::error!("{:?}", message);
     return;
   }
 
   let shared_message_event = Arc::new(Mutex::new(message_event));
-  info!("Worker initialized, ready to receive jobs");
+  log::info!("Worker initialized, ready to receive jobs");
 
   if let Some(source_orders) = get_source_orders() {
-    warn!("Worker will process source orders");
+    log::warn!("Worker will process source orders");
 
     let exchange = LocalExchange::new();
     let shared_exchange = Arc::new(exchange);
@@ -94,7 +94,7 @@ pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent
     });
 
     for source_order in &source_orders {
-      info!("Start to process order: {:?}", source_order);
+      log::info!("Start to process order: {:?}", source_order);
 
       let message_data = fs::read_to_string(source_order).unwrap();
 
@@ -118,7 +118,7 @@ pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent
       let local_exchange = Arc::make_mut(&mut local_exchange);
 
       while let Ok(message) = local_exchange.next_response() {
-        info!("{:?}", message);
+        log::info!("{:?}", message);
         match message {
           Some(ResponseMessage::Completed(_)) | Some(ResponseMessage::Error(_)) => {
             break;
@@ -146,6 +146,6 @@ pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent
 
     let sleep_duration = time::Duration::new(1, 0);
     thread::sleep(sleep_duration);
-    info!("Reconnection...");
+    log::info!("Reconnection...");
   }
 }

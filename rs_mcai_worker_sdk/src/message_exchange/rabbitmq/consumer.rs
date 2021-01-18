@@ -53,7 +53,7 @@ impl RabbitmqConsumer {
         )
         .await
         {
-          log::error!("{:?}", error);
+          log::error!("RabbitMQ consumer: {:?}", error);
           if let Err(error) = publish::error(channel.clone(), &delivery, &error).await {
             log::error!("Unable to publish response: {:?}", error);
           }

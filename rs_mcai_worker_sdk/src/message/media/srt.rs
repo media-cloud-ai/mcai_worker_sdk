@@ -45,7 +45,7 @@ impl SrtStream {
     let socket = self.socket.clone();
     self.runtime.block_on(async {
       if let Err(reason) = socket.borrow_mut().send((Instant::now(), data)).await {
-        error!("unable to send message, reason: {}", reason);
+        log::error!("unable to send message, reason: {}", reason);
       }
     });
   }

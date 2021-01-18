@@ -20,7 +20,7 @@ impl BindDescription {
       )
       .wait()
     {
-      error!(
+      log::error!(
         "Unable to bind queue {} to exchange {}: {:?}",
         self.queue, self.exchange, msg
       );

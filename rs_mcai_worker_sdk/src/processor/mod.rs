@@ -100,13 +100,13 @@ impl Processor {
           task::block_on(async move { order_receiver.lock().unwrap().recv().await });
 
         if let Ok(message) = next_message {
-          debug!("Processor received an order message: {:?}", message);
+          log::debug!("Processor received an order message: {:?}", message);
 
           let current_job_id = process.get_current_job_id(message_event.clone());
 
           if let Err(error) = validate_message(&message, current_job_id) {
             let response = ResponseMessage::Error(error);
-            debug!(
+            log::debug!(
               "Processor send the process response message: {:?}",
               response
             );
@@ -116,13 +116,13 @@ impl Processor {
               .send_response(response)
               .unwrap();
 
-            debug!("Process response message sent!");
+            log::debug!("Process response message sent!");
             continue;
           }
 
           if let Err(error) = process.handle(message_event.clone(), message) {
             let response = ResponseMessage::Error(error);
-            debug!(
+            log::debug!(
               "Processor send the process response message: {:?}",
               response
             );
@@ -132,7 +132,7 @@ impl Processor {
               .send_response(response)
               .unwrap();
 
-            debug!("Process response message sent!");
+            log::debug!("Process response message sent!");
           }
         }
       }

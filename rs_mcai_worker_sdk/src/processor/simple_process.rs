@@ -109,43 +109,43 @@ impl SimpleProcess {
   }
 
   fn start_job<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<ResponseMessage> {
-    info!("Process job: {:?}", job);
-        self.status = JobStatus::Running;
+    log::info!("Process job: {:?}", job);
+    self.status = JobStatus::Running;
 
-        // start publishing progression
-        self
-          .response_sender
-          .lock()
-          .unwrap()
-          .send_response(ResponseMessage::Feedback(Feedback::Progression(
-            JobProgression::new(job.job_id, 0),
-          )))?;
+    // start publishing progression
+    self
+      .response_sender
+      .lock()
+      .unwrap()
+      .send_response(ResponseMessage::Feedback(Feedback::Progression(
+        JobProgression::new(job.job_id, 0),
+      )))?;
 
-        let response = message_event
-          .lock()
-          .unwrap()
-          .process(
-            Some(self.response_sender.clone()),
-            job.get_parameters().unwrap(),
-            JobResult::from(job),
-          )
-          .map(ResponseMessage::Completed)
-          .unwrap_or_else(ResponseMessage::Error);
+    let response = message_event
+      .lock()
+      .unwrap()
+      .process(
+        Some(self.response_sender.clone()),
+        job.get_parameters().unwrap(),
+        JobResult::from(job),
+      )
+      .map(ResponseMessage::Completed)
+      .unwrap_or_else(ResponseMessage::Error);
 
-        self.status = match response {
-            ResponseMessage::Completed(_) => JobStatus::Completed,
-            ResponseMessage::Error(_) => JobStatus::Error,
-            _ => JobStatus::Unknown,
-          };
+    self.status = match response {
+        ResponseMessage::Completed(_) => JobStatus::Completed,
+        ResponseMessage::Error(_) => JobStatus::Error,
+        _ => JobStatus::Unknown,
+      };
 
-        self.current_job_id = None;
+    self.current_job_id = None;
 
-        Ok(response)
+    Ok(response)
   }
 }
 
 impl Drop for SimpleProcess {
   fn drop(&mut self) {
-    info!("Simple process dropped with status: {:?}", self.status);
+    log::info!("Simple process dropped with status: {:?}", self.status);
   }
 }
