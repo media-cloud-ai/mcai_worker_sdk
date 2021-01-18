@@ -1,6 +1,6 @@
 [package]
 name = "py_mcai_worker_sdk"
-version = "1.0.0-alpha2"
+version = "1.0.0-alpha3"
 authors = [
   "Valentin NOEL <valentin.noel@media-io.com>",
   "Marc-Antoine Arnaud <maarnaud@media-io.com>",
@@ -23,7 +23,7 @@ media = [
 
 [dependencies]
 dict_derive = { version = "0.3.0", git = 'https://github.com/media-io/dict-derive' }
-mcai_worker_sdk = { version = "1.0.0-alpha2", path = "../rs_mcai_worker_sdk" }
+mcai_worker_sdk = { version = "1.0.0-alpha3", path = "../rs_mcai_worker_sdk" }
 pyo3 = "0.13"
 schemars = "0.8.0"
 serde = "^1.0"
