@@ -8,9 +8,10 @@ use media_process::MediaProcess as ProcessEngine;
 use simple_process::SimpleProcess as ProcessEngine;
 
 use crate::{
+  job::{Job, JobResult, JobStatus},
   message_exchange::{InternalExchange, OrderMessage, ResponseMessage},
   worker::{status::WorkerStatus, WorkerConfiguration},
-  job::{Job, JobResult, JobStatus}, McaiChannel, MessageError, MessageEvent, Result,
+  McaiChannel, MessageError, MessageEvent, Result,
 };
 use async_std::task;
 use schemars::JsonSchema;
@@ -88,9 +89,9 @@ impl Processor {
       response_sender_to_exchange
         .lock()
         .unwrap()
-        .send_response(ResponseMessage::WorkerCreated(
-          Box::new(cloned_worker_configuration.clone()),
-        ))
+        .send_response(ResponseMessage::WorkerCreated(Box::new(
+          cloned_worker_configuration.clone(),
+        )))
         .unwrap();
 
       loop {
@@ -150,7 +151,10 @@ fn validate_message(message: &OrderMessage, current_job_id: Option<u64>) -> Resu
   match message {
     OrderMessage::Job(job) | OrderMessage::InitProcess(job) => {
       if current_job_id.is_some() {
-        build_error(job, "Cannot initialize this job, an another job is already in progress.")?;
+        build_error(
+          job,
+          "Cannot initialize this job, an another job is already in progress.",
+        )?;
       }
     }
     OrderMessage::StartProcess(job) => {

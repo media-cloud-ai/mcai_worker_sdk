@@ -19,8 +19,8 @@ use stainless_ffmpeg_sys::AVMediaType;
 use std::{
   ops::Deref,
   sync::{mpsc::Sender, Arc, Mutex},
-  time::Duration,
   thread::sleep,
+  time::Duration,
 };
 
 #[derive(Debug, Deserialize, JsonSchema)]

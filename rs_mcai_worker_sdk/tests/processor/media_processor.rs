@@ -59,8 +59,7 @@ fn processor() {
   let local_exchange = LocalExchange::new();
   let mut local_exchange = Arc::new(local_exchange);
 
-  let worker = Worker {
-  };
+  let worker = Worker {};
   let worker_configuration = WorkerConfiguration::new("", &worker, "instance_id").unwrap();
   let cloned_worker_configuration = worker_configuration.clone();
 
@@ -77,7 +76,8 @@ fn processor() {
   let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::WorkerCreated(_));
 
-  let job = Job::new(r#"{
+  let job = Job::new(
+    r#"{
     "job_id": 999,
     "parameters": [
       {
@@ -91,7 +91,9 @@ fn processor() {
         "value": "/test_media_processor.mp4"
       }
     ]
-  }"#).unwrap();
+  }"#,
+  )
+  .unwrap();
 
   local_exchange
     .send_order(OrderMessage::InitProcess(job.clone()))
@@ -105,17 +107,24 @@ fn processor() {
     .unwrap();
 
   let response = local_exchange.next_response().unwrap();
-  assert_matches!(response.unwrap(), ResponseMessage::WorkerStarted(JobResult{..}));
+  assert_matches!(
+    response.unwrap(),
+    ResponseMessage::WorkerStarted(JobResult { .. })
+  );
 
   let response = local_exchange.next_response().unwrap();
-  assert_matches!(response.unwrap(), ResponseMessage::Feedback(Feedback::Progression{..}));
+  assert_matches!(
+    response.unwrap(),
+    ResponseMessage::Feedback(Feedback::Progression { .. })
+  );
 
-  local_exchange
-    .send_order(OrderMessage::Status)
-    .unwrap();
+  local_exchange.send_order(OrderMessage::Status).unwrap();
 
   let response = local_exchange.next_response().unwrap();
-  assert_matches!(response.unwrap(), ResponseMessage::Feedback(Feedback::Status{..}));
+  assert_matches!(
+    response.unwrap(),
+    ResponseMessage::Feedback(Feedback::Status { .. })
+  );
 
   local_exchange
     .send_order(OrderMessage::StopProcess(job.clone()))
@@ -123,9 +132,12 @@ fn processor() {
 
   let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::Completed(_));
-  
+
   local_exchange.send_order(OrderMessage::StopWorker).unwrap();
 
   let response = local_exchange.next_response().unwrap();
-  assert_matches!(response.unwrap(), ResponseMessage::Feedback(Feedback::Status{..}));
+  assert_matches!(
+    response.unwrap(),
+    ResponseMessage::Feedback(Feedback::Status { .. })
+  );
 }

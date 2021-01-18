@@ -8,7 +8,7 @@ pub use time_expression::{Frames, TimeExpression, TimeUnit};
 #[cfg(all(feature = "media", feature = "python"))]
 use {
   std::io::{Read, Write},
-  yaserde::{YaDeserialize, YaSerialize}
+  yaserde::{YaDeserialize, YaSerialize},
 };
 
 #[cfg(all(feature = "media", feature = "python"))]

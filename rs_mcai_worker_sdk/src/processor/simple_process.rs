@@ -58,7 +58,11 @@ impl SimpleProcess {
     }
   }
 
-  fn handle_message<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(&mut self, message_event: Arc<Mutex<ME>>, order_message: OrderMessage) -> Result<ResponseMessage> {
+  fn handle_message<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
+    &mut self,
+    message_event: Arc<Mutex<ME>>,
+    order_message: OrderMessage,
+  ) -> Result<ResponseMessage> {
     match order_message {
       OrderMessage::InitProcess(job) => {
         self.status = JobStatus::Initialized;
@@ -77,14 +81,12 @@ impl SimpleProcess {
           .lock()
           .unwrap()
           .send_response(ResponseMessage::WorkerInitialized(
-            JobResult::new(job.job_id).with_status(JobStatus::Initialized)
+            JobResult::new(job.job_id).with_status(JobStatus::Initialized),
           ))?;
 
         self.start_job(message_event, &job)
       }
-      OrderMessage::StartProcess(job) => {
-        self.start_job(message_event, &job)
-      }
+      OrderMessage::StartProcess(job) => self.start_job(message_event, &job),
       OrderMessage::StopProcess(job) => {
         self.status = JobStatus::Completed;
         self.current_job_id = None;
@@ -98,17 +100,22 @@ impl SimpleProcess {
         )))
       }
       OrderMessage::Status | OrderMessage::StopWorker => {
-        let current_job_result = self.current_job_id.map(|job_id| JobResult::new(job_id).with_status(self.status.clone()));
+        let current_job_result = self
+          .current_job_id
+          .map(|job_id| JobResult::new(job_id).with_status(self.status.clone()));
 
-        Ok(ResponseMessage::Feedback(Feedback::Status(ProcessStatus::new(
-          self.get_worker_status(),
-          current_job_result,
-        ))))
+        Ok(ResponseMessage::Feedback(Feedback::Status(
+          ProcessStatus::new(self.get_worker_status(), current_job_result),
+        )))
       }
     }
   }
 
-  fn start_job<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(&mut self, message_event: Arc<Mutex<ME>>, job: &Job) -> Result<ResponseMessage> {
+  fn start_job<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
+    &mut self,
+    message_event: Arc<Mutex<ME>>,
+    job: &Job,
+  ) -> Result<ResponseMessage> {
     log::info!("Process job: {:?}", job);
     self.status = JobStatus::Running;
 
@@ -133,10 +140,10 @@ impl SimpleProcess {
       .unwrap_or_else(ResponseMessage::Error);
 
     self.status = match response {
-        ResponseMessage::Completed(_) => JobStatus::Completed,
-        ResponseMessage::Error(_) => JobStatus::Error,
-        _ => JobStatus::Unknown,
-      };
+      ResponseMessage::Completed(_) => JobStatus::Completed,
+      ResponseMessage::Error(_) => JobStatus::Error,
+      _ => JobStatus::Unknown,
+    };
 
     self.current_job_id = None;
 

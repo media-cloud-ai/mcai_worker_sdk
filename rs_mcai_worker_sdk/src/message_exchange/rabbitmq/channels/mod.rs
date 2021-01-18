@@ -136,7 +136,8 @@ pub fn declare_consumer_channel(
   {
     log::error!(
       "Impossible to send message on {} queue: {:?}",
-      QUEUE_WORKER_DISCOVERY, msg
+      QUEUE_WORKER_DISCOVERY,
+      msg
     );
   }
 

@@ -22,7 +22,9 @@ impl BindDescription {
     {
       log::error!(
         "Unable to bind queue {} to exchange {}: {:?}",
-        self.queue, self.exchange, msg
+        self.queue,
+        self.exchange,
+        msg
       );
     }
   }

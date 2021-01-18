@@ -1,14 +1,10 @@
-
-use std::{
-    collections::HashMap,
-    ffi::CString,
-  };
 use stainless_ffmpeg::{
-    check_result, format_context::FormatContext, frame::Frame, order::output::OutputStream,
-    order::ParameterValue, packet::Packet, tools, tools::rational::Rational,
-    video_encoder::VideoEncoder,
-  };
+  check_result, format_context::FormatContext, frame::Frame, order::output::OutputStream,
+  order::ParameterValue, packet::Packet, tools, tools::rational::Rational,
+  video_encoder::VideoEncoder,
+};
 use stainless_ffmpeg_sys::*;
+use std::{collections::HashMap, ffi::CString};
 
 unsafe fn write_header(format_context: &FormatContext) -> Result<(), String> {
   let path = CString::new(format_context.filename.as_str()).unwrap();

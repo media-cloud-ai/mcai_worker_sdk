@@ -1,15 +1,10 @@
 use super::{publish, CurrentOrders};
 use crate::{
   message_exchange::{
-    rabbitmq::{
-      QUEUE_WORKER_CREATED,
-      publish::publish_worker_response,
-    },
-    Feedback,
-    ResponseMessage,
+    rabbitmq::{publish::publish_worker_response, QUEUE_WORKER_CREATED},
+    Feedback, ResponseMessage,
   },
-  MessageError,
-  Result,
+  MessageError, Result,
 };
 use async_std::{
   channel::{self, Receiver, Sender},
@@ -79,7 +74,7 @@ impl RabbitmqPublisher {
       ResponseMessage::WorkerCreated(worker_configuration) => {
         let payload = json!(worker_configuration).to_string();
         return publish_worker_response(channel, None, QUEUE_WORKER_CREATED, &payload).await;
-      },
+      }
       ResponseMessage::WorkerInitialized(_)
       | ResponseMessage::WorkerStarted(_)
       | ResponseMessage::Completed(_)
@@ -96,7 +91,9 @@ impl RabbitmqPublisher {
     }
 
     for delivery in deliveries {
-      if let Err(error) = publish::response_with_delivery(channel.clone(), &delivery, &response).await {
+      if let Err(error) =
+        publish::response_with_delivery(channel.clone(), &delivery, &response).await
+      {
         if let Err(error) = publish::error(channel.clone(), &delivery, &error).await {
           log::error!("Unable to publish response: {:?}", error);
         }
@@ -107,8 +104,7 @@ impl RabbitmqPublisher {
       ResponseMessage::WorkerCreated(_)
       | ResponseMessage::WorkerInitialized(_)
       | ResponseMessage::WorkerStarted(_) => {}
-      ResponseMessage::Completed(_)
-      | ResponseMessage::Error(_) => {
+      ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
         current_orders.lock().unwrap().reset_process_deliveries();
       }
       ResponseMessage::Feedback(_) | ResponseMessage::StatusError(_) => {

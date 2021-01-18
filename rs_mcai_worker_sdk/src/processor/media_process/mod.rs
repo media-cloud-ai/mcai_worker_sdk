@@ -16,7 +16,7 @@ use serde::de::DeserializeOwned;
 use std::cell::RefCell;
 use std::ops::DerefMut;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex, mpsc::Sender};
+use std::sync::{mpsc::Sender, Arc, Mutex};
 use threaded_media_process::ThreadedMediaProcess;
 
 pub struct MediaProcess {
@@ -75,12 +75,11 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
                   worker_configuration.clone(),
                 );
 
-              *status.lock().unwrap() =
-                if matches!(response, ResponseMessage::Error(_)) {
-                  JobStatus::Error
-                } else {
-                  JobStatus::Completed
-                };
+              *status.lock().unwrap() = if matches!(response, ResponseMessage::Error(_)) {
+                JobStatus::Error
+              } else {
+                JobStatus::Completed
+              };
 
               *current_job_id.lock().unwrap() = None;
 
@@ -119,7 +118,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
               ResponseMessage::Error(MessageError::ProcessingError(
                 JobResult::new(job.job_id)
                   .with_status(JobStatus::Error)
-                  .with_message("Process cannot be started, it must be initialized before!")
+                  .with_message("Process cannot be started, it must be initialized before!"),
               ))
             };
 
@@ -133,13 +132,11 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
 
             response
           }
-          OrderMessage::StopProcess(job) => {
-            ResponseMessage::Error(MessageError::ProcessingError(
-              JobResult::new(job.job_id)
-                .with_status(JobStatus::Error)
-                .with_message("Cannot stop a non-running job."),
-            ))
-          }
+          OrderMessage::StopProcess(job) => ResponseMessage::Error(MessageError::ProcessingError(
+            JobResult::new(job.job_id)
+              .with_status(JobStatus::Error)
+              .with_message("Cannot stop a non-running job."),
+          )),
           OrderMessage::Status => Self::get_status_feedback(
             status.lock().unwrap().clone(),
             process_parameters.clone(),

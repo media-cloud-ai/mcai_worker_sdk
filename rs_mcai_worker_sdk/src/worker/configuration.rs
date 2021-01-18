@@ -4,11 +4,7 @@ use crate::{
   MessageError,
 };
 use crate::{MessageEvent, Version};
-use schemars::{
-  schema::RootSchema,
-  schema_for,
-  JsonSchema,
-};
+use schemars::{schema::RootSchema, schema_for, JsonSchema};
 use serde::de::DeserializeOwned;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -36,8 +32,8 @@ impl WorkerConfiguration {
 
     let parameters = WorkerConfiguration::get_parameter_schema::<P>()?;
 
-    let identifier = std::env::var("DIRECT_MESSAGING_IDENTIFIER")
-      .unwrap_or_else(|_| instance_id.to_string());
+    let identifier =
+      std::env::var("DIRECT_MESSAGING_IDENTIFIER").unwrap_or_else(|_| instance_id.to_string());
 
     let direct_messaging_queue_name = format!("direct_messaging_{}", identifier);
 

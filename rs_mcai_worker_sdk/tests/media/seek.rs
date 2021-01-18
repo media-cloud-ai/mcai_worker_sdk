@@ -1,10 +1,7 @@
-use std::sync::{Arc, Mutex};
-use stainless_ffmpeg::{
-  format_context::FormatContext,
-  tools::rational::Rational,
-};
-use stainless_ffmpeg_sys::*;
 use mcai_worker_sdk::message::media::source::Source;
+use stainless_ffmpeg::{format_context::FormatContext, tools::rational::Rational};
+use stainless_ffmpeg_sys::*;
+use std::sync::{Arc, Mutex};
 
 #[test]
 pub fn test_media_source_seek() {

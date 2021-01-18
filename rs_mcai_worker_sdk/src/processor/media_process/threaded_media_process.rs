@@ -1,22 +1,23 @@
 use crate::{
   job::{Job, JobProgression, JobResult, JobStatus},
-  message_exchange::{Feedback, OrderMessage, ResponseMessage},
-  processor::ProcessStatus,
-  worker::{
-    status::{WorkerActivity, WorkerStatus},
-    system_information::SystemInformation,
-    WorkerConfiguration,
-  },
   message::media::{
     finish_process, initialize_process,
     output::Output,
     source::{DecodeResult, Source},
   },
-  publish_job_progression, McaiChannel, MessageError, MessageEvent, Result,
+  message_exchange::{Feedback, OrderMessage, ResponseMessage},
+  processor::ProcessStatus,
+  publish_job_progression,
+  worker::{
+    status::{WorkerActivity, WorkerStatus},
+    system_information::SystemInformation,
+    WorkerConfiguration,
+  },
+  McaiChannel, MessageError, MessageEvent, Result,
 };
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use std::sync::{Arc, Mutex, mpsc::Receiver};
+use std::sync::{mpsc::Receiver, Arc, Mutex};
 
 pub struct ThreadedMediaProcess {
   source: Source,
@@ -26,7 +27,10 @@ pub struct ThreadedMediaProcess {
 }
 
 impl ThreadedMediaProcess {
-  pub fn initialize_process<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
+  pub fn initialize_process<
+    P: DeserializeOwned + JsonSchema,
+    ME: 'static + MessageEvent<P> + Send,
+  >(
     message_event: Arc<Mutex<ME>>,
     job: Job,
   ) -> Result<Self> {

@@ -90,13 +90,19 @@ fn processor() {
     .unwrap();
 
   let response = local_exchange.next_response().unwrap();
-  assert_matches!(response.unwrap(), ResponseMessage::Feedback(Feedback::Progression{..}));
+  assert_matches!(
+    response.unwrap(),
+    ResponseMessage::Feedback(Feedback::Progression { .. })
+  );
 
   let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::Completed(_));
-  
+
   local_exchange.send_order(OrderMessage::StopWorker).unwrap();
 
   let response = local_exchange.next_response().unwrap();
-  assert_matches!(response.unwrap(), ResponseMessage::Feedback(Feedback::Status{..}));
+  assert_matches!(
+    response.unwrap(),
+    ResponseMessage::Feedback(Feedback::Status { .. })
+  );
 }
