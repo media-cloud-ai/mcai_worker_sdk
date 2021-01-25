@@ -10,7 +10,7 @@ use simple_process::SimpleProcess as ProcessEngine;
 use crate::{
   job::{Job, JobResult, JobStatus},
   message_exchange::{InternalExchange, OrderMessage, ResponseMessage},
-  worker::{status::WorkerStatus, WorkerConfiguration},
+  worker::{WorkerStatus, WorkerConfiguration},
   McaiChannel, MessageError, MessageEvent, Result,
 };
 use async_std::task;

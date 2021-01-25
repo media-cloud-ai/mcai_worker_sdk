@@ -15,7 +15,6 @@
 //! use mcai_worker_sdk::{
 //!   MessageEvent,
 //!   Version,
-//!   worker::Parameter,
 //! };
 //! use serde_derive::Deserialize;
 //! use schemars::JsonSchema;
@@ -108,33 +107,30 @@ pub use schemars::JsonSchema;
 pub use semver::Version;
 
 pub use error::{MessageError, Result};
-#[cfg(feature = "media")]
-pub use message::media::{
-  audio::AudioFormat,
-  ebu_ttml_live::{
-    Body, Div, EbuTtmlLive, Frames, Head, Paragraph, Span, Styling, TimeExpression, TimeUnit, Title,
-  },
-  filters::{AudioFilter, GenericFilter, VideoFilter},
-  video::{RegionOfInterest, Scaling, VideoFormat},
-  StreamDescriptor,
-};
 pub use message::publish_job_progression;
 pub use message_event::MessageEvent;
 pub use parameter::container::ParametersContainer;
 pub use parameter::{Parameter, ParameterValue, Requirement};
-#[cfg(feature = "media")]
-pub use process_frame::ProcessFrame;
-#[cfg(feature = "media")]
-pub use process_result::ProcessResult;
 use processor::Processor;
-#[cfg(feature = "media")]
-pub use stainless_ffmpeg::{format_context::FormatContext, frame::Frame};
 pub use start_worker::start_worker;
-
 use job::JobResult;
-
 use crate::message_exchange::ResponseSender;
 use std::sync::{Arc, Mutex};
+
+#[cfg(feature = "media")]
+pub use {
+  message::media::{
+    audio::AudioFormat,
+    ebu_ttml_live::{
+      Body, Div, EbuTtmlLive, Frames, Head, Paragraph, Span, Styling, TimeExpression, TimeUnit, Title,
+    },
+    filters::{AudioFilter, GenericFilter, VideoFilter},
+    video::{RegionOfInterest, Scaling, VideoFormat},
+    StreamDescriptor,
+  },
+  process_frame::{ProcessFrame, ProcessResult},
+  stainless_ffmpeg::{format_context::FormatContext, frame::Frame},
+};
 
 /// Exposed Channel type
 pub type McaiChannel = Arc<Mutex<dyn ResponseSender + Send>>;

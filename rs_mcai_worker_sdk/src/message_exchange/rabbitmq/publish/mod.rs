@@ -28,40 +28,64 @@ use std::sync::Arc;
 
 pub async fn response_with_delivery(
   channel: Arc<Channel>,
-  delivery: &Delivery,
+  delivery: Option<Delivery>,
   response: &ResponseMessage,
 ) -> Result<()> {
   match response {
     ResponseMessage::WorkerCreated(worker_configuration) => {
       let payload = json!(worker_configuration).to_string();
 
-      publish_worker_response(channel, Some(delivery), QUEUE_WORKER_CREATED, &payload).await
+      publish_worker_response(channel, delivery, QUEUE_WORKER_CREATED, &payload).await
     }
     ResponseMessage::WorkerInitialized(job_result) => {
       let payload = json!(job_result).to_string();
 
-      publish_worker_response(channel, None, QUEUE_WORKER_INITIALIZED, &payload).await
+      publish_worker_response(channel, delivery, QUEUE_WORKER_INITIALIZED, &payload).await
     }
     ResponseMessage::WorkerStarted(job_result) => {
       let payload = json!(job_result).to_string();
 
-      publish_worker_response(channel, None, QUEUE_WORKER_STARTED, &payload).await
+      publish_worker_response(channel, delivery, QUEUE_WORKER_STARTED, &payload).await
     }
     ResponseMessage::Completed(job_result) => {
       let payload = json!(job_result).to_string();
 
-      publish_job_response(channel, delivery, QUEUE_JOB_COMPLETED, &payload).await
+      if delivery.is_none() {
+        return Err(MessageError::RuntimeError(
+          "Cannot send response without corresponding delivery.".to_string(),
+        ));
+      }
+
+      publish_job_response(channel, &delivery.unwrap(), QUEUE_JOB_COMPLETED, &payload).await
     }
-    ResponseMessage::Error(message_error) => error(channel, delivery, message_error).await,
+    ResponseMessage::Error(message_error) => {
+      if delivery.is_none() {
+        return Err(MessageError::RuntimeError(
+          "Cannot send response without corresponding delivery.".to_string(),
+        ));
+      }
+
+      error(channel, &delivery.unwrap(), message_error).await
+    },
     ResponseMessage::Feedback(feedback) => match feedback {
-      Feedback::Progression(progression) => job_progression(channel, progression.clone()),
+      Feedback::Progression(progression) => {
+        job_progression(channel, progression.clone())
+      },
       Feedback::Status(process_status) => {
         let payload = json!(process_status).to_string();
 
-        publish_worker_response(channel, Some(delivery), QUEUE_WORKER_STATUS, &payload).await
+        publish_worker_response(channel, delivery, QUEUE_WORKER_STATUS, &payload).await
       }
     },
-    ResponseMessage::StatusError(message_error) => error(channel, delivery, message_error).await,
+    ResponseMessage::StatusError(message_error) => {
+       if delivery.is_none() {
+        return Err(MessageError::RuntimeError(
+          "Cannot send response without corresponding delivery.".to_string(),
+        ));
+      }
+
+      error(channel, &delivery.unwrap(), message_error).await
+    },
   }
 }
 

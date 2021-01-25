@@ -87,19 +87,28 @@ impl RabbitmqConsumer {
 
     match order_message {
       OrderMessage::Job(_) => {
-        let is_initializing = current_orders.lock().unwrap().init.is_some();
-        let is_starting = current_orders.lock().unwrap().start.is_some();
+        let (is_initializing, is_starting, has_job) = {
+          let current_orders = current_orders.lock().unwrap();
 
-        if is_initializing || is_starting {
+          (
+            current_orders.init.is_some(),
+            current_orders.start.is_some(),
+            current_orders.job.is_some(),
+          )
+        };
+
+        if is_initializing || is_starting || has_job {
           // Worker already processing
           return Self::reject_delivery(channel, delivery.delivery_tag).await;
         }
 
-        current_orders.lock().unwrap().init = Some(delivery.clone());
-        current_orders.lock().unwrap().start = Some(delivery.clone());
+        current_orders.lock().unwrap().job = Some(delivery.clone());
       }
       OrderMessage::InitProcess(_) => {
-        if current_orders.lock().unwrap().init.is_some() {
+        let is_initializing = current_orders.lock().unwrap().init.is_some();
+        let has_job = current_orders.lock().unwrap().job.is_some();
+
+        if is_initializing || has_job {
           // Worker already processing
           return Self::reject_delivery(channel, delivery.delivery_tag).await;
         }

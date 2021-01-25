@@ -1,9 +1,14 @@
 use assert_matches::assert_matches;
 use mcai_worker_sdk::{
-  job::{Job, JobResult},
+  job::{Job, JobProgression, JobResult},
   message_exchange::{ExternalExchange, Feedback, LocalExchange, OrderMessage, ResponseMessage},
-  processor::Processor,
-  worker::WorkerConfiguration,
+  processor::{Processor, ProcessStatus},
+  worker::{
+    WorkerConfiguration,
+    WorkerActivity,
+    WorkerStatus,
+    SystemInformation,
+  },
   JsonSchema, McaiChannel, MessageEvent, Result,
 };
 use std::sync::{Arc, Mutex};
@@ -83,8 +88,9 @@ fn processor() {
   let response = local_exchange.next_response().unwrap();
   assert_matches!(
     response.unwrap(),
-    ResponseMessage::Feedback(Feedback::Progression { .. })
+    ResponseMessage::Feedback(Feedback::Progression(JobProgression{job_id: 666, progression: 0, .. }))
   );
+
 
   let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::Completed(_));
@@ -92,8 +98,17 @@ fn processor() {
   local_exchange.send_order(OrderMessage::StopWorker).unwrap();
 
   let response = local_exchange.next_response().unwrap();
+    println!("{:?}", response);
   assert_matches!(
     response.unwrap(),
-    ResponseMessage::Feedback(Feedback::Status { .. })
+    ResponseMessage::Feedback(Feedback::Status(ProcessStatus{
+      job: None,
+      worker: WorkerStatus {
+        activity: WorkerActivity::Idle,
+        system_info: SystemInformation {
+          .. 
+        }
+      }
+    }))
   );
 }

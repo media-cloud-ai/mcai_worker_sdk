@@ -1,10 +1,10 @@
 use crate::job::JobProgression;
-use crate::worker::status::{WorkerActivity, WorkerStatus};
+use crate::worker::{WorkerActivity, WorkerStatus};
 use crate::{
   job::{Job, JobResult, JobStatus},
   message_exchange::{Feedback, OrderMessage, ResponseMessage},
   processor::{Process, ProcessStatus},
-  worker::{system_information::SystemInformation, WorkerConfiguration},
+  worker::{SystemInformation, WorkerConfiguration},
   McaiChannel, MessageError, MessageEvent, Result,
 };
 use schemars::JsonSchema;

@@ -65,7 +65,7 @@ impl RabbitmqPublisher {
     })?;
 
     log::debug!("Response: {:?}", response);
-    log::debug!("Current orders: {}", current_orders.lock().unwrap());
+    log::debug!("{}", current_orders.lock().unwrap());
 
     let deliveries: Vec<Delivery> = match response {
       ResponseMessage::Feedback(Feedback::Progression(progression)) => {
@@ -84,15 +84,37 @@ impl RabbitmqPublisher {
       }
     };
 
+    let job_delivery = current_orders.lock().unwrap().get_job_delivery();
+
     if deliveries.is_empty() {
-      return Err(MessageError::RuntimeError(
-        "Cannot send response without corresponding delivery.".to_string(),
-      ));
+      match response {
+        ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
+          if let Some(job_delivery) = job_delivery {
+            if let Err(error) = publish::response_with_delivery(channel.clone(), Some(job_delivery.clone()), &response).await {
+              log::error!("Unable to publish response: {:?}", error);
+            }
+          }
+        }
+        _ => {
+          if let Err(error) = publish::response_with_delivery(channel.clone(), None, &response).await {
+            log::error!("Unable to publish response: {:?}", error);
+          }
+        }
+        // if let Some(job_delivery) = job_delivery {
+        //   if let Err(error) = publish::response_with_delivery(channel.clone(), Some(job_delivery.clone()), &response).await {
+        //     log::error!("Unable to publish response: {:?}", error);
+        //   }
+        // } else {
+        //   if let Err(error) = publish::response_with_delivery(channel.clone(), None, &response).await {
+        //     log::error!("Unable to publish response: {:?}", error);
+        //   }
+        // }
+      }
     }
 
     for delivery in deliveries {
       if let Err(error) =
-        publish::response_with_delivery(channel.clone(), &delivery, &response).await
+        publish::response_with_delivery(channel.clone(), Some(delivery.clone()), &response).await
       {
         if let Err(error) = publish::error(channel.clone(), &delivery, &error).await {
           log::error!("Unable to publish response: {:?}", error);

@@ -3,6 +3,7 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct CurrentOrders {
+  pub job: Option<Delivery>,
   pub init: Option<Delivery>,
   pub start: Option<Delivery>,
   pub stop: Option<Delivery>,
@@ -11,6 +12,7 @@ pub struct CurrentOrders {
 
 impl CurrentOrders {
   pub(crate) fn reset_process_deliveries(&mut self) {
+    self.job = None;
     self.init = None;
     self.start = None;
     self.stop = None;
@@ -18,6 +20,10 @@ impl CurrentOrders {
 
   pub(crate) fn reset_status_deliveries(&mut self) {
     self.status = None;
+  }
+
+  pub(crate) fn get_job_delivery(&self) -> Option<Delivery> {
+    self.job.clone()
   }
 
   pub(crate) fn get_process_deliveries(&self) -> Vec<Delivery> {
@@ -55,10 +61,11 @@ impl Display for CurrentOrders {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
     write!(
       f,
-      "CurrentOrders {{ init: {:?}, start: {:?}, stop: {:?}, status: {:?} }}",
+      "CurrentOrders ==> init: {:?}, start: {:?}, stop: {:?}, job: {:?}, status: {:?}",
       self.init.clone().map(|d| d.delivery_tag),
       self.start.clone().map(|d| d.delivery_tag),
       self.stop.clone().map(|d| d.delivery_tag),
+      self.job.clone().map(|d| d.delivery_tag),
       self.status.clone().map(|d| d.delivery_tag)
     )
   }

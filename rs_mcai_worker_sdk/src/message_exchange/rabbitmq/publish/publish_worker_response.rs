@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 pub async fn publish_worker_response(
   channel: Arc<Channel>,
-  delivery: Option<&Delivery>,
+  delivery: Option<Delivery>,
   queue_name: &str,
   payload: &str,
 ) -> Result<()> {
