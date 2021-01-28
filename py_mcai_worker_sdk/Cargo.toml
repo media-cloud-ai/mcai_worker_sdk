@@ -22,7 +22,7 @@ media = [
 ]
 
 [dependencies]
-dict_derive = "0.2.0"
+dict_derive = "^0.3.0"
 mcai_worker_sdk = { version = "0.11.10", path = "../rs_mcai_worker_sdk" }
 pyo3 = "0.11"
 schemars = "0.8.0"
