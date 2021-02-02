@@ -11,10 +11,10 @@ pub use crate::message_exchange::{
   rabbitmq::*,
   ExternalExchange, LocalExchange, RabbitmqExchange,
 };
-pub use crate::parameter::{Parameter, ParameterValue, Requirement};
+pub use crate::parameter::{MediaSegment, MediaSegments, Parameter, ParameterValue, Requirement};
 pub use crate::processor::{ProcessStatus, Processor};
 pub use crate::start_worker;
 pub use crate::worker::{
-  Parameter as WorkerParameter, ParameterType as WorkerParameterType, SystemInformation, WorkerActivity, WorkerConfiguration, WorkerStatus,
+  WorkerParameter, WorkerParameterType, SystemInformation, WorkerActivity, WorkerConfiguration, WorkerStatus,
 };
 pub use crate::{McaiChannel, MessageError, MessageEvent, Result};

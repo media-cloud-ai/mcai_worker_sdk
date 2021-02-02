@@ -153,27 +153,27 @@ fn add_value_to_py_list(value: &Value, list: &PyList, py: Python) -> pyo3::PyRes
 pub fn test_get_instance_type_from_parameter() {
   assert_eq!(
     InstanceType::String,
-    get_instance_type_from_parameter_type(&ParameterType::String)
+    get_instance_type_from_parameter_type(&WorkerParameterType::String)
   );
   assert_eq!(
     InstanceType::Array,
-    get_instance_type_from_parameter_type(&ParameterType::ArrayOfStrings)
+    get_instance_type_from_parameter_type(&WorkerParameterType::ArrayOfStrings)
   );
   assert_eq!(
     InstanceType::Boolean,
-    get_instance_type_from_parameter_type(&ParameterType::Boolean)
+    get_instance_type_from_parameter_type(&WorkerParameterType::Boolean)
   );
   assert_eq!(
     InstanceType::String,
-    get_instance_type_from_parameter_type(&ParameterType::Credential)
+    get_instance_type_from_parameter_type(&WorkerParameterType::Credential)
   );
   assert_eq!(
     InstanceType::Integer,
-    get_instance_type_from_parameter_type(&ParameterType::Integer)
+    get_instance_type_from_parameter_type(&WorkerParameterType::Integer)
   );
   assert_eq!(
     InstanceType::Object,
-    get_instance_type_from_parameter_type(&ParameterType::Requirements)
+    get_instance_type_from_parameter_type(&WorkerParameterType::Requirements)
   );
 }
 

@@ -1,12 +1,9 @@
 use c_mcai_worker_sdk::get_worker_parameters;
 use c_mcai_worker_sdk::worker::CWorkerEvent;
-use mcai_worker_sdk::job::{Job, JobResult, JobStatus};
-use mcai_worker_sdk::MessageEvent;
+use mcai_worker_sdk::prelude::*;
 
 #[test]
 pub fn test_c_binding_worker_info() {
-  use mcai_worker_sdk::worker::ParameterType;
-
   let worker_event = CWorkerEvent::default();
   let name = worker_event.get_name();
   let short_description = worker_event.get_short_description();
@@ -32,7 +29,7 @@ pub fn test_c_binding_worker_info() {
   let parameter_kind =
     serde_json::to_string(&parameters[0].kind[0]).expect("cannot serialize parameter kind");
   let expected_kind =
-    serde_json::to_string(&ParameterType::String).expect("cannot serialize parameter kind");
+    serde_json::to_string(&WorkerParameterType::String).expect("cannot serialize parameter kind");
   assert_eq!(expected_kind, parameter_kind);
 
   assert_eq!("path".to_string(), parameters[1].identifier);
@@ -43,7 +40,7 @@ pub fn test_c_binding_worker_info() {
   let parameter_kind =
     serde_json::to_string(&parameters[1].kind[0]).expect("cannot serialize parameter kind");
   let expected_kind =
-    serde_json::to_string(&ParameterType::String).expect("cannot serialize parameter kind");
+    serde_json::to_string(&WorkerParameterType::String).expect("cannot serialize parameter kind");
   assert_eq!(expected_kind, parameter_kind);
 }
 

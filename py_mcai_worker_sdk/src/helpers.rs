@@ -91,7 +91,7 @@ pub fn test_py_err_to_string() {
   let gil = Python::acquire_gil();
   let py = gil.python();
 
-  PyErr::new::<pyo3::exceptions::TypeError, _>(error_message.clone()).restore(py);
+  PyErr::new::<pyo3::exceptions::PyTypeError, _>(error_message.clone()).restore(py);
   let py_err = PyErr::fetch(py);
 
   let expected_message = format!("TypeError(\'{}\'", error_message);

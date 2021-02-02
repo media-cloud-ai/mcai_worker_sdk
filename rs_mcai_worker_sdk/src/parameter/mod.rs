@@ -3,7 +3,7 @@ pub mod media_segment;
 pub mod store;
 
 use crate::{MessageError, Result};
-pub use media_segment::MediaSegments;
+pub use media_segment::{MediaSegment, MediaSegments};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 
