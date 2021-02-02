@@ -1,6 +1,8 @@
 #[cfg(feature = "media")]
 mod media_process;
 mod simple_process;
+mod process;
+mod process_status;
 
 #[cfg(feature = "media")]
 use media_process::MediaProcess as ProcessEngine;
@@ -8,10 +10,12 @@ use media_process::MediaProcess as ProcessEngine;
 use simple_process::SimpleProcess as ProcessEngine;
 
 use crate::{
-  job::{Job, JobResult, JobStatus},
-  message_exchange::{InternalExchange, OrderMessage, ResponseMessage},
-  worker::{status::WorkerStatus, WorkerConfiguration},
-  McaiChannel, MessageError, MessageEvent, Result,
+  message_exchange::{
+    message::ResponseMessage,
+    InternalExchange,
+  },
+  worker::WorkerConfiguration,
+  MessageEvent, Result,
 };
 use async_std::task;
 use schemars::JsonSchema;
@@ -21,32 +25,8 @@ use std::{
   thread::spawn,
 };
 
-pub trait Process<P, ME> {
-  fn new(
-    message_event: Arc<Mutex<ME>>,
-    response_sender: McaiChannel,
-    worker_configuration: WorkerConfiguration,
-  ) -> Self;
-
-  fn handle(&mut self, message_event: Arc<Mutex<ME>>, order_message: OrderMessage) -> Result<()>;
-
-  fn get_current_job_id(&self, message_event: Arc<Mutex<ME>>) -> Option<u64>;
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ProcessStatus {
-  pub job: Option<JobResult>, // Contains job_status
-  pub worker: WorkerStatus,
-}
-
-impl ProcessStatus {
-  pub fn new(worker_status: WorkerStatus, job_result: Option<JobResult>) -> Self {
-    ProcessStatus {
-      job: job_result,
-      worker: worker_status,
-    }
-  }
-}
+pub use process::Process;
+pub use process_status::ProcessStatus;
 
 pub struct Processor {
   internal_exchange: Arc<dyn InternalExchange>,
@@ -70,6 +50,7 @@ impl Processor {
   ) -> Result<()> {
     let order_receiver_from_exchange = self.internal_exchange.get_order_receiver();
     let response_sender_to_exchange = self.internal_exchange.get_response_sender();
+    let worker_response_sender_to_exchange = self.internal_exchange.get_worker_response_sender();
 
     let cloned_worker_configuration = self.worker_configuration.clone();
 
@@ -82,7 +63,7 @@ impl Processor {
       // Create Simple or Media Process
       let mut process = ProcessEngine::new(
         message_event.clone(),
-        response_sender_to_exchange.clone(),
+        worker_response_sender_to_exchange,
         cloned_worker_configuration.clone(),
       );
 
@@ -97,15 +78,16 @@ impl Processor {
       loop {
         let order_receiver = order_receiver_from_exchange.clone();
 
-        let next_message =
-          task::block_on(async move { order_receiver.lock().unwrap().recv().await });
+        let next_message = task::block_on(async move {
+          order_receiver.lock().unwrap().recv().await
+        });
 
         if let Ok(message) = next_message {
           log::debug!("Processor received an order message: {:?}", message);
 
           let current_job_id = process.get_current_job_id(message_event.clone());
 
-          if let Err(error) = validate_message(&message, current_job_id) {
+          if let Err(error) = message.matches_job_id(current_job_id) {
             let response = ResponseMessage::Error(error);
             log::debug!(
               "Processor send the process response message: {:?}",
@@ -121,7 +103,11 @@ impl Processor {
             continue;
           }
 
-          if let Err(error) = process.handle(message_event.clone(), message) {
+          // process the message on the processor
+          let response = process.handle(message_event.clone(), message);          
+
+          // manage errors returned by the processor
+          if let Err(error) = response {
             let response = ResponseMessage::Error(error);
             log::debug!(
               "Processor send the process response message: {:?}",
@@ -145,43 +131,4 @@ impl Processor {
       Ok(())
     }
   }
-}
-
-fn validate_message(message: &OrderMessage, current_job_id: Option<u64>) -> Result<()> {
-  match message {
-    OrderMessage::Job(job) | OrderMessage::InitProcess(job) => {
-      if current_job_id.is_some() {
-        build_error(
-          job,
-          "Cannot initialize this job, an another job is already in progress.",
-        )?;
-      }
-    }
-    OrderMessage::StartProcess(job) => {
-      if current_job_id.is_none() {
-        build_error(job, "Cannot start a not initialized job.")?;
-      }
-      if current_job_id != Some(job.job_id) {
-        build_error(job, "The Job ID is not the same as the initialized job.")?;
-      }
-    }
-    OrderMessage::StopProcess(job) => {
-      if current_job_id.is_none() {
-        build_error(job, "Cannot stop a non-running job.")?;
-      }
-      if current_job_id != Some(job.job_id) {
-        build_error(job, "The Job ID is not the same as the current job.")?;
-      }
-    }
-    _ => {}
-  }
-  Ok(())
-}
-
-fn build_error(job: &Job, message: &str) -> Result<()> {
-  Err(MessageError::ProcessingError(
-    JobResult::new(job.job_id)
-      .with_status(JobStatus::Error)
-      .with_message(message),
-  ))
 }

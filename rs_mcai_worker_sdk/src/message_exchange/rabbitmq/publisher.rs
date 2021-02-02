@@ -1,8 +1,8 @@
 use super::{publish, CurrentOrders};
 use crate::{
   message_exchange::{
+    message::{Feedback, ResponseMessage},
     rabbitmq::{publish::publish_worker_response, QUEUE_WORKER_CREATED},
-    Feedback, ResponseMessage,
   },
   MessageError, Result,
 };
@@ -65,7 +65,7 @@ impl RabbitmqPublisher {
     })?;
 
     log::debug!("Response: {:?}", response);
-    log::debug!("Current orders: {}", current_orders.lock().unwrap());
+    log::debug!("{}", current_orders.lock().unwrap());
 
     let deliveries: Vec<Delivery> = match response {
       ResponseMessage::Feedback(Feedback::Progression(progression)) => {
@@ -78,21 +78,44 @@ impl RabbitmqPublisher {
       ResponseMessage::WorkerInitialized(_)
       | ResponseMessage::WorkerStarted(_)
       | ResponseMessage::Completed(_)
+      | ResponseMessage::JobStopped(_)
       | ResponseMessage::Error(_) => current_orders.lock().unwrap().get_process_deliveries(),
-      ResponseMessage::Feedback(_) | ResponseMessage::StatusError(_) => {
+      ResponseMessage::Feedback(_) |
+      ResponseMessage::StatusError(_) => {
         current_orders.lock().unwrap().get_status_deliveries()
       }
     };
 
+    let job_delivery = current_orders.lock().unwrap().get_job_delivery();
+
     if deliveries.is_empty() {
-      return Err(MessageError::RuntimeError(
-        "Cannot send response without corresponding delivery.".to_string(),
-      ));
+      match response {
+        ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
+          if let Some(job_delivery) = job_delivery {
+            if let Err(error) = publish::response_with_delivery(
+              channel.clone(),
+              Some(job_delivery.clone()),
+              &response,
+            )
+            .await
+            {
+              log::error!("Unable to publish response: {:?}", error);
+            }
+          }
+        }
+        _ => {
+          if let Err(error) =
+            publish::response_with_delivery(channel.clone(), None, &response).await
+          {
+            log::error!("Unable to publish response: {:?}", error);
+          }
+        }
+      }
     }
 
     for delivery in deliveries {
       if let Err(error) =
-        publish::response_with_delivery(channel.clone(), &delivery, &response).await
+        publish::response_with_delivery(channel.clone(), Some(delivery.clone()), &response).await
       {
         if let Err(error) = publish::error(channel.clone(), &delivery, &error).await {
           log::error!("Unable to publish response: {:?}", error);
@@ -104,7 +127,9 @@ impl RabbitmqPublisher {
       ResponseMessage::WorkerCreated(_)
       | ResponseMessage::WorkerInitialized(_)
       | ResponseMessage::WorkerStarted(_) => {}
-      ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
+      ResponseMessage::Completed(_)
+      | ResponseMessage::Error(_) 
+      | ResponseMessage::JobStopped(_) => {
         current_orders.lock().unwrap().reset_process_deliveries();
       }
       ResponseMessage::Feedback(_) | ResponseMessage::StatusError(_) => {

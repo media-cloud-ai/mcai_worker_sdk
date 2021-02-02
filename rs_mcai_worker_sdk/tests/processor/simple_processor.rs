@@ -1,12 +1,5 @@
 use assert_matches::assert_matches;
-use mcai_worker_sdk::{
-  job::{Job, JobResult},
-  message_exchange::{ExternalExchange, Feedback, LocalExchange, OrderMessage, ResponseMessage},
-  processor::Processor,
-  worker::WorkerConfiguration,
-  JsonSchema, McaiChannel, MessageEvent, Result,
-};
-use std::sync::{Arc, Mutex};
+use mcai_worker_sdk::prelude::*;
 
 #[test]
 fn processor() {
@@ -83,6 +76,9 @@ fn processor() {
   local_exchange
     .send_order(OrderMessage::StartProcess(job.clone()))
     .unwrap();
+
+  let response = local_exchange.next_response().unwrap();
+  assert_matches!(response.unwrap(), ResponseMessage::WorkerStarted(_));
 
   let response = local_exchange.next_response().unwrap();
   assert_matches!(

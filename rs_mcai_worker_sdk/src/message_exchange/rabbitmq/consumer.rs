@@ -8,7 +8,7 @@ use async_std::{
 };
 use lapin::{
   message::Delivery,
-  options::{BasicConsumeOptions, BasicRejectOptions},
+  options::{BasicAckOptions, BasicConsumeOptions, BasicRejectOptions},
   Channel,
 };
 use std::{
@@ -87,19 +87,28 @@ impl RabbitmqConsumer {
 
     match order_message {
       OrderMessage::Job(_) => {
-        let is_initializing = current_orders.lock().unwrap().init.is_some();
-        let is_starting = current_orders.lock().unwrap().start.is_some();
+        let (is_initializing, is_starting, has_job) = {
+          let current_orders = current_orders.lock().unwrap();
 
-        if is_initializing || is_starting {
+          (
+            current_orders.init.is_some(),
+            current_orders.start.is_some(),
+            current_orders.job.is_some(),
+          )
+        };
+
+        if is_initializing || is_starting || has_job {
           // Worker already processing
           return Self::reject_delivery(channel, delivery.delivery_tag).await;
         }
 
-        current_orders.lock().unwrap().init = Some(delivery.clone());
-        current_orders.lock().unwrap().start = Some(delivery.clone());
+        current_orders.lock().unwrap().job = Some(delivery.clone());
       }
       OrderMessage::InitProcess(_) => {
-        if current_orders.lock().unwrap().init.is_some() {
+        let is_initializing = current_orders.lock().unwrap().init.is_some();
+        let has_job = current_orders.lock().unwrap().job.is_some();
+
+        if is_initializing || has_job {
           // Worker already processing
           return Self::reject_delivery(channel, delivery.delivery_tag).await;
         }
@@ -121,6 +130,12 @@ impl RabbitmqConsumer {
         }
 
         current_orders.lock().unwrap().stop = Some(delivery.clone());
+
+        channel
+          .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
+          .await?;
+
+        return Ok(());
       }
       OrderMessage::Status => {
         if current_orders.lock().unwrap().status.is_some() {
@@ -147,6 +162,7 @@ impl RabbitmqConsumer {
   }
 
   async fn reject_delivery(channel: Arc<Channel>, delivery_tag: u64) -> Result<()> {
+    log::warn!("Reject delivery {}", delivery_tag);
     channel
       .basic_reject(delivery_tag, BasicRejectOptions { requeue: true })
       .await

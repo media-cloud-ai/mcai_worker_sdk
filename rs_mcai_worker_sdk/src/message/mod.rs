@@ -1,9 +1,7 @@
 #[cfg(feature = "media")]
 pub use media::{DESTINATION_PATH_PARAMETER, SOURCE_PATH_PARAMETER};
 
-use crate::message_exchange::Feedback;
-use crate::message_exchange::ResponseMessage;
-use crate::{job::JobProgression, McaiChannel, Result};
+use crate::{McaiChannel, Result};
 
 #[cfg(feature = "media")]
 pub mod media;
@@ -20,9 +18,7 @@ pub fn publish_job_progression(
     return response_channel
       .lock()
       .unwrap()
-      .send_response(ResponseMessage::Feedback(Feedback::Progression(
-        JobProgression::new(job_id, progression),
-      )));
+      .progression(job_id, progression)
   }
   Ok(())
 }

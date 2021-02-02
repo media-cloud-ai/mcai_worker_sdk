@@ -3,6 +3,7 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct CurrentOrders {
+  pub job: Option<Delivery>,
   pub init: Option<Delivery>,
   pub start: Option<Delivery>,
   pub stop: Option<Delivery>,
@@ -11,6 +12,7 @@ pub struct CurrentOrders {
 
 impl CurrentOrders {
   pub(crate) fn reset_process_deliveries(&mut self) {
+    self.job = None;
     self.init = None;
     self.start = None;
     self.stop = None;
@@ -20,12 +22,24 @@ impl CurrentOrders {
     self.status = None;
   }
 
+  pub(crate) fn get_job_delivery(&self) -> Option<Delivery> {
+    self.job.clone()
+  }
+
   pub(crate) fn get_process_deliveries(&self) -> Vec<Delivery> {
-    Self::filter_sort_and_dedup_deliveries(vec![
-      self.init.clone(),
-      self.start.clone(),
-      self.stop.clone(),
-    ])
+    if let Some(stop) = &self.stop {
+      return vec![stop.clone()];
+    }
+    if let Some(job) = &self.job {
+      return vec![job.clone()];
+    }
+    if let Some(start) = &self.start {
+      return vec![start.clone()];
+    }
+    if let Some(init) = &self.init {
+      return vec![init.clone()];
+    }
+    vec![]
   }
 
   pub(crate) fn get_status_deliveries(&self) -> Vec<Delivery> {
@@ -37,8 +51,7 @@ impl CurrentOrders {
     let mut deliveries: Vec<Delivery> = deliveries
       .iter()
       .cloned()
-      .filter(|delivery| delivery.is_some())
-      .map(|delivery| delivery.unwrap())
+      .filter_map(|delivery| delivery)
       .collect();
 
     // Sort deliveries by tag
@@ -55,11 +68,12 @@ impl Display for CurrentOrders {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
     write!(
       f,
-      "CurrentOrders {{ init: {:?}, start: {:?}, stop: {:?}, status: {:?} }}",
+      "CurrentOrders ==> init: {:?}, start: {:?}, stop: {:?}, job: {:?}, status: {:?}",
       self.init.clone().map(|d| d.delivery_tag),
       self.start.clone().map(|d| d.delivery_tag),
       self.stop.clone().map(|d| d.delivery_tag),
-      self.status.clone().map(|d| d.delivery_tag)
+      self.job.clone().map(|d| d.delivery_tag),
+      self.status.clone().map(|d| d.delivery_tag),
     )
   }
 }

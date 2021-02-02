@@ -16,7 +16,7 @@ pub struct RabbitmqConnection {
   _job_consumer: RabbitmqConsumer,
   _order_consumer: RabbitmqConsumer,
   response_publisher: RabbitmqPublisher,
-  _current_orders: Arc<Mutex<CurrentOrders>>,
+  current_orders: Arc<Mutex<CurrentOrders>>,
 }
 
 impl RabbitmqConnection {
@@ -66,7 +66,7 @@ impl RabbitmqConnection {
       _job_consumer: job_consumer,
       _order_consumer: order_consumer,
       response_publisher,
-      _current_orders: current_orders,
+      current_orders,
     })
   }
 
@@ -78,18 +78,22 @@ impl RabbitmqConnection {
 
     Ok(())
   }
+
+  pub fn get_current_orders(&self) -> Arc<Mutex<CurrentOrders>> {
+    self.current_orders.clone()
+  }
 }
 
 impl Drop for RabbitmqConnection {
   fn drop(&mut self) {
     // TODO close consumer/publisher connections
     self
-      ._current_orders
+      .current_orders
       .lock()
       .unwrap()
       .reset_process_deliveries();
     self
-      ._current_orders
+      .current_orders
       .lock()
       .unwrap()
       .reset_status_deliveries();

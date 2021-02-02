@@ -111,19 +111,21 @@ pub fn get_source_orders() -> Option<Vec<String>> {
 
 #[test]
 fn configuration() {
-  assert!(get_amqp_tls());
   assert!(get_amqp_hostname() == *"127.0.0.1");
   assert!(get_amqp_port() == 5672);
   assert!(get_amqp_username() == *"guest");
   assert!(get_amqp_password() == *"guest");
-  assert!(get_amqp_vhost() == *"/");
   assert!(get_amqp_queue() == *"job_undefined");
   assert!(get_store_hostname("BACKEND") == *"http://127.0.0.1:4000/api");
   assert!(get_store_username("BACKEND") == *"");
   assert!(get_store_password("BACKEND") == *"");
 
+  env::set_var("AMQP_TLS", "1");
+  assert!(get_amqp_tls());
   env::set_var("AMQP_TLS", "False");
   assert!(!get_amqp_tls());
+  env::set_var("AMQP_VHOST", "/");
+  assert!(get_amqp_vhost() == *"/");
   env::set_var("AMQP_PORT", "BAD_VALUE");
   assert!(get_amqp_port() == 5672);
 }

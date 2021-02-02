@@ -1,11 +1,6 @@
-use crate::worker::system_information::SystemInformation;
+use super::{SystemInformation, WorkerActivity};
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum WorkerActivity {
-  Idle,
-  Busy,
-}
-
+/// Container to generate the status message for the worker
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WorkerStatus {
   pub activity: WorkerActivity,

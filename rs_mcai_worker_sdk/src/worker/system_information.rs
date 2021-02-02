@@ -1,11 +1,7 @@
 use crate::worker::WorkerConfiguration;
-use lapin::{
-  message::Delivery,
-  options::{BasicAckOptions, BasicPublishOptions, BasicRejectOptions},
-  BasicProperties, Channel, Promise,
-};
 use sysinfo::SystemExt;
 
+/// Hardware information where the worker is running
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SystemInformation {
   pub docker_container_id: String,
@@ -36,37 +32,5 @@ impl SystemInformation {
       used_swap,
       number_of_processors,
     }
-  }
-}
-
-pub fn send_real_time_information(
-  message: Delivery,
-  channel: &Channel,
-  worker_configuration: &WorkerConfiguration,
-) -> Promise<()> {
-  let information = SystemInformation::new(worker_configuration);
-  let serialized = serde_json::to_string(&information).unwrap();
-
-  let result = channel
-    .basic_publish(
-      "",
-      "worker_status_response",
-      BasicPublishOptions::default(),
-      serialized.as_bytes().to_vec(),
-      BasicProperties::default(),
-    )
-    .wait()
-    .is_ok();
-
-  if result {
-    channel.basic_ack(
-      message.delivery_tag,
-      BasicAckOptions::default(), /*not requeue*/
-    )
-  } else {
-    channel.basic_reject(
-      message.delivery_tag,
-      BasicRejectOptions { requeue: true }, /*requeue*/
-    )
   }
 }

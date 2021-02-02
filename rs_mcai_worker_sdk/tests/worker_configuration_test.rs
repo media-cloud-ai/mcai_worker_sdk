@@ -3,10 +3,7 @@ extern crate mcai_worker_sdk;
 #[macro_use]
 extern crate serde_derive;
 
-use mcai_worker_sdk::worker::WorkerConfiguration;
-#[cfg(feature = "media")]
-use mcai_worker_sdk::MessageError;
-use mcai_worker_sdk::{MessageEvent, Version};
+use mcai_worker_sdk::prelude::*;
 
 use schemars::JsonSchema;
 

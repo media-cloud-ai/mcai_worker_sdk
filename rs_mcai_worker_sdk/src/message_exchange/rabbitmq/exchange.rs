@@ -1,8 +1,7 @@
 use super::RabbitmqConnection;
 use crate::{
-  message_exchange::{InternalExchange, OrderMessage, ResponseMessage, ResponseSender},
-  worker::WorkerConfiguration,
-  Result,
+  message_exchange::{InternalExchange, OrderMessage, ResponseMessage, ResponseSender, WorkerResponseSender},
+  prelude::*
 };
 use async_std::{
   channel::{self, Receiver},
@@ -48,6 +47,12 @@ impl InternalExchange for RabbitmqExchange {
     Arc::new(Mutex::new(RabbitmqResponseSender { connection }))
   }
 
+  fn get_worker_response_sender(&self) -> McaiChannel {
+    Arc::new(Mutex::new(RabbitmqResponseSender {
+      connection: self.connection.clone(),
+    }))
+  }
+
   fn get_order_receiver(&self) -> Arc<Mutex<Receiver<OrderMessage>>> {
     self.order_receiver.clone()
   }
@@ -69,5 +74,27 @@ impl ResponseSender for RabbitmqResponseSender {
         .unwrap()
     });
     Ok(())
+  }
+}
+
+impl WorkerResponseSender for RabbitmqResponseSender {
+  fn progression(&'_ self, job_id: u64, progression: u8) -> Result<()> {
+    let message = ResponseMessage::Feedback(Feedback::Progression(
+      JobProgression::new(job_id, progression),
+    ));
+    task::block_on(async move { self.connection.lock().unwrap().send_response(message).await.unwrap() });
+
+    Ok(())
+  }
+
+  fn is_stopped(&self) -> bool {
+    self
+      .connection
+      .lock()
+      .unwrap()
+      .get_current_orders()
+      .lock()
+      .unwrap()
+      .stop.is_some()
   }
 }

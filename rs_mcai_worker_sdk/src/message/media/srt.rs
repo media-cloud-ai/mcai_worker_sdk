@@ -1,6 +1,5 @@
 use crate::Result;
 use bytes::Bytes;
-// use futures::prelude::*;
 use futures_util::sink::SinkExt;
 use srt_tokio::SrtSocket;
 use srt_tokio::SrtSocketBuilder;

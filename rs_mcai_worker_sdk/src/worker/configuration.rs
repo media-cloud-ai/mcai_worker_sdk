@@ -1,12 +1,14 @@
+use crate::MessageEvent;
 #[cfg(feature = "media")]
 use crate::{
   message::{DESTINATION_PATH_PARAMETER, SOURCE_PATH_PARAMETER},
   MessageError,
 };
-use crate::{MessageEvent, Version};
 use schemars::{schema::RootSchema, schema_for, JsonSchema};
+use semver::Version;
 use serde::de::DeserializeOwned;
 
+/// Structure that contains configuration for that worker
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct WorkerConfiguration {
   instance_id: String,
@@ -104,6 +106,7 @@ impl WorkerConfiguration {
   }
 
   pub fn get_consumer_mode(&self) -> String {
+    // TODO if it still necessary ?
     "file".to_string()
   }
 

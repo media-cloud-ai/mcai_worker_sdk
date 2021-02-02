@@ -7,20 +7,21 @@ use mcai_worker_sdk::{
 };
 use schemars::JsonSchema;
 use semver::Version;
-
-#[cfg(feature = "media")]
-use mcai_worker_sdk::{
-  info, AudioFilter, AudioFormat, FormatContext, ProcessFrame, ProcessResult, Scaling,
-  StreamDescriptor, VideoFilter,
-};
-#[cfg(feature = "media")]
-use stainless_ffmpeg_sys::AVMediaType;
-#[cfg(feature = "media")]
 use std::{
-  ops::Deref,
-  sync::{mpsc::Sender, Arc, Mutex},
   thread::sleep,
   time::Duration,
+};
+
+#[cfg(feature = "media")]
+use {
+  mcai_worker_sdk::{
+    info, AudioFilter, AudioFormat, FormatContext, ProcessFrame, ProcessResult, Scaling,
+    StreamDescriptor, VideoFilter,
+
+  },
+  ops::Deref,
+  stainless_ffmpeg_sys::AVMediaType,
+  sync::{mpsc::Sender, Arc, Mutex},
 };
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -28,7 +29,11 @@ struct WorkerParameters {
   action: Option<String>,
   source_path: Option<String>,
   destination_path: Option<String>,
-  /// Option sleep time in milliseconds between each frames
+  /// Option sleep time in milliseconds
+  /// 
+  /// For not media, it will sleep until a stop is received
+  ///
+  /// For media it will be between each frame
   sleep: Option<u64>,
 }
 
@@ -186,6 +191,18 @@ Do no use in production, just for developments."#
     job_result: JobResult,
   ) -> Result<JobResult> {
     publish_job_progression(channel.clone(), job_result.get_job_id(), 50)?;
+
+    if let Some(duration) = parameters.sleep {
+      loop {
+        if let Some(channel) = &channel {
+          if channel.lock().unwrap().is_stopped() {
+            return Ok(job_result.with_status(JobStatus::Stopped));
+          }
+        }
+        log::debug!("sleep more ...");
+        sleep(Duration::from_millis(duration));
+      }
+    }
 
     match parameters.action {
       Some(action_label) => match action_label.as_str() {

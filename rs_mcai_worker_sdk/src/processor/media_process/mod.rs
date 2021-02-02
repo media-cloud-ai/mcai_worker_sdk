@@ -2,12 +2,12 @@ mod threaded_media_process;
 
 use crate::{
   job::{JobResult, JobStatus},
-  message_exchange::{Feedback, OrderMessage, ResponseMessage},
+  message_exchange::message::{Feedback, OrderMessage, ResponseMessage},
   processor::{Process, ProcessStatus},
   worker::{
-    status::{WorkerActivity, WorkerStatus},
-    system_information::SystemInformation,
+    SystemInformation, 
     WorkerConfiguration,
+    WorkerStatus,
   },
   McaiChannel, MessageError, MessageEvent, Result,
 };
@@ -16,7 +16,7 @@ use serde::de::DeserializeOwned;
 use std::cell::RefCell;
 use std::ops::DerefMut;
 use std::rc::Rc;
-use std::sync::{mpsc::Sender, Arc, Mutex};
+use std::sync::{mpsc::{channel, Sender}, Arc, Mutex};
 use threaded_media_process::ThreadedMediaProcess;
 
 pub struct MediaProcess {
@@ -32,13 +32,13 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
     response_sender: McaiChannel,
     worker_configuration: WorkerConfiguration,
   ) -> Self {
-    let (order_sender, order_receiver) = std::sync::mpsc::channel();
+    let (order_sender, order_receiver) = channel();
 
     let status = Arc::new(Mutex::new(JobStatus::Unknown));
     let current_job_id = Arc::new(Mutex::new(None));
     let cloned_current_job_id = current_job_id.clone();
 
-    let _join_handle = std::thread::spawn(move || {
+    std::thread::spawn(move || {
       let mut process_parameters: Option<Rc<RefCell<ThreadedMediaProcess>>> = None;
 
       let mut keep_running = true;
@@ -206,10 +206,7 @@ fn get_status_feedback(
   job_result: Option<JobResult>,
   worker_configuration: WorkerConfiguration,
 ) -> ResponseMessage {
-  let activity = match &status {
-    JobStatus::Initialized | JobStatus::Running => WorkerActivity::Busy,
-    JobStatus::Completed | JobStatus::Error | JobStatus::Unknown => WorkerActivity::Idle,
-  };
+  let activity = status.into();
   let system_info = SystemInformation::new(&worker_configuration);
 
   ResponseMessage::Feedback(Feedback::Status(ProcessStatus::new(
