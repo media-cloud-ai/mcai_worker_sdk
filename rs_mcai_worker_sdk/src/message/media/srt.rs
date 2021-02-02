@@ -1,10 +1,11 @@
 use crate::Result;
 use bytes::Bytes;
 use futures_util::sink::SinkExt;
-use srt::tokio::SrtSocket;
-use srt::SrtSocketBuilder;
+use srt_tokio::SrtSocket;
+use srt_tokio::SrtSocketBuilder;
 use std::{cell::RefCell, rc::Rc, time::Instant};
-use tokio::{runtime::Runtime, stream::StreamExt};
+use tokio::runtime::Runtime;
+use futures_util::TryStreamExt;
 
 pub struct SrtStream {
   socket: Rc<RefCell<SrtSocket>>,
@@ -17,7 +18,7 @@ impl SrtStream {
   }
 
   pub fn open_connection(url: &str) -> Result<SrtStream> {
-    let mut runtime = Runtime::new().unwrap();
+    let runtime = Runtime::new().unwrap();
 
     let socket = runtime.block_on(async {
       if url.starts_with("srt://:") {
