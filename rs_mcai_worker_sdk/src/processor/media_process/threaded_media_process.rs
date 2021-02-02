@@ -5,13 +5,14 @@ use crate::{
     output::Output,
     source::{DecodeResult, Source},
   },
-  message_exchange::{Feedback, OrderMessage, ResponseMessage},
+  message_exchange::message::{Feedback, OrderMessage, ResponseMessage},
   processor::ProcessStatus,
   publish_job_progression,
   worker::{
-    status::{WorkerActivity, WorkerStatus},
-    system_information::SystemInformation,
+    SystemInformation,
+    WorkerActivity,
     WorkerConfiguration,
+    WorkerStatus,
   },
   McaiChannel, MessageError, MessageEvent, Result,
 };

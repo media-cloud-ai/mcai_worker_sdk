@@ -12,6 +12,7 @@ pub async fn publish_worker_response(
   queue_name: &str,
   payload: &str,
 ) -> Result<()> {
+  log::debug!("Worker publish {}", payload);
   let result = channel
     .basic_publish(
       EXCHANGE_NAME_WORKER_RESPONSE,

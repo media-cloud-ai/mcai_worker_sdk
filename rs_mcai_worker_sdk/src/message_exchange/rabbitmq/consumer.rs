@@ -8,7 +8,7 @@ use async_std::{
 };
 use lapin::{
   message::Delivery,
-  options::{BasicConsumeOptions, BasicRejectOptions},
+  options::{BasicAckOptions, BasicConsumeOptions, BasicRejectOptions},
   Channel,
 };
 use std::{
@@ -130,6 +130,12 @@ impl RabbitmqConsumer {
         }
 
         current_orders.lock().unwrap().stop = Some(delivery.clone());
+
+        channel
+          .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
+          .await?;
+
+        return Ok(());
       }
       OrderMessage::Status => {
         if current_orders.lock().unwrap().status.is_some() {
@@ -156,6 +162,7 @@ impl RabbitmqConsumer {
   }
 
   async fn reject_delivery(channel: Arc<Channel>, delivery_tag: u64) -> Result<()> {
+    log::warn!("Reject delivery {}", delivery_tag);
     channel
       .basic_reject(delivery_tag, BasicRejectOptions { requeue: true })
       .await

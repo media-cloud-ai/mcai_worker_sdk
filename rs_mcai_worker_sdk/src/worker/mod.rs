@@ -1,7 +1,7 @@
-//! Module to manage the worker
+//! Module to manage the worker (configuration and status information)
 
 mod activity;
-pub mod configuration;
+mod configuration;
 pub mod docker;
 mod status;
 mod system_information;

@@ -99,7 +99,8 @@ impl Source {
         let media_stream = MediaStream::new(format, consumer).unwrap();
         log::debug!(
           "Initializing media stream with format {:?}: {:?}",
-          format, media_stream
+          format,
+          media_stream
         );
 
         let mut got_stream_info = false;
@@ -202,7 +203,10 @@ impl Source {
       let time_stamp = Self::get_pts_from_milliseconds(milliseconds, &time_base);
       log::debug!(
         "Seek in source stream {}, at position {} (with time base: {}/{})",
-        stream_index, time_stamp, time_base.num, time_base.den
+        stream_index,
+        time_stamp,
+        time_base.num,
+        time_base.den
       );
 
       if av_seek_frame(
@@ -339,7 +343,8 @@ impl Source {
 
     log::info!(
       target: job_id,
-      "Selected stream IDs: {:?}", selected_streams
+      "Selected stream IDs: {:?}",
+      selected_streams
     );
 
     let mut decoders = HashMap::<usize, Decoder>::new();

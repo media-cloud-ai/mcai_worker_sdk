@@ -15,11 +15,11 @@ pub use publish_worker_response::publish_worker_response;
 use crate::{
   job::{JobResult, JobStatus},
   message_exchange::{
+    message::{Feedback, ResponseMessage},
     rabbitmq::{
-      QUEUE_JOB_COMPLETED, QUEUE_JOB_ERROR, QUEUE_WORKER_CREATED, QUEUE_WORKER_INITIALIZED,
+      QUEUE_JOB_COMPLETED, QUEUE_JOB_ERROR, QUEUE_JOB_STOPPED, QUEUE_WORKER_CREATED, QUEUE_WORKER_INITIALIZED,
       QUEUE_WORKER_STARTED, QUEUE_WORKER_STATUS,
     },
-    Feedback, ResponseMessage,
   },
   MessageError, Result,
 };
@@ -66,26 +66,35 @@ pub async fn response_with_delivery(
       }
 
       error(channel, &delivery.unwrap(), message_error).await
+    }
+    ResponseMessage::JobStopped(job_result) => {
+      let payload = json!(job_result).to_string();
+
+      if delivery.is_none() {
+        return Err(MessageError::RuntimeError(
+          "Cannot send response without corresponding delivery.".to_string(),
+        ));
+      }
+
+      publish_job_response(channel, &delivery.unwrap(), QUEUE_JOB_STOPPED, &payload).await
     },
     ResponseMessage::Feedback(feedback) => match feedback {
-      Feedback::Progression(progression) => {
-        job_progression(channel, progression.clone())
-      },
-      Feedback::Status(process_status) => {
-        let payload = json!(process_status).to_string();
+      Feedback::Progression(progression) => job_progression(channel, progression.clone()),
+      Feedback::Status(_process_status) => {
+        let payload = json!(feedback).to_string();
 
         publish_worker_response(channel, delivery, QUEUE_WORKER_STATUS, &payload).await
       }
     },
     ResponseMessage::StatusError(message_error) => {
-       if delivery.is_none() {
+      if delivery.is_none() {
         return Err(MessageError::RuntimeError(
           "Cannot send response without corresponding delivery.".to_string(),
         ));
       }
 
       error(channel, &delivery.unwrap(), message_error).await
-    },
+    }
   }
 }
 

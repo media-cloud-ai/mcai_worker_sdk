@@ -1,5 +1,4 @@
-
-/// Worker activity mode (idle or busy)
+/// Worker activity mode
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum WorkerActivity {
   Idle,

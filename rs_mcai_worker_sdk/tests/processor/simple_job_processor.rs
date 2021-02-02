@@ -1,17 +1,5 @@
 use assert_matches::assert_matches;
-use mcai_worker_sdk::{
-  job::{Job, JobProgression, JobResult},
-  message_exchange::{ExternalExchange, Feedback, LocalExchange, OrderMessage, ResponseMessage},
-  processor::{Processor, ProcessStatus},
-  worker::{
-    WorkerConfiguration,
-    WorkerActivity,
-    WorkerStatus,
-    SystemInformation,
-  },
-  JsonSchema, McaiChannel, MessageEvent, Result,
-};
-use std::sync::{Arc, Mutex};
+use mcai_worker_sdk::prelude::*;
 
 #[test]
 fn processor() {
@@ -86,11 +74,13 @@ fn processor() {
   assert_matches!(response.unwrap(), ResponseMessage::WorkerInitialized(_));
 
   let response = local_exchange.next_response().unwrap();
+  assert_matches!(response.unwrap(), ResponseMessage::WorkerStarted(_));
+
+  let response = local_exchange.next_response().unwrap();
   assert_matches!(
     response.unwrap(),
     ResponseMessage::Feedback(Feedback::Progression(JobProgression{job_id: 666, progression: 0, .. }))
   );
-
 
   let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::Completed(_));
@@ -98,7 +88,7 @@ fn processor() {
   local_exchange.send_order(OrderMessage::StopWorker).unwrap();
 
   let response = local_exchange.next_response().unwrap();
-    println!("{:?}", response);
+  println!("{:?}", response);
   assert_matches!(
     response.unwrap(),
     ResponseMessage::Feedback(Feedback::Status(ProcessStatus{
@@ -106,7 +96,7 @@ fn processor() {
       worker: WorkerStatus {
         activity: WorkerActivity::Idle,
         system_info: SystemInformation {
-          .. 
+          ..
         }
       }
     }))

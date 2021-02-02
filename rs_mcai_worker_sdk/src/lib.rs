@@ -12,10 +12,7 @@
 //! and call the [`start_worker`](fn.start_worker.html) to start the worker itself.
 //!
 //! ```rust
-//! use mcai_worker_sdk::{
-//!   MessageEvent,
-//!   Version,
-//! };
+//! use mcai_worker_sdk::prelude::*;
 //! use serde_derive::Deserialize;
 //! use schemars::JsonSchema;
 //!
@@ -83,12 +80,13 @@ extern crate serde_json;
 #[macro_use]
 extern crate yaserde_derive;
 
-mod config;
+pub mod config;
 mod error;
 pub mod job;
 pub mod message;
 pub mod message_event;
 pub mod parameter;
+pub mod prelude;
 #[cfg(feature = "media")]
 mod process_frame;
 #[cfg(feature = "media")]
@@ -99,22 +97,15 @@ pub mod worker;
 pub mod message_exchange;
 pub mod processor;
 
-/// Re-export from lapin Channel
-pub use lapin::Channel;
-pub use log::{debug, error, info, trace, warn};
-pub use schemars::JsonSchema;
-/// Re-export from semver:
-pub use semver::Version;
-
+use crate::message_exchange::WorkerResponseSender;
 pub use error::{MessageError, Result};
+use job::JobResult;
 pub use message::publish_job_progression;
 pub use message_event::MessageEvent;
 pub use parameter::container::ParametersContainer;
 pub use parameter::{Parameter, ParameterValue, Requirement};
 use processor::Processor;
 pub use start_worker::start_worker;
-use job::JobResult;
-use crate::message_exchange::ResponseSender;
 use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "media")]
@@ -122,21 +113,25 @@ pub use {
   message::media::{
     audio::AudioFormat,
     ebu_ttml_live::{
-      Body, Div, EbuTtmlLive, Frames, Head, Paragraph, Span, Styling, TimeExpression, TimeUnit, Title,
+      Body, Div, EbuTtmlLive, Frames, Head, Paragraph, Span, Styling, TimeExpression, TimeUnit,
+      Title,
     },
     filters::{AudioFilter, GenericFilter, VideoFilter},
     video::{RegionOfInterest, Scaling, VideoFormat},
     StreamDescriptor,
   },
-  process_frame::{ProcessFrame, ProcessResult},
+  process_frame::ProcessFrame,
+  process_result::ProcessResult,
   stainless_ffmpeg::{format_context::FormatContext, frame::Frame},
 };
 
 /// Exposed Channel type
-pub type McaiChannel = Arc<Mutex<dyn ResponseSender + Send>>;
+pub type McaiChannel = Arc<Mutex<dyn WorkerResponseSender + Send>>;
 
 #[test]
 fn empty_message_event_impl() {
+  use crate::prelude::*;
+
   #[derive(Debug)]
   struct CustomEvent {}
 

@@ -1,33 +1,15 @@
+//! Connectors between message brokers and processors
+
 pub mod local;
-mod order_message;
+pub mod message;
 pub mod rabbitmq;
 
-pub use order_message::OrderMessage;
+pub use {local::LocalExchange, rabbitmq::RabbitmqExchange};
 
-use crate::worker::WorkerConfiguration;
-use crate::{job::JobProgression, processor::ProcessStatus, JobResult, MessageError, Result};
+use crate::prelude::*;
 use async_std::channel::Receiver;
-pub use local::LocalExchange;
-pub use rabbitmq::RabbitmqExchange;
+use message::{OrderMessage, ResponseMessage};
 use std::sync::{Arc, Mutex};
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum ResponseMessage {
-  Completed(JobResult),
-  Feedback(Feedback),
-  Error(MessageError),
-  StatusError(MessageError),
-  WorkerCreated(Box<WorkerConfiguration>),
-  WorkerInitialized(JobResult),
-  WorkerStarted(JobResult),
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum Feedback {
-  Progression(JobProgression),
-  Status(ProcessStatus),
-}
 
 pub type SharedExternalExchange = Arc<Mutex<dyn ExternalExchange + Send>>;
 pub type SharedInternalExchange = Arc<Mutex<dyn InternalExchange + Send>>;
@@ -40,9 +22,15 @@ pub trait ExternalExchange {
 pub trait InternalExchange {
   fn send_response(&mut self, message: ResponseMessage) -> Result<()>;
   fn get_response_sender(&self) -> Arc<Mutex<dyn ResponseSender + Send>>;
+  fn get_worker_response_sender(&self) -> McaiChannel;
   fn get_order_receiver(&self) -> Arc<Mutex<Receiver<OrderMessage>>>;
 }
 
 pub trait ResponseSender {
   fn send_response(&'_ self, message: ResponseMessage) -> Result<()>;
+}
+
+pub trait WorkerResponseSender: ResponseSender {
+  fn progression(&'_ self, job_id: u64, progression: u8) -> Result<()>;
+  fn is_stopped(&'_ self) -> bool;
 }

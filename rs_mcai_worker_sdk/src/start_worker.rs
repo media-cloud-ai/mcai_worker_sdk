@@ -2,7 +2,8 @@ use crate::{
   config::*,
   job::Job,
   message_exchange::{
-    ExternalExchange, LocalExchange, OrderMessage, RabbitmqExchange, ResponseMessage,
+    message::{OrderMessage, ResponseMessage},
+    ExternalExchange, LocalExchange, RabbitmqExchange,
   },
   worker::{docker, WorkerConfiguration},
   MessageEvent, Processor,

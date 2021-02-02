@@ -27,11 +27,19 @@ impl CurrentOrders {
   }
 
   pub(crate) fn get_process_deliveries(&self) -> Vec<Delivery> {
-    Self::filter_sort_and_dedup_deliveries(vec![
-      self.init.clone(),
-      self.start.clone(),
-      self.stop.clone(),
-    ])
+    if let Some(stop) = &self.stop {
+      return vec![stop.clone()];
+    }
+    if let Some(job) = &self.job {
+      return vec![job.clone()];
+    }
+    if let Some(start) = &self.start {
+      return vec![start.clone()];
+    }
+    if let Some(init) = &self.init {
+      return vec![init.clone()];
+    }
+    vec![]
   }
 
   pub(crate) fn get_status_deliveries(&self) -> Vec<Delivery> {
@@ -43,8 +51,7 @@ impl CurrentOrders {
     let mut deliveries: Vec<Delivery> = deliveries
       .iter()
       .cloned()
-      .filter(|delivery| delivery.is_some())
-      .map(|delivery| delivery.unwrap())
+      .filter_map(|delivery| delivery)
       .collect();
 
     // Sort deliveries by tag
@@ -66,7 +73,7 @@ impl Display for CurrentOrders {
       self.start.clone().map(|d| d.delivery_tag),
       self.stop.clone().map(|d| d.delivery_tag),
       self.job.clone().map(|d| d.delivery_tag),
-      self.status.clone().map(|d| d.delivery_tag)
+      self.status.clone().map(|d| d.delivery_tag),
     )
   }
 }

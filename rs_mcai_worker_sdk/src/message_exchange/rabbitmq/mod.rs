@@ -1,3 +1,5 @@
+//! Implements a RabbitMQ `MessageExchange`
+
 pub mod channels;
 mod connection;
 mod consumer;
@@ -25,6 +27,7 @@ pub static EXCHANGE_NAME_RESPONSE_DELAYED: &str = "job_response_delayed";
 pub static QUEUE_JOB_COMPLETED: &str = "job_completed";
 pub static QUEUE_JOB_ERROR: &str = "job_error";
 pub static QUEUE_JOB_PROGRESSION: &str = "job_progression";
+pub static QUEUE_JOB_STOPPED: &str = "job_stopped";
 
 pub static QUEUE_WORKER_DISCOVERY: &str = "worker_discovery";
 

@@ -1,3 +1,4 @@
+use crate::worker::WorkerActivity;
 use std::fmt;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -6,6 +7,7 @@ pub enum JobStatus {
   Unknown,
   Initialized,
   Running,
+  Stopped,
   Completed,
   Error,
 }
@@ -19,6 +21,19 @@ impl Default for JobStatus {
 impl fmt::Display for JobStatus {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{:?}", self)
+  }
+}
+
+impl Into<WorkerActivity> for JobStatus {
+  fn into(self) -> WorkerActivity {
+    match self {
+      JobStatus::Initialized |
+      JobStatus::Running => WorkerActivity::Busy,
+      JobStatus::Completed |
+      JobStatus::Stopped |
+      JobStatus::Error |
+      JobStatus::Unknown => WorkerActivity::Idle,
+    }
   }
 }
 

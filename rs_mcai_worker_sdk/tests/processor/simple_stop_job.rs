@@ -1,12 +1,5 @@
 use assert_matches::assert_matches;
-use mcai_worker_sdk::{
-  job::{Job, JobResult},
-  message_exchange::{ExternalExchange, Feedback, LocalExchange, OrderMessage, ResponseMessage},
-  processor::Processor,
-  worker::WorkerConfiguration,
-  JsonSchema, McaiChannel, MessageEvent, Result,
-};
-use std::sync::{Arc, Mutex};
+use mcai_worker_sdk::prelude::*;
 
 #[test]
 fn processor() {
@@ -47,8 +40,14 @@ fn processor() {
       Self: std::marker::Sized,
     {
       assert!(channel.is_some());
-      std::thread::sleep(std::time::Duration::from_secs(99999));
-      Ok(job_result.with_message("OK"))
+      loop {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        if let Some(channel) = &channel {
+          if channel.lock().unwrap().is_stopped() {
+            return Ok(job_result.with_status(JobStatus::Stopped));
+          }
+        }
+      }
     }
   }
 
@@ -86,6 +85,9 @@ fn processor() {
     .unwrap();
 
   let response = local_exchange.next_response().unwrap();
+  assert_matches!(response.unwrap(), ResponseMessage::WorkerStarted(_));
+
+  let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::Feedback(Feedback::Progression{..}));
 
   local_exchange
@@ -93,7 +95,7 @@ fn processor() {
     .unwrap();
 
   let response = local_exchange.next_response().unwrap();
-  assert_matches!(response.unwrap(), ResponseMessage::Completed(_));
+  assert_matches!(response.unwrap(), ResponseMessage::JobStopped(_));
   
   local_exchange.send_order(OrderMessage::StopWorker).unwrap();
 

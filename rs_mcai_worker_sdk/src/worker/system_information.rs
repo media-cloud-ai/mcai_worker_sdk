@@ -1,6 +1,7 @@
 use crate::worker::WorkerConfiguration;
 use sysinfo::SystemExt;
 
+/// Hardware information where the worker is running
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SystemInformation {
   pub docker_container_id: String,
