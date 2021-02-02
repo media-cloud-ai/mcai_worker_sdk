@@ -6,8 +6,8 @@ use schemars::{
 
 use crate::get_c_string;
 use crate::utils::get_worker_parameters;
-use crate::worker::WorkerParameter;
-use mcai_worker_sdk::worker::{Parameter, ParameterType};
+use crate::worker::CWorkerParameter;
+use mcai_worker_sdk::prelude::*;
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::CStr;
@@ -19,14 +19,14 @@ pub struct CWorkerParameters {
   pub parameters: HashMap<String, Value>,
 }
 
-fn get_instance_type_from_parameter_type(parameter_type: &ParameterType) -> InstanceType {
+fn get_instance_type_from_parameter_type(parameter_type: &WorkerParameterType) -> InstanceType {
   match parameter_type {
-    ParameterType::String => InstanceType::String,
-    ParameterType::ArrayOfStrings => InstanceType::Array,
-    ParameterType::Boolean => InstanceType::Boolean,
-    ParameterType::Credential => InstanceType::String,
-    ParameterType::Integer => InstanceType::Integer,
-    ParameterType::Requirements => InstanceType::Array,
+    WorkerParameterType::String => InstanceType::String,
+    WorkerParameterType::ArrayOfStrings => InstanceType::Array,
+    WorkerParameterType::Boolean => InstanceType::Boolean,
+    WorkerParameterType::Credential => InstanceType::String,
+    WorkerParameterType::Integer => InstanceType::Integer,
+    WorkerParameterType::Requirements => InstanceType::Array,
   }
 }
 
@@ -69,7 +69,7 @@ impl JsonSchema for CWorkerParameters {
   }
 }
 
-fn get_parameter_type_from_c_str(c_str: &CStr) -> ParameterType {
+fn get_parameter_type_from_c_str(c_str: &CStr) -> WorkerParameterType {
   match c_str.to_str() {
     Ok(c_str) => {
       // keep string quotes in string to json deserializer
@@ -86,18 +86,20 @@ fn get_parameter_type_from_c_str(c_str: &CStr) -> ParameterType {
   }
 }
 
-pub unsafe fn get_parameter_from_worker_parameter(worker_parameter: &WorkerParameter) -> Parameter {
+pub unsafe fn get_parameter_from_worker_parameter(worker_parameter: &CWorkerParameter) -> WorkerParameter {
   let identifier = get_c_string!(worker_parameter.identifier);
   let label = get_c_string!(worker_parameter.label);
   let kind_list: &[*const c_char] =
     std::slice::from_raw_parts(worker_parameter.kind, worker_parameter.kind_size);
-  let mut parameter_types = vec![];
-  for kind in kind_list.iter() {
-    parameter_types.push(get_parameter_type_from_c_str(CStr::from_ptr(*kind)));
-  }
+
+  let parameter_types = kind_list
+    .iter()
+    .map(|kind| get_parameter_type_from_c_str(CStr::from_ptr(*kind)))
+    .collect();
+
   let required = worker_parameter.required > 0;
 
-  Parameter {
+  WorkerParameter {
     identifier,
     label,
     kind: parameter_types,
@@ -109,26 +111,26 @@ pub unsafe fn get_parameter_from_worker_parameter(worker_parameter: &WorkerParam
 pub fn test_get_instance_type_from_parameter() {
   assert_eq!(
     InstanceType::String,
-    get_instance_type_from_parameter_type(&ParameterType::String)
+    get_instance_type_from_parameter_type(&WorkerParameterType::String)
   );
   assert_eq!(
     InstanceType::Array,
-    get_instance_type_from_parameter_type(&ParameterType::ArrayOfStrings)
+    get_instance_type_from_parameter_type(&WorkerParameterType::ArrayOfStrings)
   );
   assert_eq!(
     InstanceType::Boolean,
-    get_instance_type_from_parameter_type(&ParameterType::Boolean)
+    get_instance_type_from_parameter_type(&WorkerParameterType::Boolean)
   );
   assert_eq!(
     InstanceType::String,
-    get_instance_type_from_parameter_type(&ParameterType::Credential)
+    get_instance_type_from_parameter_type(&WorkerParameterType::Credential)
   );
   assert_eq!(
     InstanceType::Integer,
-    get_instance_type_from_parameter_type(&ParameterType::Integer)
+    get_instance_type_from_parameter_type(&WorkerParameterType::Integer)
   );
   assert_eq!(
     InstanceType::Array,
-    get_instance_type_from_parameter_type(&ParameterType::Requirements)
+    get_instance_type_from_parameter_type(&WorkerParameterType::Requirements)
   );
 }

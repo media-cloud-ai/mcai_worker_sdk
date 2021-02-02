@@ -8,7 +8,7 @@ use schemars::{
 };
 use serde_json::Value;
 
-use mcai_worker_sdk::{worker::ParameterType, MessageError, Result};
+use mcai_worker_sdk::prelude::*;
 
 use crate::{helpers::py_err_to_string, PythonWorkerEvent};
 
@@ -65,14 +65,14 @@ impl JsonSchema for PythonWorkerParameters {
   }
 }
 
-fn get_instance_type_from_parameter_type(parameter_type: &ParameterType) -> InstanceType {
+fn get_instance_type_from_parameter_type(parameter_type: &WorkerParameterType) -> InstanceType {
   match parameter_type {
-    ParameterType::String => InstanceType::String,
-    ParameterType::ArrayOfStrings => InstanceType::Array,
-    ParameterType::Boolean => InstanceType::Boolean,
-    ParameterType::Credential => InstanceType::String,
-    ParameterType::Integer => InstanceType::Integer,
-    ParameterType::Requirements => InstanceType::Object,
+    WorkerParameterType::String => InstanceType::String,
+    WorkerParameterType::ArrayOfStrings => InstanceType::Array,
+    WorkerParameterType::Boolean => InstanceType::Boolean,
+    WorkerParameterType::Credential => InstanceType::String,
+    WorkerParameterType::Integer => InstanceType::Integer,
+    WorkerParameterType::Requirements => InstanceType::Object,
   }
 }
 

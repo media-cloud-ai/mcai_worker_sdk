@@ -7,17 +7,13 @@ use mcai_worker_sdk::{
 };
 use schemars::JsonSchema;
 use semver::Version;
-use std::{
-  thread::sleep,
-  time::Duration,
-};
+use std::{thread::sleep, time::Duration};
 
 #[cfg(feature = "media")]
 use {
   mcai_worker_sdk::{
     info, AudioFilter, AudioFormat, FormatContext, ProcessFrame, ProcessResult, Scaling,
     StreamDescriptor, VideoFilter,
-
   },
   ops::Deref,
   stainless_ffmpeg_sys::AVMediaType,
@@ -30,7 +26,7 @@ struct WorkerParameters {
   source_path: Option<String>,
   destination_path: Option<String>,
   /// Option sleep time in milliseconds
-  /// 
+  ///
   /// For not media, it will sleep until a stop is received
   ///
   /// For media it will be between each frame

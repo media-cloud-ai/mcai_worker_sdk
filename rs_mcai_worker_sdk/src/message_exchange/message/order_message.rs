@@ -1,4 +1,7 @@
-use crate::{job::{Job, JobResult, JobStatus}, MessageError, Result};
+use crate::{
+  job::{Job, JobResult, JobStatus},
+  MessageError, Result,
+};
 use std::convert::TryFrom;
 
 /// Message to start actions on the worker itself

@@ -1,20 +1,16 @@
-use std::ffi::CString;
-use std::os::raw::{c_char, c_uchar, c_void};
-use std::ptr::null;
-
-use libloading::Library;
-use serde_json::Value;
-
-use mcai_worker_sdk::{
-  debug, error, info, publish_job_progression, trace, warn, worker::Parameter, McaiChannel,
-};
-
 use crate::constants;
 use crate::get_c_string;
 use crate::parameters::{get_parameter_from_worker_parameter, CWorkerParameters};
-use crate::worker::WorkerParameter;
-
 use crate::types::{GetParametersFunc, GetParametersSizeFunc, GetStringFunc};
+use crate::worker::CWorkerParameter;
+use libloading::Library;
+use mcai_worker_sdk::prelude::*;
+use serde_json::Value;
+use std::{
+  ffi::CString,
+  os::raw::{c_char, c_uchar, c_void},
+  ptr::null,
+};
 
 #[macro_export]
 macro_rules! get_c_string {
@@ -28,7 +24,6 @@ macro_rules! get_c_string {
 }
 
 #[repr(C)]
-// #[derive(Debug)]
 pub struct Handler {
   pub job_id: Option<u64>,
   pub parameters: Option<CWorkerParameters>,
@@ -163,7 +158,7 @@ pub fn get_worker_function_string_value(function_name: &str) -> String {
   }
 }
 
-pub fn get_worker_parameters() -> Vec<Parameter> {
+pub fn get_worker_parameters() -> Vec<WorkerParameter> {
   let mut parameters = vec![];
   match libloading::Library::new(get_library_file_path()) {
     Ok(worker_lib) => unsafe {
@@ -174,8 +169,8 @@ pub fn get_worker_parameters() -> Vec<Parameter> {
       let parameters_size = get_parameters_size_func() as usize;
 
       // Allocate a C array to retrieve the worker parameters
-      let worker_parameters = libc::malloc(std::mem::size_of::<WorkerParameter>() * parameters_size)
-        as *mut WorkerParameter;
+      let worker_parameters = libc::malloc(std::mem::size_of::<CWorkerParameter>() * parameters_size)
+        as *mut CWorkerParameter;
 
       let get_parameters_func: libloading::Symbol<GetParametersFunc> =
         get_library_function(&worker_lib, constants::GET_PARAMETERS_FUNCTION)

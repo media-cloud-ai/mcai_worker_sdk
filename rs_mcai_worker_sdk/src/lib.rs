@@ -103,7 +103,6 @@ use job::JobResult;
 pub use message::publish_job_progression;
 pub use message_event::MessageEvent;
 pub use parameter::container::ParametersContainer;
-pub use parameter::{Parameter, ParameterValue, Requirement};
 use processor::Processor;
 pub use start_worker::start_worker;
 use std::sync::{Arc, Mutex};

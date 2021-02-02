@@ -1,8 +1,8 @@
 #[cfg(feature = "media")]
 mod media_process;
-mod simple_process;
 mod process;
 mod process_status;
+mod simple_process;
 
 #[cfg(feature = "media")]
 use media_process::MediaProcess as ProcessEngine;
@@ -10,10 +10,7 @@ use media_process::MediaProcess as ProcessEngine;
 use simple_process::SimpleProcess as ProcessEngine;
 
 use crate::{
-  message_exchange::{
-    message::ResponseMessage,
-    InternalExchange,
-  },
+  message_exchange::{message::ResponseMessage, InternalExchange},
   worker::WorkerConfiguration,
   MessageEvent, Result,
 };
@@ -78,9 +75,8 @@ impl Processor {
       loop {
         let order_receiver = order_receiver_from_exchange.clone();
 
-        let next_message = task::block_on(async move {
-          order_receiver.lock().unwrap().recv().await
-        });
+        let next_message =
+          task::block_on(async move { order_receiver.lock().unwrap().recv().await });
 
         if let Ok(message) = next_message {
           log::debug!("Processor received an order message: {:?}", message);
@@ -104,7 +100,7 @@ impl Processor {
           }
 
           // process the message on the processor
-          let response = process.handle(message_event.clone(), message);          
+          let response = process.handle(message_event.clone(), message);
 
           // manage errors returned by the processor
           if let Err(error) = response {

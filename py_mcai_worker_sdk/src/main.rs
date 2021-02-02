@@ -1,34 +1,25 @@
 #[macro_use]
 extern crate serde_derive;
 
+#[cfg(feature = "media")]
+use crate::{helpers::get_stream_descriptors, media::PyEbuTtmlLive};
+use crate::{
+  helpers::{get_destination_paths, py_err_to_string},
+  parameters::{build_parameters, PythonWorkerParameters},
+};
+use mcai_worker_sdk::prelude::*;
+#[cfg(feature = "media")]
+pub use mcai_worker_sdk::{
+  AudioFilter, AudioFormat, FormatContext, Frame, GenericFilter, ProcessFrame, ProcessResult,
+  StreamDescriptor,
+};
+use pyo3::{prelude::*, types::*};
 use std::{env, fs};
 #[cfg(feature = "media")]
 use std::{
   ops::Deref,
   sync::{mpsc::Sender, Arc, Mutex},
 };
-
-use pyo3::{prelude::*, types::*};
-
-use mcai_worker_sdk::{
-  info,
-  job::{JobResult, JobStatus},
-  publish_job_progression, start_worker,
-  worker::{Parameter, ParameterType},
-  McaiChannel, MessageError, MessageEvent, Result, Version,
-};
-#[cfg(feature = "media")]
-pub use mcai_worker_sdk::{
-  AudioFilter, AudioFormat, FormatContext, Frame, GenericFilter, ProcessFrame, ProcessResult,
-  StreamDescriptor,
-};
-
-#[cfg(feature = "media")]
-use crate::helpers::get_stream_descriptors;
-use crate::helpers::{get_destination_paths, py_err_to_string};
-#[cfg(feature = "media")]
-use crate::media::PyEbuTtmlLive;
-use crate::parameters::{build_parameters, PythonWorkerParameters};
 
 mod helpers;
 #[cfg(feature = "media")]
@@ -66,7 +57,7 @@ impl PythonWorkerEvent {
     response
   }
 
-  fn get_parameters() -> Vec<Parameter> {
+  fn get_parameters() -> Vec<WorkerParameter> {
     let gil = Python::acquire_gil();
     let (py, python_module) = get_python_module(&gil).unwrap();
 
@@ -103,7 +94,7 @@ impl PythonWorkerEvent {
           .downcast::<PyString>()
           .expect("not a python string")
           .to_string();
-        let parameter_type: ParameterType = serde_json::from_str(&format!("{:?}", value)).unwrap();
+        let parameter_type: WorkerParameterType = serde_json::from_str(&format!("{:?}", value)).unwrap();
         parameter_types.push(parameter_type);
       }
 
@@ -113,7 +104,7 @@ impl PythonWorkerEvent {
         .is_true()
         .unwrap();
 
-      parameters.push(Parameter {
+      parameters.push(WorkerParameter {
         label,
         identifier,
         kind: parameter_types,

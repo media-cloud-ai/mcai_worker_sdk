@@ -9,7 +9,10 @@ use async_std::{
   channel::{self, Receiver, Sender},
   task,
 };
-use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+  atomic::{AtomicBool, Ordering},
+  Arc, Mutex,
+};
 
 #[derive(Clone)]
 pub struct LocalExchange {
@@ -50,10 +53,9 @@ impl ExternalExchange for LocalExchange {
     match message {
       OrderMessage::StopProcess(_) => {
         self.is_stopped.store(true, Ordering::Relaxed);
-        return Ok(())
+        return Ok(());
       }
-      OrderMessage::Job(_) |
-      OrderMessage::InitProcess(_) => {
+      OrderMessage::Job(_) | OrderMessage::InitProcess(_) => {
         self.is_stopped.store(false, Ordering::Relaxed);
       }
       _ => {}
@@ -97,7 +99,7 @@ impl InternalExchange for LocalExchange {
 
 struct LocalResponseSender {
   response_sender: Sender<ResponseMessage>,
-  is_stopped: Arc<AtomicBool>
+  is_stopped: Arc<AtomicBool>,
 }
 
 impl ResponseSender for LocalResponseSender {
@@ -109,9 +111,10 @@ impl ResponseSender for LocalResponseSender {
 
 impl WorkerResponseSender for LocalResponseSender {
   fn progression(&'_ self, job_id: u64, progression: u8) -> Result<()> {
-    let message = ResponseMessage::Feedback(Feedback::Progression(
-      JobProgression::new(job_id, progression),
-    ));
+    let message = ResponseMessage::Feedback(Feedback::Progression(JobProgression::new(
+      job_id,
+      progression,
+    )));
     task::block_on(async move { self.response_sender.send(message).await.unwrap() });
 
     Ok(())

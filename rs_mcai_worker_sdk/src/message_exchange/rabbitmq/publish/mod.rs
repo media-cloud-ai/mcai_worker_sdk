@@ -17,8 +17,8 @@ use crate::{
   message_exchange::{
     message::{Feedback, ResponseMessage},
     rabbitmq::{
-      QUEUE_JOB_COMPLETED, QUEUE_JOB_ERROR, QUEUE_JOB_STOPPED, QUEUE_WORKER_CREATED, QUEUE_WORKER_INITIALIZED,
-      QUEUE_WORKER_STARTED, QUEUE_WORKER_STATUS,
+      QUEUE_JOB_COMPLETED, QUEUE_JOB_ERROR, QUEUE_JOB_STOPPED, QUEUE_WORKER_CREATED,
+      QUEUE_WORKER_INITIALIZED, QUEUE_WORKER_STARTED, QUEUE_WORKER_STATUS,
     },
   },
   MessageError, Result,
@@ -77,7 +77,7 @@ pub async fn response_with_delivery(
       }
 
       publish_job_response(channel, &delivery.unwrap(), QUEUE_JOB_STOPPED, &payload).await
-    },
+    }
     ResponseMessage::Feedback(feedback) => match feedback {
       Feedback::Progression(progression) => job_progression(channel, progression.clone()),
       Feedback::Status(_process_status) => {

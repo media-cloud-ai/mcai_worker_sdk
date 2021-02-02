@@ -5,7 +5,11 @@ pub use decoder::EbuTtmlLiveDecoder;
 pub use time_expression::{Frames, TimeExpression, TimeUnit};
 
 #[cfg(all(feature = "media", feature = "python"))]
-use dict_derive::{FromPyObject, IntoPyObject};
+use {
+  dict_derive::{FromPyObject, IntoPyObject},
+  std::io::{Read, Write},
+  yaserde::{YaDeserialize, YaSerialize},
+};
 
 pub fn default_lang() -> String {
   "en".to_owned()

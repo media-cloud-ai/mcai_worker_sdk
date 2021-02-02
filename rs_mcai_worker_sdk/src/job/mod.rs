@@ -1,6 +1,9 @@
 //! Module to manage Job
 
-use crate::{parameter::container::ParametersContainer, MessageError, Parameter, Requirement};
+use crate::{
+  parameter::{container::ParametersContainer, Parameter, Requirement},
+  MessageError,
+};
 use serde_json::{Map, Value};
 use std::path::Path;
 

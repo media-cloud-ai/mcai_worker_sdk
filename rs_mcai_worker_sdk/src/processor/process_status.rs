@@ -1,8 +1,4 @@
-
-use crate::{
-  job::JobResult,
-  worker::WorkerStatus,
-};
+use crate::{job::JobResult, worker::WorkerStatus};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ProcessStatus {

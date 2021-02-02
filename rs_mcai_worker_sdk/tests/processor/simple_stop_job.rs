@@ -88,7 +88,10 @@ fn processor() {
   assert_matches!(response.unwrap(), ResponseMessage::WorkerStarted(_));
 
   let response = local_exchange.next_response().unwrap();
-  assert_matches!(response.unwrap(), ResponseMessage::Feedback(Feedback::Progression{..}));
+  assert_matches!(
+    response.unwrap(),
+    ResponseMessage::Feedback(Feedback::Progression { .. })
+  );
 
   local_exchange
     .send_order(OrderMessage::StopProcess(job.clone()))
@@ -96,9 +99,12 @@ fn processor() {
 
   let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::JobStopped(_));
-  
+
   local_exchange.send_order(OrderMessage::StopWorker).unwrap();
 
   let response = local_exchange.next_response().unwrap();
-  assert_matches!(response.unwrap(), ResponseMessage::Feedback(Feedback::Status{..}));
+  assert_matches!(
+    response.unwrap(),
+    ResponseMessage::Feedback(Feedback::Status { .. })
+  );
 }

@@ -1,8 +1,8 @@
 use super::Feedback;
 use crate::{
-  job::{JobStatus, JobResult},
+  job::{JobResult, JobStatus},
   worker::WorkerConfiguration,
-  MessageError
+  MessageError,
 };
 
 /// Message from the Worker to the Message Exchange

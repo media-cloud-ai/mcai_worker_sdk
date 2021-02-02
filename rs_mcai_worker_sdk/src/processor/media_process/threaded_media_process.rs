@@ -8,12 +8,7 @@ use crate::{
   message_exchange::message::{Feedback, OrderMessage, ResponseMessage},
   processor::ProcessStatus,
   publish_job_progression,
-  worker::{
-    SystemInformation,
-    WorkerActivity,
-    WorkerConfiguration,
-    WorkerStatus,
-  },
+  worker::{SystemInformation, WorkerActivity, WorkerConfiguration, WorkerStatus},
   McaiChannel, MessageError, MessageEvent, Result,
 };
 use schemars::JsonSchema;

@@ -18,7 +18,7 @@ pub fn publish_job_progression(
     return response_channel
       .lock()
       .unwrap()
-      .progression(job_id, progression)
+      .progression(job_id, progression);
   }
   Ok(())
 }

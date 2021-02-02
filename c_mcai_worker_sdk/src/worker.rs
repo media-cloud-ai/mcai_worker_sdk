@@ -1,34 +1,31 @@
-#[cfg(feature = "media")]
-use std::sync::{mpsc::Sender, Arc, Mutex};
+use mcai_worker_sdk::prelude::*;
 
-use mcai_worker_sdk::{
-  debug, job::JobResult, McaiChannel, MessageError, MessageEvent, Result, Version,
+use crate::{
+  constants,
+  parameters::CWorkerParameters,
+  process_return::ProcessReturn,
+  types::{InitFunc, ProcessFunc},
+  utils::*,
 };
 #[cfg(feature = "media")]
-use mcai_worker_sdk::{FormatContext, ProcessFrame, ProcessResult, StreamDescriptor};
-
-use crate::constants;
-#[cfg(feature = "media")]
-use crate::media::{
-  filters::{add_descriptor_filter, add_filter_parameter, new_filter, new_stream_descriptor},
-  stream_descriptors::CStreamDescriptor,
+use crate::{
+  media::{
+    filters::{add_descriptor_filter, add_filter_parameter, new_filter, new_stream_descriptor},
+    stream_descriptors::CStreamDescriptor,
+  },
+  types::{EndingProcessFunc, InitProcessFunc, ProcessFrameFunc},
 };
-use crate::parameters::CWorkerParameters;
-use crate::process_return::ProcessReturn;
+use std::{ffi::c_void, os::raw::c_char};
 #[cfg(feature = "media")]
-use crate::types::{EndingProcessFunc, InitProcessFunc, ProcessFrameFunc};
-use crate::types::{InitFunc, ProcessFunc};
-use crate::utils::*;
-use std::ffi::c_void;
-#[cfg(feature = "media")]
-use std::mem::size_of;
-use std::os::raw::c_char;
-#[cfg(feature = "media")]
-use std::os::raw::c_uint;
+use std::{
+  mem::size_of,
+  os::raw::c_uint,
+  sync::{mpsc::Sender, Arc, Mutex},
+};
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct WorkerParameter {
+pub struct CWorkerParameter {
   pub identifier: *const c_char,
   pub label: *const c_char,
   pub kind_size: usize,

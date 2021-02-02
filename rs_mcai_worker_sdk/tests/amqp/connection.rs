@@ -5,15 +5,13 @@ use lapin::{
   BasicProperties, Channel, Connection, ConnectionProperties, ExchangeKind,
 };
 use mcai_worker_sdk::{
-  message_exchange::{
-    rabbitmq::{
-      channels::{BindDescription, ExchangeDescription, QueueDescription},
-      EXCHANGE_NAME_DIRECT_MESSAGING, EXCHANGE_NAME_WORKER_RESPONSE, QUEUE_WORKER_CREATED,
-      QUEUE_WORKER_INITIALIZED, QUEUE_WORKER_STARTED, QUEUE_WORKER_STATUS, QUEUE_WORKER_TERMINATED,
-      QUEUE_WORKER_UPDATED, WORKER_RESPONSE_NOT_FOUND,
-    },
-  },
   config,
+  message_exchange::rabbitmq::{
+    channels::{BindDescription, ExchangeDescription, QueueDescription},
+    EXCHANGE_NAME_DIRECT_MESSAGING, EXCHANGE_NAME_WORKER_RESPONSE, QUEUE_WORKER_CREATED,
+    QUEUE_WORKER_INITIALIZED, QUEUE_WORKER_STARTED, QUEUE_WORKER_STATUS, QUEUE_WORKER_TERMINATED,
+    QUEUE_WORKER_UPDATED, WORKER_RESPONSE_NOT_FOUND,
+  },
   prelude::*,
 };
 use std::{collections::HashMap, sync::mpsc::Sender};
@@ -32,16 +30,18 @@ impl AmqpConnection {
     )
     .wait()?;
 
-    let channel = connection
-      .create_channel()
-      .wait()?;
+    let channel = connection.create_channel().wait()?;
 
     Self::declare_consumed_queues(&channel);
 
     Ok(AmqpConnection { channel })
   }
 
-  pub fn start_consumer<T: 'static + serde::de::DeserializeOwned + Send>(&self, queue_name: &str, sender: Sender<T>) {
+  pub fn start_consumer<T: 'static + serde::de::DeserializeOwned + Send>(
+    &self,
+    queue_name: &str,
+    sender: Sender<T>,
+  ) {
     let channel = self.channel.clone();
     let sender = sender.clone();
     let queue_name = queue_name.to_string();
@@ -127,10 +127,18 @@ impl AmqpConnection {
       .declare(channel);
 
     Self::declare_queue(channel, EXCHANGE_NAME_WORKER_RESPONSE, QUEUE_WORKER_CREATED);
-    Self::declare_queue(channel, EXCHANGE_NAME_WORKER_RESPONSE, QUEUE_WORKER_INITIALIZED);
+    Self::declare_queue(
+      channel,
+      EXCHANGE_NAME_WORKER_RESPONSE,
+      QUEUE_WORKER_INITIALIZED,
+    );
     Self::declare_queue(channel, EXCHANGE_NAME_WORKER_RESPONSE, QUEUE_WORKER_STARTED);
     Self::declare_queue(channel, EXCHANGE_NAME_WORKER_RESPONSE, QUEUE_WORKER_STATUS);
-    Self::declare_queue(channel, EXCHANGE_NAME_WORKER_RESPONSE, QUEUE_WORKER_TERMINATED);
+    Self::declare_queue(
+      channel,
+      EXCHANGE_NAME_WORKER_RESPONSE,
+      QUEUE_WORKER_TERMINATED,
+    );
     Self::declare_queue(channel, EXCHANGE_NAME_WORKER_RESPONSE, QUEUE_WORKER_UPDATED);
 
     Self::declare_queue(channel, EXCHANGE_NAME_JOB_RESPONSE, QUEUE_JOB_COMPLETED);

@@ -1,10 +1,5 @@
-
 use crate::{
-  message_exchange::{
-    message::OrderMessage,
-  },
-  worker::WorkerConfiguration,
-  McaiChannel, Result,
+  message_exchange::message::OrderMessage, worker::WorkerConfiguration, McaiChannel, Result,
 };
 use std::sync::{Arc, Mutex};
 

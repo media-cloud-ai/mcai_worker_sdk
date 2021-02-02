@@ -80,8 +80,7 @@ impl RabbitmqPublisher {
       | ResponseMessage::Completed(_)
       | ResponseMessage::JobStopped(_)
       | ResponseMessage::Error(_) => current_orders.lock().unwrap().get_process_deliveries(),
-      ResponseMessage::Feedback(_) |
-      ResponseMessage::StatusError(_) => {
+      ResponseMessage::Feedback(_) | ResponseMessage::StatusError(_) => {
         current_orders.lock().unwrap().get_status_deliveries()
       }
     };
@@ -128,7 +127,7 @@ impl RabbitmqPublisher {
       | ResponseMessage::WorkerInitialized(_)
       | ResponseMessage::WorkerStarted(_) => {}
       ResponseMessage::Completed(_)
-      | ResponseMessage::Error(_) 
+      | ResponseMessage::Error(_)
       | ResponseMessage::JobStopped(_) => {
         current_orders.lock().unwrap().reset_process_deliveries();
       }

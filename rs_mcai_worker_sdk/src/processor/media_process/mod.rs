@@ -4,11 +4,7 @@ use crate::{
   job::{JobResult, JobStatus},
   message_exchange::message::{Feedback, OrderMessage, ResponseMessage},
   processor::{Process, ProcessStatus},
-  worker::{
-    SystemInformation, 
-    WorkerConfiguration,
-    WorkerStatus,
-  },
+  worker::{SystemInformation, WorkerConfiguration, WorkerStatus},
   McaiChannel, MessageError, MessageEvent, Result,
 };
 use schemars::JsonSchema;
@@ -16,7 +12,10 @@ use serde::de::DeserializeOwned;
 use std::cell::RefCell;
 use std::ops::DerefMut;
 use std::rc::Rc;
-use std::sync::{mpsc::{channel, Sender}, Arc, Mutex};
+use std::sync::{
+  mpsc::{channel, Sender},
+  Arc, Mutex,
+};
 use threaded_media_process::ThreadedMediaProcess;
 
 pub struct MediaProcess {

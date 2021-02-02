@@ -27,12 +27,10 @@ impl fmt::Display for JobStatus {
 impl Into<WorkerActivity> for JobStatus {
   fn into(self) -> WorkerActivity {
     match self {
-      JobStatus::Initialized |
-      JobStatus::Running => WorkerActivity::Busy,
-      JobStatus::Completed |
-      JobStatus::Stopped |
-      JobStatus::Error |
-      JobStatus::Unknown => WorkerActivity::Idle,
+      JobStatus::Initialized | JobStatus::Running => WorkerActivity::Busy,
+      JobStatus::Completed | JobStatus::Stopped | JobStatus::Error | JobStatus::Unknown => {
+        WorkerActivity::Idle
+      }
     }
   }
 }

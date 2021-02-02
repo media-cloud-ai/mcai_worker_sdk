@@ -5,11 +5,15 @@ mod configuration;
 pub mod docker;
 mod status;
 mod system_information;
+mod worker_parameter;
+mod worker_parameter_type;
 
 pub use activity::WorkerActivity;
 pub use configuration::WorkerConfiguration;
 pub use status::WorkerStatus;
 pub use system_information::SystemInformation;
+pub use worker_parameter::WorkerParameter;
+pub use worker_parameter_type::WorkerParameterType;
 
 pub mod built_info {
   include!(concat!(env!("OUT_DIR"), "/built.rs"));

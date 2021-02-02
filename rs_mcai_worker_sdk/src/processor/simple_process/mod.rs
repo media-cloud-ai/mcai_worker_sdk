@@ -2,7 +2,7 @@ use crate::{
   job::{Job, JobProgression, JobResult, JobStatus},
   message_exchange::message::{Feedback, OrderMessage, ResponseMessage},
   processor::{Process, ProcessStatus},
-  worker::{SystemInformation, WorkerActivity, WorkerStatus, WorkerConfiguration},
+  worker::{SystemInformation, WorkerActivity, WorkerConfiguration, WorkerStatus},
   McaiChannel, MessageEvent, Result,
 };
 use schemars::JsonSchema;
@@ -34,53 +34,55 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
   }
 
   fn handle(&mut self, message_event: Arc<Mutex<ME>>, order_message: OrderMessage) -> Result<()> {
-    let response = match order_message {
-      OrderMessage::Job(job) => {
-        *self.status.lock().unwrap() = JobStatus::Initialized;
-        *self.current_job_id.lock().unwrap() = Some(job.job_id);
+    let response =
+      match order_message {
+        OrderMessage::Job(job) => {
+          *self.status.lock().unwrap() = JobStatus::Initialized;
+          *self.current_job_id.lock().unwrap() = Some(job.job_id);
 
-        self.response_sender
-          .lock()
-          .unwrap()
-          .send_response(ResponseMessage::WorkerInitialized(
+          self.response_sender.lock().unwrap().send_response(
+            ResponseMessage::WorkerInitialized(
+              JobResult::new(job.job_id).with_status(JobStatus::Initialized),
+            ),
+          )?;
+
+          *self.status.lock().unwrap() = JobStatus::Running;
+          self.execute(message_event, &job);
+          None
+        }
+        OrderMessage::InitProcess(job) => {
+          *self.status.lock().unwrap() = JobStatus::Initialized;
+          *self.current_job_id.lock().unwrap() = Some(job.job_id);
+
+          Some(ResponseMessage::WorkerInitialized(
             JobResult::new(job.job_id).with_status(JobStatus::Initialized),
-          ))?;
+          ))
+        }
+        OrderMessage::StartProcess(job) => {
+          *self.status.lock().unwrap() = JobStatus::Running;
+          self.execute(message_event, &job);
 
-        *self.status.lock().unwrap() = JobStatus::Running;
-        self.execute(message_event, &job);
-        None
-      }
-      OrderMessage::InitProcess(job) => {
-        *self.status.lock().unwrap() = JobStatus::Initialized;
-        *self.current_job_id.lock().unwrap() = Some(job.job_id);
+          None
+        }
+        // Nothing to do here to stop the current job
+        OrderMessage::StopProcess(_job) => None,
+        OrderMessage::Status | OrderMessage::StopWorker => {
+          let status = self.status.lock().unwrap().clone();
+          let current_job_result = self
+            .current_job_id
+            .lock()
+            .unwrap()
+            .map(|job_id| JobResult::new(job_id).with_status(status));
 
-        Some(ResponseMessage::WorkerInitialized(
-          JobResult::new(job.job_id).with_status(JobStatus::Initialized),
-        ))
-      }
-      OrderMessage::StartProcess(job) => {
-        *self.status.lock().unwrap() = JobStatus::Running;
-        self.execute(message_event, &job);
-
-        None
-      },
-      // Nothing to do here to stop the current job
-      OrderMessage::StopProcess(_job) => None,
-      OrderMessage::Status | OrderMessage::StopWorker => {
-        let status = self.status.lock().unwrap().clone();
-        let current_job_result = self.current_job_id
-          .lock()
-          .unwrap()
-          .map(|job_id| JobResult::new(job_id).with_status(status));
-
-        Some(ResponseMessage::Feedback(Feedback::Status(
-          ProcessStatus::new(self.get_worker_status(), current_job_result),
-        )))
-      }
-    };
+          Some(ResponseMessage::Feedback(Feedback::Status(
+            ProcessStatus::new(self.get_worker_status(), current_job_result),
+          )))
+        }
+      };
 
     if let Some(response) = response {
-      self.response_sender
+      self
+        .response_sender
         .lock()
         .unwrap()
         .send_response(response)?;
@@ -118,10 +120,9 @@ impl SimpleProcess {
     spawn(move || {
       let job_id = job.job_id;
 
-      let worker_started = 
-        ResponseMessage::WorkerStarted(
-          JobResult::from(job.clone()).with_status(JobStatus::Running)
-        );
+      let worker_started = ResponseMessage::WorkerStarted(
+        JobResult::from(job.clone()).with_status(JobStatus::Running),
+      );
 
       response_sender
         .lock()
@@ -130,11 +131,8 @@ impl SimpleProcess {
         .unwrap();
 
       // start publishing progression
-      let feedback = ResponseMessage::Feedback(
-        Feedback::Progression(
-          JobProgression::new(job_id, 0),
-        )
-      );
+      let feedback =
+        ResponseMessage::Feedback(Feedback::Progression(JobProgression::new(job_id, 0)));
 
       response_sender
         .lock()
@@ -142,25 +140,21 @@ impl SimpleProcess {
         .send_response(feedback)
         .unwrap();
 
-      let response = message_event
-        .lock()
-        .unwrap()
-        .process(
-          Some(response_sender.clone()),
-          job.get_parameters().unwrap(),
-          JobResult::from(job),
-        );
+      let response = message_event.lock().unwrap().process(
+        Some(response_sender.clone()),
+        job.get_parameters().unwrap(),
+        JobResult::from(job),
+      );
 
-      let response =
-        if response_sender.lock().unwrap().is_stopped() {
-          response
-            .map(ResponseMessage::JobStopped)
-            .unwrap_or_else(ResponseMessage::Error)
-        } else {
-          response
-            .map(ResponseMessage::Completed)
-            .unwrap_or_else(ResponseMessage::Error)
-        };
+      let response = if response_sender.lock().unwrap().is_stopped() {
+        response
+          .map(ResponseMessage::JobStopped)
+          .unwrap_or_else(ResponseMessage::Error)
+      } else {
+        response
+          .map(ResponseMessage::Completed)
+          .unwrap_or_else(ResponseMessage::Error)
+      };
 
       *status.lock().unwrap() = response.clone().into();
 
@@ -169,9 +163,9 @@ impl SimpleProcess {
       response_sender
         .lock()
         .unwrap()
-        .send_response(response).unwrap();
+        .send_response(response)
+        .unwrap();
     });
-
   }
 }
 

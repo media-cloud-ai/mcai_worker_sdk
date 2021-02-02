@@ -1,7 +1,9 @@
 use super::RabbitmqConnection;
 use crate::{
-  message_exchange::{InternalExchange, OrderMessage, ResponseMessage, ResponseSender, WorkerResponseSender},
-  prelude::*
+  message_exchange::{
+    InternalExchange, OrderMessage, ResponseMessage, ResponseSender, WorkerResponseSender,
+  },
+  prelude::*,
 };
 use async_std::{
   channel::{self, Receiver},
@@ -79,10 +81,19 @@ impl ResponseSender for RabbitmqResponseSender {
 
 impl WorkerResponseSender for RabbitmqResponseSender {
   fn progression(&'_ self, job_id: u64, progression: u8) -> Result<()> {
-    let message = ResponseMessage::Feedback(Feedback::Progression(
-      JobProgression::new(job_id, progression),
-    ));
-    task::block_on(async move { self.connection.lock().unwrap().send_response(message).await.unwrap() });
+    let message = ResponseMessage::Feedback(Feedback::Progression(JobProgression::new(
+      job_id,
+      progression,
+    )));
+    task::block_on(async move {
+      self
+        .connection
+        .lock()
+        .unwrap()
+        .send_response(message)
+        .await
+        .unwrap()
+    });
 
     Ok(())
   }
@@ -95,6 +106,7 @@ impl WorkerResponseSender for RabbitmqResponseSender {
       .get_current_orders()
       .lock()
       .unwrap()
-      .stop.is_some()
+      .stop
+      .is_some()
   }
 }

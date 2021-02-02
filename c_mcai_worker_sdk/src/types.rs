@@ -1,15 +1,14 @@
-use std::os::raw::{c_char, c_int, c_uchar, c_uint, c_void};
-
 #[cfg(feature = "media")]
 use crate::media::filters::{
   AddDescriptorFilterCallback, AddFilterParameterCallback, NewFilterCallback,
   NewStreamDescriptorCallback,
 };
-use crate::worker::WorkerParameter;
+use crate::worker::CWorkerParameter;
+use std::os::raw::{c_char, c_int, c_uchar, c_uint, c_void};
 
 pub(crate) type GetStringFunc = unsafe fn() -> *const c_char;
 pub(crate) type GetParametersSizeFunc = unsafe fn() -> c_uint;
-pub(crate) type GetParametersFunc = unsafe fn(parameters: *mut WorkerParameter);
+pub(crate) type GetParametersFunc = unsafe fn(parameters: *mut CWorkerParameter);
 
 pub(crate) type GetParameterValueCallback =
   extern "C" fn(*mut c_void, *const c_char) -> *const c_char;
