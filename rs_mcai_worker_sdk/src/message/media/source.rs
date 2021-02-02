@@ -1,30 +1,45 @@
-use std::sync::{
-  mpsc,
-  mpsc::{Receiver, Sender},
-  Arc, Mutex,
-};
-use std::{collections::HashMap, io::Cursor, thread};
-
+use bytes::Buf;
 use ringbuf::RingBuffer;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use stainless_ffmpeg::tools::rational::Rational;
 use stainless_ffmpeg::{
-  audio_decoder::AudioDecoder, check_result, filter_graph::FilterGraph,
-  format_context::FormatContext, frame::Frame, packet::Packet, tools, video_decoder::VideoDecoder,
+  audio_decoder::AudioDecoder,
+  check_result,
+  filter_graph::FilterGraph,
+  format_context::FormatContext,
+  frame::Frame,
+  packet::Packet,
+  tools::{self, rational::Rational},
+  video_decoder::VideoDecoder,
 };
 use stainless_ffmpeg_sys::{
   av_frame_alloc, av_frame_clone, av_q2d, av_seek_frame, av_strerror, avcodec_receive_frame,
   avcodec_send_packet, AVSEEK_FLAG_BACKWARD, AV_ERROR_MAX_STRING_SIZE,
 };
-
+use std::{
+  collections::HashMap,
+  io::Cursor,
+  sync::{
+    mpsc::{self, Receiver, Sender},
+    Arc, Mutex,
+  },
+  thread,
+};
 use crate::{
   error::MessageError::RuntimeError,
   job::JobResult,
-  message::media::{ebu_ttml_live::EbuTtmlLiveDecoder, media_stream::MediaStream, srt::SrtStream},
-  AudioFilter, MessageError, MessageEvent, ProcessFrame, ProcessResult, Result, VideoFilter,
+  MessageError, MessageEvent,
+  process_frame::ProcessFrame,
+  process_result::ProcessResult,
+  Result,
 };
-use bytes::Buf;
+use super::{
+  ebu_ttml_live::EbuTtmlLiveDecoder,
+  media_stream::MediaStream,
+  srt::SrtStream,
+  AudioFilter,
+  VideoFilter,
+};
 
 pub enum DecodeResult {
   EndOfStream,

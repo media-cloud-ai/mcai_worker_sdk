@@ -1,4 +1,4 @@
-use crate::{
+  use crate::{
   job::{Job, JobProgression, JobResult, JobStatus},
   message::media::{
     finish_process, initialize_process,
@@ -219,7 +219,7 @@ fn get_status_feedback(
 ) -> ResponseMessage {
   let activity = match &status {
     JobStatus::Initialized | JobStatus::Running => WorkerActivity::Busy,
-    JobStatus::Completed | JobStatus::Error | JobStatus::Unknown => WorkerActivity::Idle,
+    JobStatus::Completed | JobStatus::Error | JobStatus::Stopped | JobStatus::Unknown => WorkerActivity::Idle,
   };
   let system_info = SystemInformation::new(&worker_configuration);
 

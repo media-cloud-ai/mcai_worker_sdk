@@ -30,7 +30,7 @@ pub struct FormatContext {
 }
 
 impl FormatContext {
-  pub fn from(format_context: Arc<Mutex<mcai_worker_sdk::FormatContext>>) -> FormatContext {
+  pub fn from(format_context: Arc<Mutex<mcai_worker_sdk::prelude::FormatContext>>) -> FormatContext {
     let context = format_context.lock().unwrap();
 
     let format_name = context.get_format_name();

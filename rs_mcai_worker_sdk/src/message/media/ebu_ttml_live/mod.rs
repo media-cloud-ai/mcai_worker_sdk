@@ -3,13 +3,8 @@ mod time_expression;
 
 pub use decoder::EbuTtmlLiveDecoder;
 pub use time_expression::{Frames, TimeExpression, TimeUnit};
-
 #[cfg(all(feature = "media", feature = "python"))]
-use {
-  dict_derive::{FromPyObject, IntoPyObject},
-  std::io::{Read, Write},
-  yaserde::{YaDeserialize, YaSerialize},
-};
+use dict_derive::{FromPyObject, IntoPyObject};
 
 pub fn default_lang() -> String {
   "en".to_owned()

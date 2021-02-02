@@ -1,14 +1,3 @@
-use crate::{
-  job::{Job, JobResult, JobStatus},
-  message::{media::output::Output, media::source::Source},
-  parameter::container::ParametersContainer,
-  AudioFilter, MessageEvent, ProcessFrame, Result,
-};
-use filters::VideoFilter;
-use schemars::JsonSchema;
-use serde::de::DeserializeOwned;
-use std::sync::{Arc, Mutex};
-
 pub mod audio;
 pub mod ebu_ttml_live;
 pub mod filters;
@@ -17,6 +6,20 @@ pub mod output;
 pub mod source;
 mod srt;
 pub mod video;
+
+use crate::{
+  job::{Job, JobResult, JobStatus},
+  message::{media::output::Output, media::source::Source},
+  parameter::container::ParametersContainer,
+  process_frame::ProcessFrame,  
+  MessageEvent, Result,
+};
+use audio::AudioFormat;
+use filters::{AudioFilter, VideoFilter};
+use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
+use std::sync::{Arc, Mutex};
+use video::{RegionOfInterest, Scaling, VideoFormat};
 
 pub const SOURCE_PATH_PARAMETER: &str = "source_path";
 pub const DESTINATION_PATH_PARAMETER: &str = "destination_path";

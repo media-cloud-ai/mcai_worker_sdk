@@ -1,5 +1,8 @@
-use crate::message::media::srt::SrtStream;
-use crate::{MessageError, ProcessResult, Result};
+use crate::{
+  message::media::srt::SrtStream,
+  process_result::ProcessResult,
+  MessageError, Result,
+};
 use bytes::Bytes;
 use std::{
   sync::{

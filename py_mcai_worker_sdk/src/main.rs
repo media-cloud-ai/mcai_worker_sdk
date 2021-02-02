@@ -8,11 +8,11 @@ use crate::{
   parameters::{build_parameters, PythonWorkerParameters},
 };
 use mcai_worker_sdk::prelude::*;
-#[cfg(feature = "media")]
-pub use mcai_worker_sdk::{
-  AudioFilter, AudioFormat, FormatContext, Frame, GenericFilter, ProcessFrame, ProcessResult,
-  StreamDescriptor,
-};
+// #[cfg(feature = "media")]
+// pub use mcai_worker_sdk::{
+//   AudioFilter, AudioFormat, FormatContext, Frame, GenericFilter, ProcessFrame, ProcessResult,
+//   StreamDescriptor,
+// };
 use pyo3::{prelude::*, types::*};
 use std::{env, fs};
 #[cfg(feature = "media")]

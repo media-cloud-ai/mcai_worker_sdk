@@ -1,4 +1,5 @@
-use crate::{EbuTtmlLive, Frame};
+use crate::message::media::ebu_ttml_live::EbuTtmlLive;
+use stainless_ffmpeg::frame::Frame;
 
 pub enum ProcessFrame {
   AudioVideo(Frame),

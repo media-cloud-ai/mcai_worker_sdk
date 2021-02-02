@@ -1,14 +1,12 @@
-use schemars::JsonSchema;
-use std::collections::HashMap;
-
+use super::{AudioFormat, RegionOfInterest, Scaling, VideoFormat};
 #[cfg(all(feature = "media", feature = "python"))]
 use dict_derive::{FromPyObject, IntoPyObject};
-use stainless_ffmpeg::order::{Filter, ParameterValue};
-use stainless_ffmpeg::video_decoder::VideoDecoder;
-
-use crate::message::media::audio::AudioFormat;
-use crate::message::media::video::VideoFormat;
-use crate::{RegionOfInterest, Scaling};
+use schemars::JsonSchema;
+use stainless_ffmpeg::{
+  order::{Filter, ParameterValue},
+  video_decoder::VideoDecoder,
+};
+use std::collections::HashMap;
 
 pub trait FilterParameters {
   fn get_filter_parameters(&self) -> HashMap<String, String>;

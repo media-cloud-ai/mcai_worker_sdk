@@ -61,7 +61,7 @@ impl Frame {
 }
 
 impl Frame {
-  pub fn from(frame: &mcai_worker_sdk::Frame) -> Result<Frame> {
+  pub fn from(frame: &mcai_worker_sdk::prelude::Frame) -> Result<Frame> {
     if frame.frame.is_null() {
       return Err(MessageError::RuntimeError(
         "Cannot initialize frame struct from null AVFrame".to_string(),

@@ -1,9 +1,7 @@
+use super::EbuTtmlLive;
+use stainless_ffmpeg::packet::Packet;
 use std::collections::VecDeque;
 use std::mem::forget;
-
-use stainless_ffmpeg::packet::Packet;
-
-use crate::EbuTtmlLive;
 
 #[derive(Default)]
 pub struct EbuTtmlLiveDecoder {

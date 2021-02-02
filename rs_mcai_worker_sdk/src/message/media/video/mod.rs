@@ -1,14 +1,13 @@
-use std::collections::HashMap;
+mod region_of_interest;
 
+use crate::message::media::filters::FilterParameters;
 #[cfg(all(feature = "media", feature = "python"))]
 use dict_derive::{FromPyObject, IntoPyObject};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-use crate::message::media::filters::FilterParameters;
 pub use region_of_interest::RegionOfInterest;
-
-mod region_of_interest;
 
 #[cfg(feature = "media")]
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]

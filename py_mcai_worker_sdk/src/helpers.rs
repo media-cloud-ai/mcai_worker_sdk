@@ -1,7 +1,7 @@
 #[cfg(feature = "media")]
 use crate::GenericStreamDescriptor;
 #[cfg(feature = "media")]
-use mcai_worker_sdk::{AudioFilter, MessageError, StreamDescriptor, VideoFilter};
+use mcai_worker_sdk::prelude::*;
 use pyo3::{prelude::*, types::*};
 
 pub fn py_err_to_string(py: Python, error: PyErr) -> String {
@@ -43,7 +43,7 @@ pub fn get_destination_paths(response: &PyAny) -> Option<Vec<String>> {
 }
 
 #[cfg(feature = "media")]
-pub fn get_stream_descriptors(response: &PyAny) -> Result<Vec<StreamDescriptor>, MessageError> {
+pub fn get_stream_descriptors(response: &PyAny) -> Result<Vec<StreamDescriptor>> {
   response
     .downcast::<PyList>()
     .map(|py_list| {

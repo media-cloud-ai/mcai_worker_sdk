@@ -13,8 +13,24 @@ pub use crate::message_exchange::{
 };
 pub use crate::parameter::{MediaSegment, MediaSegments, Parameter, ParameterValue, Requirement};
 pub use crate::processor::{ProcessStatus, Processor};
-pub use crate::start_worker;
+pub use crate::start_worker::start_worker;
 pub use crate::worker::{
   WorkerParameter, WorkerParameterType, SystemInformation, WorkerActivity, WorkerConfiguration, WorkerStatus,
 };
 pub use crate::{McaiChannel, MessageError, MessageEvent, Result};
+
+#[cfg(feature = "media")]
+pub use {
+  crate::{
+    message::media::{
+      audio::AudioFormat,
+      ebu_ttml_live::*,
+      filters::{AudioFilter, GenericFilter, VideoFilter},
+      video::{RegionOfInterest, Scaling, VideoFormat},
+      StreamDescriptor
+    },
+    process_frame::ProcessFrame,
+    process_result::ProcessResult,
+  },
+  stainless_ffmpeg::{format_context::FormatContext, frame::Frame},
+};

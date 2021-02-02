@@ -99,30 +99,11 @@ pub mod processor;
 
 use crate::message_exchange::WorkerResponseSender;
 pub use error::{MessageError, Result};
-use job::JobResult;
 pub use message::publish_job_progression;
 pub use message_event::MessageEvent;
 pub use parameter::container::ParametersContainer;
 use processor::Processor;
-pub use start_worker::start_worker;
 use std::sync::{Arc, Mutex};
-
-#[cfg(feature = "media")]
-pub use {
-  message::media::{
-    audio::AudioFormat,
-    ebu_ttml_live::{
-      Body, Div, EbuTtmlLive, Frames, Head, Paragraph, Span, Styling, TimeExpression, TimeUnit,
-      Title,
-    },
-    filters::{AudioFilter, GenericFilter, VideoFilter},
-    video::{RegionOfInterest, Scaling, VideoFormat},
-    StreamDescriptor,
-  },
-  process_frame::ProcessFrame,
-  process_result::ProcessResult,
-  stainless_ffmpeg::{format_context::FormatContext, frame::Frame},
-};
 
 /// Exposed Channel type
 pub type McaiChannel = Arc<Mutex<dyn WorkerResponseSender + Send>>;
