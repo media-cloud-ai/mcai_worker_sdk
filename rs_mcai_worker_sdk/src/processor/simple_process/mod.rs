@@ -112,7 +112,7 @@ impl SimpleProcess {
     job: &Job,
   ) {
     let response_sender = self.response_sender.clone();
-    let message_event = message_event.clone();
+    let message_event = message_event;
     let status = self.status.clone();
     let current_job_id = self.current_job_id.clone();
     let job = job.clone();

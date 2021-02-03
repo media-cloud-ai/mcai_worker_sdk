@@ -1,7 +1,7 @@
 extern crate mcai_worker_sdk;
 
-use mcai_worker_sdk::prelude::*;
 use mcai_worker_sdk::parameter::MediaSegments;
+use mcai_worker_sdk::prelude::*;
 use serde_json::{Number, Value};
 
 #[test]

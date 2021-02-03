@@ -1,11 +1,11 @@
 use crate::Result;
 use bytes::Bytes;
 use futures_util::sink::SinkExt;
+use futures_util::TryStreamExt;
 use srt_tokio::SrtSocket;
 use srt_tokio::SrtSocketBuilder;
 use std::{cell::RefCell, rc::Rc, time::Instant};
 use tokio::runtime::Runtime;
-use futures_util::TryStreamExt;
 
 pub struct SrtStream {
   socket: Rc<RefCell<SrtSocket>>,

@@ -1,4 +1,4 @@
-  use crate::{
+use crate::{
   job::{Job, JobProgression, JobResult, JobStatus},
   message::media::{
     finish_process, initialize_process,
@@ -98,6 +98,11 @@ impl ThreadedMediaProcess {
       .get_stream_fps(self.source.get_first_stream_index()) as f32;
 
     loop {
+      if response_sender.lock().unwrap().is_stopped() {
+        log::info!("Stopped !");
+        break ResponseMessage::JobStopped(job_result);
+      }
+
       // Process next frame
       let response = self
         .process_frame(
@@ -190,20 +195,22 @@ impl ThreadedMediaProcess {
           processed_frames
         );
 
-        crate::message::media::process_frame(
+        let _process_result = crate::message::media::process_frame(
           message_event,
           &mut self.output,
           job_result,
           stream_index,
           frame,
         )?;
+
         None
       }
-      DecodeResult::WaitMore => None,
-      DecodeResult::Nothing => None,
+      DecodeResult::WaitMore | DecodeResult::Nothing => None,
       DecodeResult::EndOfStream => {
+        log::debug!("Media Process: End Of Stream");
         let response = finish_process(message_event, &mut self.output, job_result)
           .map(ResponseMessage::Completed)?;
+
         Some(response)
       }
     };
@@ -219,7 +226,9 @@ fn get_status_feedback(
 ) -> ResponseMessage {
   let activity = match &status {
     JobStatus::Initialized | JobStatus::Running => WorkerActivity::Busy,
-    JobStatus::Completed | JobStatus::Error | JobStatus::Stopped | JobStatus::Unknown => WorkerActivity::Idle,
+    JobStatus::Completed | JobStatus::Error | JobStatus::Stopped | JobStatus::Unknown => {
+      WorkerActivity::Idle
+    }
   };
   let system_info = SystemInformation::new(&worker_configuration);
 

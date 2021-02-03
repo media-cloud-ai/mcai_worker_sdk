@@ -15,7 +15,8 @@ pub use crate::parameter::{MediaSegment, MediaSegments, Parameter, ParameterValu
 pub use crate::processor::{ProcessStatus, Processor};
 pub use crate::start_worker::start_worker;
 pub use crate::worker::{
-  WorkerParameter, WorkerParameterType, SystemInformation, WorkerActivity, WorkerConfiguration, WorkerStatus,
+  SystemInformation, WorkerActivity, WorkerConfiguration, WorkerParameter, WorkerParameterType,
+  WorkerStatus,
 };
 pub use crate::{McaiChannel, MessageError, MessageEvent, Result};
 
@@ -27,10 +28,11 @@ pub use {
       ebu_ttml_live::*,
       filters::{AudioFilter, GenericFilter, VideoFilter},
       video::{RegionOfInterest, Scaling, VideoFormat},
-      StreamDescriptor
+      StreamDescriptor,
     },
     process_frame::ProcessFrame,
     process_result::ProcessResult,
   },
   stainless_ffmpeg::{format_context::FormatContext, frame::Frame},
+  stainless_ffmpeg_sys::AVMediaType,
 };

@@ -1,9 +1,7 @@
 extern crate mcai_worker_sdk;
 
 use mcai_worker_sdk::prelude::*;
-use mcai_worker_sdk::{
-  ParametersContainer,
-};
+use mcai_worker_sdk::ParametersContainer;
 use reqwest::blocking::Client;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;

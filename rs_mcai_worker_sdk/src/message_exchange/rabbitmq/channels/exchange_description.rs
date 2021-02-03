@@ -22,8 +22,10 @@ impl ExchangeDescription {
   }
 
   pub fn declare(&self, channel: &Channel) {
-    let mut exchange_options = ExchangeDeclareOptions::default();
-    exchange_options.durable = true;
+    let exchange_options = ExchangeDeclareOptions{
+      durable: true,
+      ..Default::default()
+    };
 
     let field_table = self.get_field_table();
 

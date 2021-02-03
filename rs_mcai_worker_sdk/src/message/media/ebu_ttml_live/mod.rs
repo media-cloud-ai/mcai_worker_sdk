@@ -2,9 +2,9 @@ pub mod decoder;
 mod time_expression;
 
 pub use decoder::EbuTtmlLiveDecoder;
-pub use time_expression::{Frames, TimeExpression, TimeUnit};
 #[cfg(all(feature = "media", feature = "python"))]
 use dict_derive::{FromPyObject, IntoPyObject};
+pub use time_expression::{Frames, TimeExpression, TimeUnit};
 
 pub fn default_lang() -> String {
   "en".to_owned()

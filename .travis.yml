@@ -1,13 +1,8 @@
 language: rust
 
 rust:
-  - 1.44.1
-  - 1.45.1
-  - 1.46.0
-  - 1.47.0
   - stable
   - beta
-  - nightly
 
 env:
   - WORKER_LIBRARY_FILE=$TRAVIS_BUILD_DIR/libworker.so

@@ -9,12 +9,14 @@ use crate::{
 };
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use std::cell::RefCell;
-use std::ops::DerefMut;
-use std::rc::Rc;
-use std::sync::{
-  mpsc::{channel, Sender},
-  Arc, Mutex,
+use std::{
+  cell::RefCell,
+  ops::DerefMut,
+  rc::Rc,
+  sync::{
+    mpsc::{channel, Sender},
+    Arc, Mutex,
+  },
 };
 use threaded_media_process::ThreadedMediaProcess;
 
@@ -42,9 +44,9 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
 
       let mut keep_running = true;
 
-      let mut received = order_receiver.recv();
+      // let mut received = order_receiver.recv();
 
-      while let Ok(message) = &received {
+      while let Ok(message) = &order_receiver.recv() {
         // Process the received order message
         let response = match message {
           OrderMessage::Job(job) => {
@@ -151,8 +153,15 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
           }
         };
 
+        match response {
+          ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
+            *current_job_id.lock().unwrap() = None;
+          }
+          _ => {}
+        }
+
         // Send the action response
-        log::trace!("Send the action response message...");
+        log::trace!("Send the action response message");
         response_sender
           .lock()
           .unwrap()
@@ -163,9 +172,6 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
         if !keep_running {
           break;
         }
-
-        // Otherwise, wait for the next order message
-        received = order_receiver.recv();
       }
     });
 

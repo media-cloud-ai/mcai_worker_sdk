@@ -1,23 +1,13 @@
 #[macro_use]
 extern crate serde_derive;
 
-use mcai_worker_sdk::{
-  job::{JobResult, JobStatus},
-  publish_job_progression, McaiChannel, MessageError, MessageEvent, Result,
-};
-use schemars::JsonSchema;
-use semver::Version;
+use mcai_worker_sdk::prelude::*;
 use std::{thread::sleep, time::Duration};
 
 #[cfg(feature = "media")]
 use {
-  mcai_worker_sdk::{
-    info, AudioFilter, AudioFormat, FormatContext, ProcessFrame, ProcessResult, Scaling,
-    StreamDescriptor, VideoFilter,
-  },
-  ops::Deref,
-  stainless_ffmpeg_sys::AVMediaType,
-  sync::{mpsc::Sender, Arc, Mutex},
+  std::ops::Deref,
+  std::sync::{mpsc::Sender, Arc, Mutex},
 };
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -169,13 +159,7 @@ Do no use in production, just for developments."#
 
   #[cfg(feature = "media")]
   fn ending_process(&mut self) -> Result<()> {
-    if let Some(result) = &self.result {
-      result
-        .lock()
-        .unwrap()
-        .send(ProcessResult::end_of_process())
-        .unwrap();
-    }
+    log::info!("Ending process");
     Ok(())
   }
 
@@ -221,5 +205,5 @@ Do no use in production, just for developments."#
 
 fn main() {
   let worker_context = WorkerContext::default();
-  mcai_worker_sdk::start_worker(worker_context);
+  start_worker(worker_context);
 }

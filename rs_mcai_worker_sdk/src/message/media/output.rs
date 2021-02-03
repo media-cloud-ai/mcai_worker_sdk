@@ -1,8 +1,4 @@
-use crate::{
-  message::media::srt::SrtStream,
-  process_result::ProcessResult,
-  MessageError, Result,
-};
+use crate::{message::media::srt::SrtStream, process_result::ProcessResult, MessageError, Result};
 use bytes::Bytes;
 use std::{
   sync::{
@@ -110,6 +106,14 @@ impl Output {
   }
 
   pub fn complete(&mut self) -> Result<()> {
+    if let Err(error) = self
+      .sender
+      .lock()
+      .unwrap()
+      .send(ProcessResult::end_of_process())
+    {
+      log::error!("Output error: {:?}", error);
+    };
     self.thread.take().map(JoinHandle::join);
 
     if SrtStream::is_srt_stream(&self.url) {

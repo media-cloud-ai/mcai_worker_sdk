@@ -11,7 +11,7 @@ use crate::{
   job::{Job, JobResult, JobStatus},
   message::{media::output::Output, media::source::Source},
   parameter::container::ParametersContainer,
-  process_frame::ProcessFrame,  
+  process_frame::ProcessFrame,
   MessageEvent, Result,
 };
 use audio::AudioFormat;

@@ -1,17 +1,13 @@
 use assert_matches::assert_matches;
-use mcai_worker_sdk::{
-  job::{Job, JobResult},
-  message_exchange::{ExternalExchange, Feedback, LocalExchange, OrderMessage, ResponseMessage},
-  processor::Processor,
-  worker::WorkerConfiguration,
-  JsonSchema, MessageEvent, ProcessFrame, ProcessResult, Result,
-};
-use std::sync::{Arc, Mutex};
+use mcai_worker_sdk::prelude::*;
+use std::sync::{mpsc::Sender, Arc, Mutex};
 
 #[test]
 fn processor() {
+  env_logger::init();
+
   let file_path = "./test_media_processor.mxf";
-  let nb_frames = 50;
+  let nb_frames = 500;
   super::ffmpeg::create_xdcam_sample_file(file_path, nb_frames).unwrap();
 
   struct Worker {}
@@ -44,13 +40,60 @@ fn processor() {
       Ok(())
     }
 
+    fn init_process(
+      &mut self,
+      _parameters: WorkerParameters,
+      format_context: Arc<Mutex<FormatContext>>,
+      _result: Arc<Mutex<Sender<ProcessResult>>>,
+    ) -> Result<Vec<StreamDescriptor>> {
+      let mut stream_descriptors = vec![];
+
+      let format_context = format_context.lock().unwrap();
+      for stream_index in 0..format_context.get_nb_streams() {
+        let stream_type = format_context.get_stream_type(stream_index as isize);
+        info!(
+          "Handle stream #{} with type: {:?}",
+          stream_index, stream_type
+        );
+
+        match stream_type {
+          AVMediaType::AVMEDIA_TYPE_VIDEO => {
+            let filters = vec![VideoFilter::Resize(Scaling {
+              width: Some(200),
+              height: Some(70),
+            })];
+            stream_descriptors.push(StreamDescriptor::new_video(stream_index as usize, filters))
+          }
+          AVMediaType::AVMEDIA_TYPE_AUDIO => {
+            let channel_layouts = vec!["mono".to_string()];
+            let sample_formats = vec!["s16".to_string()];
+            let sample_rates = vec![16000];
+
+            let filters = vec![AudioFilter::Format(AudioFormat {
+              sample_rates,
+              channel_layouts,
+              sample_formats,
+            })];
+            stream_descriptors.push(StreamDescriptor::new_audio(stream_index as usize, filters))
+          }
+          AVMediaType::AVMEDIA_TYPE_SUBTITLE => {
+            stream_descriptors.push(StreamDescriptor::new_data(stream_index as usize))
+          }
+          AVMediaType::AVMEDIA_TYPE_DATA => {
+            stream_descriptors.push(StreamDescriptor::new_data(stream_index as usize))
+          }
+          _ => info!("Skip stream #{}", stream_index),
+        };
+      }
+      Ok(stream_descriptors)
+    }
+
     fn process_frame(
       &mut self,
       _job_result: JobResult,
       _stream_index: usize,
       _frame: ProcessFrame,
     ) -> Result<ProcessResult> {
-      assert!(false);
       log::info!("Process frame");
       Ok(ProcessResult::new_json(""))
     }
@@ -88,7 +131,7 @@ fn processor() {
       {
         "id": "destination_path",
         "type": "string",
-        "value": "/test_media_processor.mp4"
+        "value": "./test_media_processor.json"
       }
     ]
   }"#,
@@ -126,12 +169,52 @@ fn processor() {
     ResponseMessage::Feedback(Feedback::Status { .. })
   );
 
+  let progress_messages = std::cmp::min(nb_frames - 1, 99);
+
+  for _ in 0..progress_messages {
+    let response = local_exchange.next_response().unwrap();
+    log::debug!("{:?}", response);
+    assert_matches!(
+      response.unwrap(),
+      ResponseMessage::Feedback(Feedback::Progression { .. })
+    );
+  }
+
+  let response = local_exchange.next_response().unwrap();
+  assert_matches!(response.unwrap(), ResponseMessage::Completed(_));
+
+  // Second job, stop during execution
+  local_exchange
+    .send_order(OrderMessage::InitProcess(job.clone()))
+    .unwrap();
+
+  let response = local_exchange.next_response().unwrap();
+  assert_matches!(response.unwrap(), ResponseMessage::WorkerInitialized(_));
+
+  local_exchange
+    .send_order(OrderMessage::StartProcess(job.clone()))
+    .unwrap();
+
+  let response = local_exchange.next_response().unwrap();
+  assert_matches!(
+    response.unwrap(),
+    ResponseMessage::WorkerStarted(JobResult { .. })
+  );
+
   local_exchange
     .send_order(OrderMessage::StopProcess(job.clone()))
     .unwrap();
 
-  let response = local_exchange.next_response().unwrap();
-  assert_matches!(response.unwrap(), ResponseMessage::Completed(_));
+  loop {
+    let response = local_exchange.next_response().unwrap();
+    match response {
+      Some(ResponseMessage::Feedback(Feedback::Progression { .. })) => {}
+      Some(ResponseMessage::JobStopped(JobResult { .. })) => {
+        break;
+      }
+      _ => assert!(false),
+    }
+  }
 
   local_exchange.send_order(OrderMessage::StopWorker).unwrap();
 

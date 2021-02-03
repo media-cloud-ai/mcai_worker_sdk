@@ -12,7 +12,7 @@ use crate::worker::WorkerConfiguration;
 pub use bind_description::BindDescription;
 pub use exchange_description::ExchangeDescription;
 use lapin::{
-  options::{BasicPublishOptions, BasicQosOptions, ExchangeDeclareOptions},
+  options::{BasicPublishOptions, BasicQosOptions},
   BasicProperties, Channel, Connection, ExchangeKind,
 };
 pub use queue_description::QueueDescription;
@@ -27,9 +27,6 @@ pub fn declare_consumer_channel(
 
   log::info!("Initialise Exchanges and Queues");
   set_qos(&channel, prefetch_count);
-
-  let mut exchange_options = ExchangeDeclareOptions::default();
-  exchange_options.durable = true;
 
   let delayed_exchange = ExchangeDescription::new(EXCHANGE_NAME_DELAYED, ExchangeKind::Fanout);
   delayed_exchange.declare(&channel);
