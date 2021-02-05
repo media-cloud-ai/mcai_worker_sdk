@@ -100,7 +100,9 @@ impl ThreadedMediaProcess {
     loop {
       if response_sender.lock().unwrap().is_stopped() {
         log::info!("Stopped !");
-        break ResponseMessage::JobStopped(job_result);
+        break ResponseMessage::JobStopped(
+          job_result.with_status(JobStatus::Stopped)
+        );
       }
 
       // Process next frame

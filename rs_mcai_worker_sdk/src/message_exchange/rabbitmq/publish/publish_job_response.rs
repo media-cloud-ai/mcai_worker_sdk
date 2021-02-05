@@ -24,7 +24,9 @@ pub async fn publish_job_response(
     .wait()
     .is_ok();
 
+
   if result {
+    log::debug!("Ack delivery ack {}", delivery.delivery_tag);
     channel
       .basic_ack(
         delivery.delivery_tag,
@@ -33,6 +35,7 @@ pub async fn publish_job_response(
       .await
       .map_err(|e| e.into())
   } else {
+    log::debug!("Reject delivery {}", delivery.delivery_tag);
     channel
       .basic_reject(
         delivery.delivery_tag,

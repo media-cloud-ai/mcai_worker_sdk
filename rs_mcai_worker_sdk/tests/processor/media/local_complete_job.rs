@@ -4,7 +4,7 @@ use std::sync::{mpsc::Sender, Arc, Mutex};
 
 #[test]
 fn processor() {
-  env_logger::init();
+  // env_logger::init();
 
   let file_path = "./test_media_processor.mxf";
   let nb_frames = 500;

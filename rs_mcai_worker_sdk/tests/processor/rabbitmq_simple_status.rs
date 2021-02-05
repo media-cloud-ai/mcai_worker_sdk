@@ -1,4 +1,3 @@
-// use assert_matches::assert_matches;
 use mcai_worker_sdk::prelude::*;
 use std::sync::mpsc;
 

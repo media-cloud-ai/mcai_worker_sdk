@@ -130,7 +130,6 @@ impl RabbitmqPublisher {
       | ResponseMessage::Error(_)
       | ResponseMessage::JobStopped(_) => {
         current_orders.lock().unwrap().reset_process_deliveries();
-        log::error!("{:?}", current_orders);
       }
       ResponseMessage::Feedback(_) | ResponseMessage::StatusError(_) => {
         current_orders.lock().unwrap().reset_status_deliveries();

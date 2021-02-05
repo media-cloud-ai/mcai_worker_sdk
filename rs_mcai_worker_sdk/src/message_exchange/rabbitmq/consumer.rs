@@ -8,7 +8,7 @@ use async_std::{
 };
 use lapin::{
   message::Delivery,
-  options::{BasicAckOptions, BasicConsumeOptions, BasicRejectOptions},
+  options::{BasicConsumeOptions, BasicRejectOptions},
   Channel,
 };
 use std::{
@@ -78,11 +78,12 @@ impl RabbitmqConsumer {
 
     let order_message = OrderMessage::try_from(message_data)?;
 
-    log::debug!(
-      "RabbitMQ consumer on {:?} queue received message: {:?} (iteration: {})",
+    log::error!(
+      "RabbitMQ consumer on {:?} queue received message: {:?} (iteration: {}, delivery: {})",
       queue_name,
       order_message,
-      count.unwrap_or(0)
+      count.unwrap_or(0),
+      delivery.delivery_tag,
     );
 
     match order_message {
@@ -130,10 +131,6 @@ impl RabbitmqConsumer {
         }
 
         current_orders.lock().unwrap().stop = Some(delivery.clone());
-
-        channel
-          .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
-          .await?;
 
         return Ok(());
       }

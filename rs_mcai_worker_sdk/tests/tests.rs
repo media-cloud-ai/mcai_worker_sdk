@@ -3,7 +3,6 @@ extern crate serde_derive;
 #[cfg(feature = "media")]
 extern crate stainless_ffmpeg_sys;
 
-#[cfg(not(feature = "media"))]
 mod amqp {
   pub mod connection;
 }
@@ -32,5 +31,11 @@ mod media {
 #[cfg(feature = "media")]
 mod processor {
   use super::generator::ffmpeg;
-  mod media_processor;
+  use super::amqp::connection::*;
+  mod media {
+    use super::*;
+
+    // mod local_complete_job;
+    mod rabbitmq_stop_job;
+  }
 }

@@ -26,6 +26,7 @@ pub async fn publish_worker_response(
 
   if let Some(delivery) = delivery {
     if result {
+      log::debug!("Ack delivery ack {}", delivery.delivery_tag);
       channel
         .basic_ack(
           delivery.delivery_tag,
@@ -34,6 +35,7 @@ pub async fn publish_worker_response(
         .await
         .map_err(|e| e.into())
     } else {
+      log::debug!("Reject delivery ack {}", delivery.delivery_tag);
       channel
         .basic_reject(
           delivery.delivery_tag,

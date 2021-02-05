@@ -125,11 +125,11 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
 
             log::info!("Finished response: {:?}", response);
 
-            if matches!(response, ResponseMessage::Error(_)) {
-              *status.lock().unwrap() = JobStatus::Error;
+            *status.lock().unwrap() = if matches!(response, ResponseMessage::Error(_)) {
+              JobStatus::Error
             } else {
-              *status.lock().unwrap() = JobStatus::Running;
-            }
+              JobStatus::Running
+            };
 
             response
           }
@@ -154,7 +154,9 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
         };
 
         match response {
-          ResponseMessage::Completed(_) | ResponseMessage::Error(_) => {
+          ResponseMessage::Completed(_) |
+          ResponseMessage::Error(_) |
+          ResponseMessage::JobStopped(_) => {
             *current_job_id.lock().unwrap() = None;
           }
           _ => {}
