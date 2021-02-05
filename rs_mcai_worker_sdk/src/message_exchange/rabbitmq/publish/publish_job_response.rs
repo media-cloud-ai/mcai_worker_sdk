@@ -24,7 +24,6 @@ pub async fn publish_job_response(
     .wait()
     .is_ok();
 
-
   if result {
     log::debug!("Ack delivery ack {}", delivery.delivery_tag);
     channel

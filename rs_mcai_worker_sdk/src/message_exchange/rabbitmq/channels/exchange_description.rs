@@ -22,7 +22,7 @@ impl ExchangeDescription {
   }
 
   pub fn declare(&self, channel: &Channel) {
-    let exchange_options = ExchangeDeclareOptions{
+    let exchange_options = ExchangeDeclareOptions {
       durable: true,
       ..Default::default()
     };

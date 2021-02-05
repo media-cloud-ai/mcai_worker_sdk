@@ -1,5 +1,8 @@
 use mcai_worker_sdk::prelude::*;
-use std::sync::{mpsc::{self, Sender}, Arc, Mutex};
+use std::sync::{
+  mpsc::{self, Sender},
+  Arc, Mutex,
+};
 
 #[async_std::test]
 async fn processor() -> Result<()> {

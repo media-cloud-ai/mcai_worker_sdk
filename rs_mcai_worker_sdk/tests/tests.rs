@@ -30,8 +30,8 @@ mod media {
 
 #[cfg(feature = "media")]
 mod processor {
-  use super::generator::ffmpeg;
   use super::amqp::connection::*;
+  use super::generator::ffmpeg;
   mod media {
     use super::*;
 
