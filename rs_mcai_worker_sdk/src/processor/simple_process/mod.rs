@@ -140,11 +140,14 @@ impl SimpleProcess {
         .send_response(feedback)
         .unwrap();
 
-      let response = message_event.lock().unwrap().process(
-        Some(response_sender.clone()),
-        job.get_parameters().unwrap(),
-        JobResult::from(job),
-      );
+      let response = match job.get_parameters() {
+        Ok(parameters) => message_event.lock().unwrap().process(
+          Some(response_sender.clone()),
+          parameters,
+          JobResult::from(job),
+        ),
+        Err(error) => Err(error),
+      };
 
       let response = if response_sender.lock().unwrap().is_stopped() {
         response
