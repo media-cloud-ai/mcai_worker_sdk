@@ -35,7 +35,7 @@ mod processor {
   mod media {
     use super::*;
 
-    // mod local_complete_job;
+    mod local_complete_job;
     mod rabbitmq_stop_job;
   }
 }

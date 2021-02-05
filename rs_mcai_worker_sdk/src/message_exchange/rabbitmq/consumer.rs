@@ -78,7 +78,7 @@ impl RabbitmqConsumer {
 
     let order_message = OrderMessage::try_from(message_data)?;
 
-    log::error!(
+    log::debug!(
       "RabbitMQ consumer on {:?} queue received message: {:?} (iteration: {}, delivery: {})",
       queue_name,
       order_message,
