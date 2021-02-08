@@ -16,8 +16,8 @@ mod processor {
 
     mod rabbitmq_stop_job;
 
-    mod job_processor;
     mod init_job_error;
+    mod job_processor;
     mod processor;
     mod stop_job;
   }

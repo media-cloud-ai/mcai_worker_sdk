@@ -38,12 +38,24 @@ fn processor_initialization_error() {
       _parameters: WorkerParameters,
       _job_result: JobResult,
     ) -> Result<JobResult>
-      where
-        Self: std::marker::Sized,
+    where
+      Self: std::marker::Sized,
     {
       unimplemented!();
     }
   }
+
+  std::env::set_var("BACKEND_HOSTNAME", mockito::server_url());
+  use mockito::mock;
+
+  let _m = mock("POST", "/sessions")
+    .with_header("content-type", "application/json")
+    .with_body(r#"{"access_token": "fake_access_token"}"#)
+    .create();
+
+  let _m = mock("GET", "/credentials/credential_key")
+    .with_status(404)
+    .create();
 
   let local_exchange = LocalExchange::new();
   let mut local_exchange = Arc::new(local_exchange);
@@ -66,7 +78,7 @@ fn processor_initialization_error() {
   assert_matches!(response.unwrap(), ResponseMessage::WorkerCreated(_));
 
   let message = r#"{ "job_id": 666, "parameters": [
-      { "id": "credential", "store": "backend", "type": "string", "value": "credential_key" }
+      { "id": "credential", "store": "BACKEND", "type": "string", "value": "credential_key" }
     ] }"#;
 
   let job = Job::new(message).unwrap();
@@ -89,8 +101,7 @@ fn processor_initialization_error() {
   let response = local_exchange.next_response().unwrap();
 
   let expected_error_message =
-    "\"error sending request for url (http://127.0.0.1:4000/api/sessions): \
-    error trying to connect: tcp connect error: Connection refused (os error 111)\""
+    "\"HTTP status client error (404 Not Found) for url (http://127.0.0.1:1234/credentials/credential_key)\""
       .to_string();
   let expected_error = MessageError::ParameterValueError(expected_error_message);
   assert_eq!(response.unwrap(), ResponseMessage::Error(expected_error));

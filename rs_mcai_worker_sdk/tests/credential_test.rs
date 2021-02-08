@@ -317,7 +317,8 @@ fn test_string_credential_request_value_no_session() {
   assert_eq!(
     job.get_parameter::<String>("test_credential"),
     Err(MessageError::ParameterValueError(
-      "\"HTTP status client error (404 Not Found) for url (http://127.0.0.1:1234/sessions)\"".to_string()
+      "\"HTTP status client error (404 Not Found) for url (http://127.0.0.1:1234/sessions)\""
+        .to_string()
     ))
   );
 }
