@@ -58,7 +58,7 @@ impl ThreadedMediaProcess {
     worker_configuration: WorkerConfiguration,
   ) -> ResponseMessage {
     let job = self.job.clone();
-    let job_result = JobResult::from(job.clone());
+    let job_result = JobResult::from(job.clone()).with_status(JobStatus::Running);
 
     response_sender
       .lock()
