@@ -2,11 +2,13 @@ use assert_matches::assert_matches;
 use mcai_worker_sdk::prelude::*;
 
 #[test]
-fn processor() {
+fn processor_initialization_error() {
   struct Worker {}
 
   #[derive(Clone, Debug, Deserialize, JsonSchema)]
-  pub struct WorkerParameters {}
+  pub struct WorkerParameters {
+    credential: String,
+  }
 
   impl MessageEvent<WorkerParameters> for Worker {
     fn get_name(&self) -> String {
@@ -32,15 +34,14 @@ fn processor() {
 
     fn process(
       &self,
-      channel: Option<McaiChannel>,
+      _channel: Option<McaiChannel>,
       _parameters: WorkerParameters,
-      job_result: JobResult,
+      _job_result: JobResult,
     ) -> Result<JobResult>
-    where
-      Self: std::marker::Sized,
+      where
+        Self: std::marker::Sized,
     {
-      assert!(channel.is_some());
-      Ok(job_result.with_message("OK"))
+      unimplemented!();
     }
   }
 
@@ -64,8 +65,11 @@ fn processor() {
   let response = local_exchange.next_response().unwrap();
   assert_matches!(response.unwrap(), ResponseMessage::WorkerCreated(_));
 
-  let job = Job::new(r#"{ "job_id": 666, "parameters": [] }"#).unwrap();
+  let message = r#"{ "job_id": 666, "parameters": [
+      { "id": "credential", "store": "backend", "type": "string", "value": "credential_key" }
+    ] }"#;
 
+  let job = Job::new(message).unwrap();
   local_exchange
     .send_order(OrderMessage::Job(job.clone()))
     .unwrap();
@@ -83,22 +87,11 @@ fn processor() {
   );
 
   let response = local_exchange.next_response().unwrap();
-  assert_matches!(response.unwrap(), ResponseMessage::Completed(_));
 
-  local_exchange.send_order(OrderMessage::StopWorker).unwrap();
-
-  let response = local_exchange.next_response().unwrap();
-  println!("{:?}", response);
-  assert_matches!(
-    response.unwrap(),
-    ResponseMessage::Feedback(Feedback::Status(ProcessStatus{
-      job: None,
-      worker: WorkerStatus {
-        activity: WorkerActivity::Idle,
-        system_info: SystemInformation {
-          ..
-        }
-      }
-    }))
-  );
+  let expected_error_message =
+    "\"error sending request for url (http://127.0.0.1:4000/api/sessions): \
+    error trying to connect: tcp connect error: Connection refused (os error 111)\""
+      .to_string();
+  let expected_error = MessageError::ParameterValueError(expected_error_message);
+  assert_eq!(response.unwrap(), ResponseMessage::Error(expected_error));
 }
