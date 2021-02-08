@@ -41,6 +41,7 @@ mod processor {
   mod media {
     use super::*;
 
+    mod init_job_error;
     mod local_complete_job;
     mod rabbitmq_stop_job;
   }
