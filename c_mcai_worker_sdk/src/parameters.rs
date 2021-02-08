@@ -86,7 +86,9 @@ fn get_parameter_type_from_c_str(c_str: &CStr) -> WorkerParameterType {
   }
 }
 
-pub unsafe fn get_parameter_from_worker_parameter(worker_parameter: &CWorkerParameter) -> WorkerParameter {
+pub unsafe fn get_parameter_from_worker_parameter(
+  worker_parameter: &CWorkerParameter,
+) -> WorkerParameter {
   let identifier = get_c_string!(worker_parameter.identifier);
   let label = get_c_string!(worker_parameter.label);
   let kind_list: &[*const c_char] =
