@@ -154,6 +154,10 @@ impl ThreadedMediaProcess {
             self.keep_running = false;
             self.get_status_feedback(JobStatus::Running, worker_configuration.clone())
           }
+          _ => ResponseMessage::Error(MessageError::RuntimeError(format!(
+            "Cannot handle such a message: {:?}",
+            message
+          ))),
         };
 
         response_sender.lock().unwrap().send_response(resp).unwrap();
