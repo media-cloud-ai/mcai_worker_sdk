@@ -1,5 +1,6 @@
-use lapin::{options::QueueBindOptions, types::FieldTable, Channel};
-use std::collections::HashMap;
+use amq_protocol_types::{AMQPValue, LongString, ShortString};
+use lapin::{options::QueueBindOptions, Channel};
+use std::collections::{BTreeMap, HashMap};
 
 pub struct BindDescription {
   pub exchange: String,
@@ -10,13 +11,22 @@ pub struct BindDescription {
 
 impl BindDescription {
   pub fn declare(&self, channel: &Channel) {
+    let mut headers = BTreeMap::new();
+
+    for (key, value) in &self.headers {
+      let key = ShortString::from(key.clone());
+      let value = AMQPValue::LongString(LongString::from(value.clone()));
+
+      headers.insert(key, value);
+    }
+
     if let Err(msg) = channel
       .queue_bind(
         &self.queue.to_string(),
         &self.exchange.to_string(),
         &self.routing_key.to_string(),
         QueueBindOptions::default(),
-        FieldTable::default(),
+        headers.into(),
       )
       .wait()
     {
