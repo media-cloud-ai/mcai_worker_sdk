@@ -1,8 +1,9 @@
+use mcai_worker_sdk::client::AmqpConnection;
 use mcai_worker_sdk::prelude::*;
 use std::sync::mpsc;
 
 #[async_std::test]
-async fn processor() -> Result<()> {
+async fn rabbitmq_stop_job() -> Result<()> {
   env_logger::init();
 
   struct Worker {}
@@ -79,7 +80,7 @@ async fn processor() -> Result<()> {
   let (progression_sender, progression_receiver) = mpsc::channel::<JobProgression>();
   let (stopped_sender, stopped_receiver) = mpsc::channel::<JobResult>();
 
-  let amqp_connection = super::AmqpConnection::new().unwrap();
+  let amqp_connection = AmqpConnection::new().unwrap();
 
   amqp_connection.start_consumer(QUEUE_WORKER_CREATED, created_sender);
   amqp_connection.start_consumer(QUEUE_WORKER_STATUS, status_sender);

@@ -80,6 +80,7 @@ extern crate serde_json;
 #[macro_use]
 extern crate yaserde_derive;
 
+pub mod client;
 pub mod config;
 mod error;
 pub mod job;
