@@ -10,11 +10,17 @@ mod amqp {
 #[cfg(not(feature = "media"))]
 mod processor {
   use super::amqp::connection::*;
-  mod rabbitmq_simple_stop_job;
 
-  mod simple_job_processor;
-  mod simple_processor;
-  mod simple_stop_job;
+  mod simple {
+    use super::*;
+
+    mod rabbitmq_stop_job;
+
+    mod init_job_error;
+    mod job_processor;
+    mod processor;
+    mod stop_job;
+  }
 }
 
 #[cfg(feature = "media")]
@@ -35,6 +41,7 @@ mod processor {
   mod media {
     use super::*;
 
+    mod init_job_error;
     mod local_complete_job;
     mod rabbitmq_stop_job;
   }

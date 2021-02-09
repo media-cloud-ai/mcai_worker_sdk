@@ -94,7 +94,8 @@ impl PythonWorkerEvent {
           .downcast::<PyString>()
           .expect("not a python string")
           .to_string();
-        let parameter_type: WorkerParameterType = serde_json::from_str(&format!("{:?}", value)).unwrap();
+        let parameter_type: WorkerParameterType =
+          serde_json::from_str(&format!("{:?}", value)).unwrap();
         parameter_types.push(parameter_type);
       }
 
