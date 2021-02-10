@@ -4,7 +4,7 @@ use mcai_worker_sdk::prelude::*;
 use srt_tokio::SrtSocketBuilder;
 use std::{
   io::Error,
-  time::{Duration, Instant}
+  time::{Duration, Instant},
 };
 use tokio::time::sleep;
 
@@ -15,7 +15,8 @@ impl SrtStreamGenerator {
     let mut srt_socket = SrtSocketBuilder::new_listen()
       .local_port(port)
       .connect()
-      .await.unwrap();
+      .await
+      .unwrap();
 
     let mut stream = stream::unfold(0, |count| async move {
       sleep(Duration::from_millis(10)).await;

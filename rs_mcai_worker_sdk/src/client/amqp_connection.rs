@@ -1,9 +1,3 @@
-use futures_util::StreamExt;
-use lapin::{
-  options::{BasicAckOptions, BasicConsumeOptions, BasicPublishOptions},
-  types::{AMQPValue, FieldTable},
-  BasicProperties, Channel, Connection, ConnectionProperties, ExchangeKind,
-};
 use crate::{
   config,
   message_exchange::rabbitmq::{
@@ -13,6 +7,12 @@ use crate::{
     QUEUE_WORKER_UPDATED, WORKER_RESPONSE_NOT_FOUND,
   },
   prelude::*,
+};
+use futures_util::StreamExt;
+use lapin::{
+  options::{BasicAckOptions, BasicConsumeOptions, BasicPublishOptions},
+  types::{AMQPValue, FieldTable},
+  BasicProperties, Channel, Connection, ConnectionProperties, ExchangeKind,
 };
 use std::{collections::HashMap, sync::mpsc::Sender};
 

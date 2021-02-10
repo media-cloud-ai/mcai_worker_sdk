@@ -7,8 +7,8 @@ extern crate stainless_ffmpeg_sys;
 mod processor {
   mod simple {
     mod local_init_job_error;
-    mod local_job_processor;
     mod local_init_start_processor;
+    mod local_job_processor;
     mod local_stop_job;
 
     mod rabbitmq_stop_job;
@@ -33,8 +33,8 @@ mod processor {
   mod media {
     use super::*;
 
-    mod local_init_job_error;
     mod local_complete_job;
+    mod local_init_job_error;
     mod rabbitmq_stop_job;
   }
 }

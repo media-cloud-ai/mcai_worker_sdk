@@ -1,5 +1,7 @@
 use super::{
-  channels::declare_consumer_channel, CurrentOrders, RabbitmqConsumer, RabbitmqPublisher,
+  channels::declare_consumer_channel,
+  consumer::{RABBITMQ_CONSUMER_TAG_DIRECT, RABBITMQ_CONSUMER_TAG_JOB},
+  CurrentOrders, RabbitmqConsumer, RabbitmqPublisher,
 };
 use crate::{
   config,
@@ -44,7 +46,7 @@ impl RabbitmqConnection {
       &channel,
       order_sender.clone(),
       &queue_name,
-      "amqp_worker",
+      RABBITMQ_CONSUMER_TAG_JOB,
       current_orders.clone(),
     )
     .await?;
@@ -55,7 +57,7 @@ impl RabbitmqConnection {
       &channel,
       order_sender,
       &queue_name,
-      "status_amqp_worker",
+      RABBITMQ_CONSUMER_TAG_DIRECT,
       current_orders.clone(),
     )
     .await?;

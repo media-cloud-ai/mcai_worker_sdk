@@ -8,7 +8,7 @@ use async_std::{
 };
 use lapin::{
   message::Delivery,
-  options::{BasicConsumeOptions, BasicRejectOptions},
+  options::{BasicCancelOptions, BasicConsumeOptions, BasicRejectOptions},
   Channel,
 };
 use std::{
@@ -19,6 +19,9 @@ use std::{
 pub struct RabbitmqConsumer {
   handle: Option<JoinHandle<()>>,
 }
+
+pub const RABBITMQ_CONSUMER_TAG_JOB: &str = "amqp_worker";
+pub const RABBITMQ_CONSUMER_TAG_DIRECT: &str = "status_amqp_worker";
 
 impl RabbitmqConsumer {
   pub async fn new(
@@ -141,6 +144,13 @@ impl RabbitmqConsumer {
         }
 
         current_orders.lock().unwrap().status = Some(delivery.clone());
+      }
+      OrderMessage::StopConsumingJobs => {
+        // Stop consuming jobs queue
+        return channel
+          .basic_cancel(RABBITMQ_CONSUMER_TAG_JOB, BasicCancelOptions::default())
+          .await
+          .map_err(MessageError::Amqp);
       }
     }
 

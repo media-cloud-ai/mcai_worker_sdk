@@ -14,6 +14,7 @@ pub enum OrderMessage {
   StopProcess(Job),
   StopWorker,
   Status,
+  StopConsumingJobs,
 }
 
 impl OrderMessage {
