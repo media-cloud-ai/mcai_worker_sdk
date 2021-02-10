@@ -1,6 +1,7 @@
 use super::{
-  channels::declare_consumer_channel, consumer::RABBITMQ_CONSUMER_TAG_DIRECT,
-  consumer::RABBITMQ_CONSUMER_TAG_JOB, CurrentOrders, RabbitmqConsumer, RabbitmqPublisher,
+  channels::declare_consumer_channel,
+  consumer::{RABBITMQ_CONSUMER_TAG_DIRECT, RABBITMQ_CONSUMER_TAG_JOB},
+  CurrentOrders, RabbitmqConsumer, RabbitmqPublisher,
 };
 use crate::{
   config,

@@ -78,7 +78,7 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
             ProcessStatus::new(self.get_worker_status(), current_job_result),
           )))
         }
-        _ => Some(ResponseMessage::Error(MessageError::RuntimeError(format!(
+        OrderMessage::StopConsumingJobs => Some(ResponseMessage::Error(MessageError::RuntimeError(format!(
           "Cannot handle such a message: {:?}",
           order_message
         )))),
