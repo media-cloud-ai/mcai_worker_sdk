@@ -4,7 +4,7 @@ use lapin::{
   types::{AMQPValue, FieldTable},
   BasicProperties, Channel, Connection, ConnectionProperties, ExchangeKind,
 };
-use mcai_worker_sdk::{
+use crate::{
   config,
   message_exchange::rabbitmq::{
     channels::{BindDescription, ExchangeDescription, QueueDescription},

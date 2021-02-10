@@ -169,8 +169,9 @@ pub fn get_worker_parameters() -> Vec<WorkerParameter> {
       let parameters_size = get_parameters_size_func() as usize;
 
       // Allocate a C array to retrieve the worker parameters
-      let worker_parameters = libc::malloc(std::mem::size_of::<CWorkerParameter>() * parameters_size)
-        as *mut CWorkerParameter;
+      let worker_parameters =
+        libc::malloc(std::mem::size_of::<CWorkerParameter>() * parameters_size)
+          as *mut CWorkerParameter;
 
       let get_parameters_func: libloading::Symbol<GetParametersFunc> =
         get_library_function(&worker_lib, constants::GET_PARAMETERS_FUNCTION)

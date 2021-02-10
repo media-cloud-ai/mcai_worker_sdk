@@ -1,8 +1,11 @@
+use mcai_worker_sdk::client::AmqpConnection;
 use mcai_worker_sdk::prelude::*;
 use std::sync::mpsc;
 
 #[async_std::test]
-async fn processor() -> Result<()> {
+async fn rabbitmq_stop_job() -> Result<()> {
+  env_logger::init();
+
   struct Worker {}
 
   #[derive(Clone, Debug, Deserialize, JsonSchema)]
@@ -43,7 +46,9 @@ async fn processor() -> Result<()> {
       loop {
         std::thread::sleep(std::time::Duration::from_secs(1));
         if let Some(channel) = &channel {
-          if channel.lock().unwrap().is_stopped() {
+          let is_stopped = channel.lock().unwrap().is_stopped();
+          log::warn!("Worker is stopped: {}", is_stopped);
+          if is_stopped {
             return Ok(job_result.with_status(JobStatus::Stopped));
           }
         }
@@ -51,7 +56,7 @@ async fn processor() -> Result<()> {
     }
   }
 
-  let worker_id = "instance_id";
+  let worker_id = "9876543210";
   let worker = Worker {};
   let worker_configuration = WorkerConfiguration::new("", &worker, worker_id).unwrap();
   let rabbitmq_exchange = RabbitmqExchange::new(&worker_configuration).await.unwrap();
@@ -69,21 +74,39 @@ async fn processor() -> Result<()> {
 
   let (created_sender, created_receiver) = mpsc::channel::<WorkerConfiguration>();
   let (status_sender, status_receiver) = mpsc::channel::<ProcessStatus>();
+  let (initialized_sender, initialized_receiver) = mpsc::channel::<JobResult>();
+  let (started_sender, started_receiver) = mpsc::channel::<JobResult>();
 
-  let amqp_connection = super::AmqpConnection::new().unwrap();
+  let (progression_sender, progression_receiver) = mpsc::channel::<JobProgression>();
+  let (stopped_sender, stopped_receiver) = mpsc::channel::<JobResult>();
+
+  let amqp_connection = AmqpConnection::new().unwrap();
 
   amqp_connection.start_consumer(QUEUE_WORKER_CREATED, created_sender);
   amqp_connection.start_consumer(QUEUE_WORKER_STATUS, status_sender);
+  amqp_connection.start_consumer(QUEUE_WORKER_INITIALIZED, initialized_sender);
+  amqp_connection.start_consumer(QUEUE_WORKER_STARTED, started_sender);
 
-  let created_message = created_receiver.recv();
-  assert!(created_message.is_ok());
+  amqp_connection.start_consumer(QUEUE_JOB_PROGRESSION, progression_sender);
+  amqp_connection.start_consumer(QUEUE_JOB_STOPPED, stopped_sender);
+
+  assert!(created_receiver.recv().is_ok());
 
   amqp_connection.send_order(vec!["worker_id"], &OrderMessage::Status)?;
+  assert!(status_receiver.recv().is_ok());
 
-  let status_message = status_receiver.recv();
-  assert!(status_message.is_ok());
+  let job = Job::new(r#"{ "job_id": 666, "parameters": [] }"#).unwrap();
 
-  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::StopWorker)?;
+  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::InitProcess(job.clone()))?;
+  assert!(initialized_receiver.recv().is_ok());
+
+  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::StartProcess(job.clone()))?;
+
+  assert!(started_receiver.recv().is_ok());
+  assert!(progression_receiver.recv().is_ok());
+
+  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::StopProcess(job))?;
+  assert!(stopped_receiver.recv().is_ok());
 
   Ok(())
 }

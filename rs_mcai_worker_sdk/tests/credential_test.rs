@@ -317,7 +317,8 @@ fn test_string_credential_request_value_no_session() {
   assert_eq!(
     job.get_parameter::<String>("test_credential"),
     Err(MessageError::ParameterValueError(
-      "\"error decoding response body: EOF while parsing a value at line 1 column 0\"".to_string()
+      "\"HTTP status client error (404 Not Found) for url (http://127.0.0.1:1234/sessions)\""
+        .to_string()
     ))
   );
 }
@@ -384,7 +385,42 @@ fn test_string_credential_request_value_no_credential() {
   assert_eq!(
     job.get_parameter::<String>("test_credential"),
     Err(MessageError::ParameterValueError(
-      "\"error decoding response body: EOF while parsing a value at line 1 column 0\"".to_string()
+      "\"HTTP status client error (404 Not Found) for url (http://127.0.0.1:1234/credentials/TEST_CREDENTIAL_KEY)\"".to_string()
+    ))
+  );
+}
+
+#[test]
+fn test_string_credential_request_value_unauthorized() {
+  std::env::set_var("BACKEND_HOSTNAME", mockito::server_url());
+  use mockito::mock;
+
+  let _m = mock("POST", "/sessions")
+    .with_header("content-type", "application/json")
+    .with_body(r#"{"access_token": "fake_access_token"}"#)
+    .create();
+
+  let _m = mock("GET", "/credentials/TEST_CREDENTIAL_KEY")
+    .with_status(401)
+    .create();
+
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      { "id":"test_credential",
+        "type":"string",
+        "store":"BACKEND",
+        "value":"TEST_CREDENTIAL_KEY"
+      }
+    ]
+  }"#;
+
+  let job = Job::new(message).unwrap();
+
+  assert_eq!(
+    job.get_parameter::<String>("test_credential"),
+    Err(MessageError::ParameterValueError(
+      "\"HTTP status client error (401 Unauthorized) for url (http://127.0.0.1:1234/credentials/TEST_CREDENTIAL_KEY)\"".to_string()
     ))
   );
 }

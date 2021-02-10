@@ -37,6 +37,8 @@ pub fn request_value(credential_key: &str, store_code: &str) -> Result<Value, St
     .json(&session_body)
     .send()
     .map_err(|e| e.to_string())?
+    .error_for_status()
+    .map_err(|e| e.to_string())?
     .json()
     .map_err(|e| e.to_string())?;
 
@@ -55,6 +57,8 @@ pub fn request_value(credential_key: &str, store_code: &str) -> Result<Value, St
   let response: ValueResponseBody = client
     .get(&credential_url)
     .send()
+    .map_err(|e| e.to_string())?
+    .error_for_status()
     .map_err(|e| e.to_string())?
     .json()
     .map_err(|e| e.to_string())?;
