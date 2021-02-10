@@ -1,5 +1,6 @@
 use assert_matches::assert_matches;
 use mcai_worker_sdk::prelude::*;
+use mockito::mock;
 
 #[test]
 fn processor_initialization_error() {
@@ -46,7 +47,6 @@ fn processor_initialization_error() {
   }
 
   std::env::set_var("BACKEND_HOSTNAME", mockito::server_url());
-  use mockito::mock;
 
   let _m = mock("POST", "/sessions")
     .with_header("content-type", "application/json")

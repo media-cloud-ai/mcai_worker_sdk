@@ -102,9 +102,9 @@ async fn processor() -> Result<()> {
     }
   }
 
-  let worker_id = "instance_id";
+  let instance_id = "9876543210";
   let worker = Worker {};
-  let worker_configuration = WorkerConfiguration::new("", &worker, worker_id).unwrap();
+  let worker_configuration = WorkerConfiguration::new("", &worker, instance_id).unwrap();
   let rabbitmq_exchange = RabbitmqExchange::new(&worker_configuration).await.unwrap();
 
   let rabbitmq_exchange = Arc::new(rabbitmq_exchange);
@@ -139,7 +139,7 @@ async fn processor() -> Result<()> {
 
   assert!(created_receiver.recv().is_ok());
 
-  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::Status)?;
+  amqp_connection.send_order(vec![instance_id], &OrderMessage::Status)?;
   assert!(status_receiver.recv().is_ok());
 
   let job = Job::new(
@@ -161,15 +161,15 @@ async fn processor() -> Result<()> {
   )
   .unwrap();
 
-  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::InitProcess(job.clone()))?;
+  amqp_connection.send_order(vec![instance_id], &OrderMessage::InitProcess(job.clone()))?;
   assert!(initialized_receiver.recv().is_ok());
 
-  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::StartProcess(job.clone()))?;
+  amqp_connection.send_order(vec![instance_id], &OrderMessage::StartProcess(job.clone()))?;
 
   assert!(started_receiver.recv().is_ok());
   assert!(progression_receiver.recv().is_ok());
 
-  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::StopProcess(job.clone()))?;
+  amqp_connection.send_order(vec![instance_id], &OrderMessage::StopProcess(job.clone()))?;
   let stopped_message = stopped_receiver.recv();
   assert!(stopped_message.is_ok());
 
@@ -177,20 +177,20 @@ async fn processor() -> Result<()> {
 
   log::error!("Get the status of the worker");
 
-  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::Status)?;
+  amqp_connection.send_order(vec![instance_id], &OrderMessage::Status)?;
   assert!(status_receiver.recv().is_ok());
 
   log::error!("Second time same job");
 
-  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::InitProcess(job.clone()))?;
+  amqp_connection.send_order(vec![instance_id], &OrderMessage::InitProcess(job.clone()))?;
   assert!(initialized_receiver.recv().is_ok());
 
-  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::StartProcess(job.clone()))?;
+  amqp_connection.send_order(vec![instance_id], &OrderMessage::StartProcess(job.clone()))?;
 
   assert!(started_receiver.recv().is_ok());
   assert!(progression_receiver.recv().is_ok());
 
-  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::StopProcess(job))?;
+  amqp_connection.send_order(vec![instance_id], &OrderMessage::StopProcess(job))?;
   let stopped_message = stopped_receiver.recv();
   assert!(stopped_message.is_ok());
 

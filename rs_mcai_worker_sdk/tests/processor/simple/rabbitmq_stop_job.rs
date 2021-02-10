@@ -56,9 +56,9 @@ async fn rabbitmq_stop_job() -> Result<()> {
     }
   }
 
-  let worker_id = "9876543210";
+  let instance_id = "9876543210";
   let worker = Worker {};
-  let worker_configuration = WorkerConfiguration::new("", &worker, worker_id).unwrap();
+  let worker_configuration = WorkerConfiguration::new("", &worker, instance_id).unwrap();
   let rabbitmq_exchange = RabbitmqExchange::new(&worker_configuration).await.unwrap();
   let rabbitmq_exchange = Arc::new(rabbitmq_exchange);
 
@@ -92,20 +92,20 @@ async fn rabbitmq_stop_job() -> Result<()> {
 
   assert!(created_receiver.recv().is_ok());
 
-  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::Status)?;
+  amqp_connection.send_order(vec![instance_id], &OrderMessage::Status)?;
   assert!(status_receiver.recv().is_ok());
 
   let job = Job::new(r#"{ "job_id": 666, "parameters": [] }"#).unwrap();
 
-  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::InitProcess(job.clone()))?;
+  amqp_connection.send_order(vec![instance_id], &OrderMessage::InitProcess(job.clone()))?;
   assert!(initialized_receiver.recv().is_ok());
 
-  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::StartProcess(job.clone()))?;
+  amqp_connection.send_order(vec![instance_id], &OrderMessage::StartProcess(job.clone()))?;
 
   assert!(started_receiver.recv().is_ok());
   assert!(progression_receiver.recv().is_ok());
 
-  amqp_connection.send_order(vec!["worker_id"], &OrderMessage::StopProcess(job))?;
+  amqp_connection.send_order(vec![instance_id], &OrderMessage::StopProcess(job))?;
   assert!(stopped_receiver.recv().is_ok());
 
   Ok(())

@@ -60,7 +60,7 @@ impl AmqpConnection {
       while let Some(delivery) = futures_executor::block_on(status_consumer.next()) {
         if let Ok((channel, delivery)) = delivery {
           let message_data = std::str::from_utf8(&delivery.data).unwrap();
-          log::debug!("Consuming message: {:?}", message_data);
+          log::debug!("AMQP Client: consuming message: {:?}", message_data);
 
           let response_message = serde_json::from_str(message_data).unwrap();
           sender.send(response_message).unwrap();
@@ -74,10 +74,10 @@ impl AmqpConnection {
     });
   }
 
-  pub fn send_order(&self, worker_ids: Vec<&str>, order_message: &OrderMessage) -> Result<()> {
+  pub fn send_order(&self, instance_ids: Vec<&str>, order_message: &OrderMessage) -> Result<()> {
     let status_message = serde_json::to_string(&order_message).unwrap();
 
-    if worker_ids.is_empty() {
+    if instance_ids.is_empty() {
       let mut headers = FieldTable::default();
       headers.insert("broadcast".into(), AMQPValue::Boolean(true));
 
@@ -95,11 +95,11 @@ impl AmqpConnection {
       return Ok(());
     }
 
-    for worker_id in worker_ids {
+    for instance_id in instance_ids {
       let mut headers = FieldTable::default();
       headers.insert(
-        "worker_name".into(),
-        AMQPValue::LongString(worker_id.to_string().into()),
+        "instance_id".into(),
+        AMQPValue::LongString(instance_id.to_string().into()),
       );
 
       self

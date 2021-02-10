@@ -31,6 +31,8 @@ impl RabbitmqConsumer {
     consumer_tag: &str,
     current_orders: Arc<Mutex<CurrentOrders>>,
   ) -> Result<Self> {
+    log::debug!("Start RabbitMQ consumer on queue {:?}", queue_name);
+
     let mut consumer = channel
       .basic_consume(
         queue_name,
