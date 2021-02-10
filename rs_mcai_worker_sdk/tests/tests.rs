@@ -18,6 +18,7 @@ mod processor {
 #[cfg(feature = "media")]
 mod generator {
   pub mod ffmpeg;
+  pub mod srt_stream;
 }
 
 #[cfg(feature = "media")]
