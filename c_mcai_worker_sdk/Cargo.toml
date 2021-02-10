@@ -1,6 +1,6 @@
 [package]
 name = "c_mcai_worker_sdk"
-version = "1.0.0-alpha6"
+version = "1.0.0-rc1"
 authors = [
   "Valentin NOEL <valentin.noel@media-io.com>",
   "Marc-Antoine Arnaud <maarnaud@media-io.com>",
@@ -28,7 +28,7 @@ media = ["mcai_worker_sdk/media"]
 
 [dependencies]
 libc = "0.2"
-mcai_worker_sdk = { version = "1.0.0-alpha6", path = "../rs_mcai_worker_sdk" }
+mcai_worker_sdk = { version = "1.0.0-rc1", path = "../rs_mcai_worker_sdk" }
 schemars = "0.8.0"
 serde = "^1.0"
 serde_derive = "^1.0"
