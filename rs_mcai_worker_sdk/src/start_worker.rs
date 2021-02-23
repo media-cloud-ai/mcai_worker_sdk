@@ -94,6 +94,22 @@ pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent
       processor.run(shared_message_event.clone()).unwrap();
     });
 
+    {
+      let mut local_exchange = shared_exchange.clone();
+      let local_exchange = Arc::make_mut(&mut local_exchange);
+      while let Ok(message) = local_exchange.next_response() {
+        log::trace!("{:?}", message);
+        match message {
+          Some(ResponseMessage::WorkerCreated(_)) => {
+            break;
+          }
+          _ => {
+            panic!("Bad message received, expected Worker created");
+          }
+        }
+      }
+    }
+
     for source_order in &source_orders {
       log::info!("Start to process order: {:?}", source_order);
 
@@ -101,15 +117,28 @@ pub fn start_worker<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent
 
       let job = Job::new(&message_data).unwrap();
 
-      log::debug!(target: &job.job_id.to_string(),
-        "received message: {:?}", job);
+      log::debug!(target: &job.job_id.to_string(), "received message: {:?}", job);
 
       let mut local_exchange = shared_exchange.clone();
       {
         let local_exchange = Arc::make_mut(&mut local_exchange);
+
         local_exchange
           .send_order(OrderMessage::InitProcess(job.clone()))
           .unwrap();
+
+        while let Ok(message) = local_exchange.next_response() {
+          log::info!("{:?}", message);
+          match message {
+            Some(ResponseMessage::WorkerInitialized(_)) => {
+              break;
+            }
+            _ => {
+              panic!("Bad message received");
+            }
+          }
+        }
+
         local_exchange
           .send_order(OrderMessage::StartProcess(job))
           .unwrap();
