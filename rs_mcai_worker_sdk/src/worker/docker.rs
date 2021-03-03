@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::fs;
 use uuid::Uuid;
 
@@ -33,7 +34,8 @@ fn parse_docker_container_id(content: &str) -> Option<String> {
     return None;
   }
 
-  let long_identifier: Vec<&str> = items[2].split("/docker/").collect();
+  let re = Regex::new(r"/[a-z0-9/-]*/").unwrap();
+  let long_identifier: Vec<&str> = re.split(items[2]).collect();
   if long_identifier.len() != 2 {
     return None;
   }
@@ -47,6 +49,11 @@ fn test_get_instance_id() {
   assert_eq!(
     get_instance_id("./tests/cgroup.sample"),
     "da9002cb1553".to_string()
+  );
+
+  assert_eq!(
+    get_instance_id("./tests/cgroup_k8s.sample"),
+    "54a5797a68b6".to_string()
   );
 
   let str_uuid = get_instance_id("/tmp/file_not_exists");
