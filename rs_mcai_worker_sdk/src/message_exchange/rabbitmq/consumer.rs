@@ -2,8 +2,8 @@ use super::{helpers, publish, CurrentOrders};
 use crate::{message_exchange::OrderMessage, MessageError, Result};
 use amq_protocol_types::FieldTable;
 use async_std::{
-  channel::Sender,
   stream::StreamExt,
+  channel::{Receiver, Sender},
   task::{self, JoinHandle},
 };
 use lapin::{
@@ -30,6 +30,8 @@ impl RabbitmqConsumer {
     queue_name: &str,
     consumer_tag: &str,
     current_orders: Arc<Mutex<CurrentOrders>>,
+    consumer_notification_sender: Option<Sender<OrderMessage>>,
+    consumer_notification_receiver: Option<Receiver<OrderMessage>>,
   ) -> Result<Self> {
     log::debug!("Start RabbitMQ consumer on queue {:?}", queue_name);
 
@@ -55,6 +57,8 @@ impl RabbitmqConsumer {
           &delivery,
           &queue_name_clone.clone(),
           current_orders.clone(),
+          consumer_notification_sender.clone(),
+          consumer_notification_receiver.clone(),
         )
         .await
         {
@@ -75,6 +79,8 @@ impl RabbitmqConsumer {
     delivery: &Delivery,
     queue_name: &str,
     current_orders: Arc<Mutex<CurrentOrders>>,
+    consumer_notification_sender: Option<Sender<OrderMessage>>,
+    consumer_notification_receiver: Option<Receiver<OrderMessage>>,
   ) -> Result<()> {
     let count = helpers::get_message_death_count(&delivery);
     let message_data = std::str::from_utf8(&delivery.data).map_err(|e| {
@@ -147,16 +153,31 @@ impl RabbitmqConsumer {
 
         current_orders.lock().unwrap().status = Some(delivery.clone());
       }
-      OrderMessage::StopConsumingJobs => {
+      OrderMessage::StopConsumingJobs | OrderMessage::ResumeConsumingJobs => {
         // Stop consuming jobs queue
-        channel
-          .basic_cancel(RABBITMQ_CONSUMER_TAG_JOB, BasicCancelOptions::default())
-          .await
-          .map_err(MessageError::Amqp)?;
-        return channel
-          .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
-          .await
-          .map_err(MessageError::Amqp);
+        if let Some(sender) = consumer_notification_sender {
+          sender.send(order_message.clone()).await.map_err(|e| {
+            MessageError::RuntimeError(format!(
+              "Unable to send {:?} order to other consumer: {:?}",
+              order_message, e
+            ))
+          })?;
+
+          return channel
+            .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
+            .await
+            .map_err(MessageError::Amqp);
+        } else if let Some(_receiver) = consumer_notification_receiver {
+          log::warn!(
+            "{:?} queue consumer cannot handle correctly such an order message: {:?}",
+            queue_name,
+            order_message
+          );
+        } else {
+          log::warn!("No order channel set between RabbitMQ consumers");
+        }
+
+        return Self::reject_delivery(channel, delivery.delivery_tag).await;
       }
     }
 

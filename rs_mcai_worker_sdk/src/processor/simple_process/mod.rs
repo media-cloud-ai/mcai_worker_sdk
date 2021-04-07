@@ -78,10 +78,12 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
             ProcessStatus::new(self.get_worker_status(), current_job_result),
           )))
         }
-        OrderMessage::StopConsumingJobs => Some(ResponseMessage::Error(MessageError::RuntimeError(format!(
-          "Cannot handle such a message: {:?}",
-          order_message
-        )))),
+        OrderMessage::StopConsumingJobs | OrderMessage::ResumeConsumingJobs => {
+          Some(ResponseMessage::Error(MessageError::RuntimeError(format!(
+            "Cannot handle such a message: {:?}",
+            order_message
+          ))))
+        }
       };
 
     if let Some(response) = response {

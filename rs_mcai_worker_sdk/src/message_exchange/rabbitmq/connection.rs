@@ -42,12 +42,17 @@ impl RabbitmqConnection {
     let current_orders = CurrentOrders::default();
     let current_orders = Arc::new(Mutex::new(current_orders));
 
+    let (consumer_notification_sender, consumer_notification_receiver) =
+      async_std::channel::unbounded();
+
     let job_consumer = RabbitmqConsumer::new(
       &channel,
       order_sender.clone(),
       &queue_name,
       RABBITMQ_CONSUMER_TAG_JOB,
       current_orders.clone(),
+      None,
+      Some(consumer_notification_receiver),
     )
     .await?;
 
@@ -59,6 +64,8 @@ impl RabbitmqConnection {
       &queue_name,
       RABBITMQ_CONSUMER_TAG_DIRECT,
       current_orders.clone(),
+      Some(consumer_notification_sender),
+      None,
     )
     .await?;
 
