@@ -8,7 +8,7 @@ use async_std::{
 };
 use lapin::{
   message::Delivery,
-  options::{BasicCancelOptions, BasicConsumeOptions, BasicRejectOptions},
+  options::{BasicAckOptions, BasicCancelOptions, BasicConsumeOptions, BasicRejectOptions},
   Channel,
 };
 use std::{
@@ -149,8 +149,12 @@ impl RabbitmqConsumer {
       }
       OrderMessage::StopConsumingJobs => {
         // Stop consuming jobs queue
-        return channel
+        channel
           .basic_cancel(RABBITMQ_CONSUMER_TAG_JOB, BasicCancelOptions::default())
+          .await
+          .map_err(MessageError::Amqp)?;
+        return channel
+          .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
           .await
           .map_err(MessageError::Amqp);
       }
