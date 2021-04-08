@@ -151,10 +151,12 @@ impl<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send> Pro
               worker_configuration.clone(),
             )
           }
-          OrderMessage::StopConsumingJobs => ResponseMessage::Error(MessageError::RuntimeError(format!(
-            "Cannot handle such a message: {:?}",
-            message
-          ))),
+          OrderMessage::StopConsumingJobs | OrderMessage::ResumeConsumingJobs => {
+            ResponseMessage::Error(MessageError::RuntimeError(format!(
+              "Cannot handle such a message: {:?}",
+              message
+            )))
+          }
         };
 
         match response {

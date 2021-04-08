@@ -8,16 +8,20 @@ use async_std::{
 };
 use lapin::{
   message::Delivery,
-  options::{BasicCancelOptions, BasicConsumeOptions, BasicRejectOptions},
+  options::{BasicAckOptions, BasicCancelOptions, BasicConsumeOptions, BasicRejectOptions},
   Channel,
 };
 use std::{
   convert::TryFrom,
-  sync::{Arc, Mutex},
+  sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+  },
 };
 
 pub struct RabbitmqConsumer {
   handle: Option<JoinHandle<()>>,
+  pub should_consume: Arc<AtomicBool>,
 }
 
 pub const RABBITMQ_CONSUMER_TAG_JOB: &str = "amqp_worker";
@@ -30,43 +34,102 @@ impl RabbitmqConsumer {
     queue_name: &str,
     consumer_tag: &str,
     current_orders: Arc<Mutex<CurrentOrders>>,
+    job_consumer_triggers: Vec<Arc<AtomicBool>>,
   ) -> Result<Self> {
     log::debug!("Start RabbitMQ consumer on queue {:?}", queue_name);
 
-    let mut consumer = channel
-      .basic_consume(
-        queue_name,
-        consumer_tag,
-        BasicConsumeOptions::default(),
-        FieldTable::default(),
-      )
-      .await?;
+    let mut optional_consumer = Some(
+      channel
+        .basic_consume(
+          queue_name,
+          consumer_tag,
+          BasicConsumeOptions::default(),
+          FieldTable::default(),
+        )
+        .await?,
+    );
 
     let channel = Arc::new(channel.clone());
     let queue_name_clone = queue_name.to_string();
+    let consumer_tag_clone = consumer_tag.to_string();
+
+    let should_consume = Arc::new(AtomicBool::new(true));
+    let should_consume_clone = should_consume.clone();
+
+    let job_consumer_triggers_clone = job_consumer_triggers.clone();
 
     let handle = Some(task::spawn(async move {
-      while let Some(delivery) = consumer.next().await {
-        let (_, delivery) = delivery.expect("error in consumer");
+      loop {
+        if optional_consumer.is_some() && !should_consume_clone.load(Ordering::Relaxed) {
+          // if should not consume, unregister consumer from channel
+          optional_consumer = None;
 
-        if let Err(error) = Self::process_delivery(
-          sender.clone(),
-          channel.clone(),
-          &delivery,
-          &queue_name_clone.clone(),
-          current_orders.clone(),
-        )
-        .await
-        {
-          log::error!("RabbitMQ consumer: {:?}", error);
-          if let Err(error) = publish::error(channel.clone(), &delivery, &error).await {
-            log::error!("Unable to publish response: {:?}", error);
+          channel
+            .basic_cancel(&consumer_tag_clone, BasicCancelOptions::default())
+            .await
+            .map_err(MessageError::Amqp)
+            .unwrap();
+        } else if optional_consumer.is_none() && should_consume_clone.load(Ordering::Relaxed) {
+          // if should consume, reset channel consumer
+          optional_consumer = Some(
+            channel
+              .basic_consume(
+                &queue_name_clone,
+                &consumer_tag_clone,
+                BasicConsumeOptions::default(),
+                FieldTable::default(),
+              )
+              .await
+              .unwrap(),
+          );
+        }
+
+        if let Some(mut consumer) = optional_consumer.clone() {
+          // Consume messages
+          if let Some(delivery) = consumer.next().await {
+            let (_, delivery) = delivery.expect("error in consumer");
+
+            if !should_consume_clone.load(Ordering::Relaxed) {
+              // if should have not consumed a message, reject it and unregister from channel
+
+              optional_consumer = None;
+
+              Self::reject_delivery(channel.clone(), delivery.delivery_tag)
+                .await
+                .unwrap();
+
+              channel
+                .basic_cancel(&consumer_tag_clone, BasicCancelOptions::default())
+                .await
+                .map_err(MessageError::Amqp)
+                .unwrap();
+            } else {
+              // else process received message
+              if let Err(error) = Self::process_delivery(
+                sender.clone(),
+                channel.clone(),
+                &delivery,
+                &queue_name_clone.clone(),
+                current_orders.clone(),
+                job_consumer_triggers_clone.clone(),
+              )
+              .await
+              {
+                log::error!("RabbitMQ consumer: {:?}", error);
+                if let Err(error) = publish::error(channel.clone(), &delivery, &error).await {
+                  log::error!("Unable to publish response: {:?}", error);
+                }
+              }
+            }
           }
         }
       }
     }));
 
-    Ok(RabbitmqConsumer { handle })
+    Ok(RabbitmqConsumer {
+      handle,
+      should_consume,
+    })
   }
 
   async fn process_delivery(
@@ -75,6 +138,7 @@ impl RabbitmqConsumer {
     delivery: &Delivery,
     queue_name: &str,
     current_orders: Arc<Mutex<CurrentOrders>>,
+    job_consumer_triggers: Vec<Arc<AtomicBool>>,
   ) -> Result<()> {
     let count = helpers::get_message_death_count(&delivery);
     let message_data = std::str::from_utf8(&delivery.data).map_err(|e| {
@@ -148,9 +212,24 @@ impl RabbitmqConsumer {
         current_orders.lock().unwrap().status = Some(delivery.clone());
       }
       OrderMessage::StopConsumingJobs => {
-        // Stop consuming jobs queue
+        // Stop consuming jobs queues
+        for trigger in job_consumer_triggers {
+          trigger.store(false, Ordering::Relaxed);
+        }
+
         return channel
-          .basic_cancel(RABBITMQ_CONSUMER_TAG_JOB, BasicCancelOptions::default())
+          .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
+          .await
+          .map_err(MessageError::Amqp);
+      }
+      OrderMessage::ResumeConsumingJobs => {
+        // Resume consuming jobs queues
+        for trigger in job_consumer_triggers {
+          trigger.store(true, Ordering::Relaxed);
+        }
+
+        return channel
+          .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
           .await
           .map_err(MessageError::Amqp);
       }

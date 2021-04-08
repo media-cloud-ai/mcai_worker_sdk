@@ -154,10 +154,12 @@ impl ThreadedMediaProcess {
             self.keep_running = false;
             self.get_status_feedback(JobStatus::Running, worker_configuration.clone())
           }
-          OrderMessage::StopConsumingJobs => ResponseMessage::Error(MessageError::RuntimeError(format!(
-            "Cannot handle such a message: {:?}",
-            message
-          ))),
+          OrderMessage::StopConsumingJobs | OrderMessage::ResumeConsumingJobs => {
+            ResponseMessage::Error(MessageError::RuntimeError(format!(
+              "Cannot handle such a message: {:?}",
+              message
+            )))
+          }
         };
 
         response_sender.lock().unwrap().send_response(resp).unwrap();
