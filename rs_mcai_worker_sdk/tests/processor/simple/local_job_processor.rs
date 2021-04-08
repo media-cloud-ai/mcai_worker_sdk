@@ -79,7 +79,11 @@ fn processor() {
   let response = local_exchange.next_response().unwrap();
   assert_matches!(
     response.unwrap(),
-    ResponseMessage::Feedback(Feedback::Progression(JobProgression{job_id: 666, progression: 0, .. }))
+    ResponseMessage::Feedback(Feedback::Progression(JobProgression {
+      job_id: 666,
+      progression: 0,
+      ..
+    }))
   );
 
   let response = local_exchange.next_response().unwrap();
@@ -91,13 +95,11 @@ fn processor() {
   println!("{:?}", response);
   assert_matches!(
     response.unwrap(),
-    ResponseMessage::Feedback(Feedback::Status(ProcessStatus{
+    ResponseMessage::Feedback(Feedback::Status(ProcessStatus {
       job: None,
       worker: WorkerStatus {
         activity: WorkerActivity::Idle,
-        system_info: SystemInformation {
-          ..
-        }
+        system_info: SystemInformation { .. }
       }
     }))
   );

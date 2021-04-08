@@ -95,7 +95,11 @@ fn processor_initialization_error() {
   let response = local_exchange.next_response().unwrap();
   assert_matches!(
     response.unwrap(),
-    ResponseMessage::Feedback(Feedback::Progression(JobProgression{job_id: 666, progression: 0, .. }))
+    ResponseMessage::Feedback(Feedback::Progression(JobProgression {
+      job_id: 666,
+      progression: 0,
+      ..
+    }))
   );
 
   let response = local_exchange.next_response().unwrap();
