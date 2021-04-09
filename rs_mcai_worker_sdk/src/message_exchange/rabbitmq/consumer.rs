@@ -3,12 +3,15 @@ use crate::{message_exchange::OrderMessage, MessageError, Result};
 use amq_protocol_types::FieldTable;
 use async_std::{
   channel::Sender,
+  future::timeout,
   stream::StreamExt,
   task::{self, JoinHandle},
 };
 use lapin::{
   message::Delivery,
-  options::{BasicAckOptions, BasicCancelOptions, BasicConsumeOptions, BasicRejectOptions},
+  options::{
+    BasicAckOptions, BasicCancelOptions, BasicConsumeOptions, BasicNackOptions, BasicRejectOptions,
+  },
   Channel,
 };
 use std::{
@@ -17,6 +20,7 @@ use std::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
   },
+  time::Duration,
 };
 
 pub struct RabbitmqConsumer {
@@ -26,6 +30,8 @@ pub struct RabbitmqConsumer {
 
 pub const RABBITMQ_CONSUMER_TAG_JOB: &str = "amqp_worker";
 pub const RABBITMQ_CONSUMER_TAG_DIRECT: &str = "status_amqp_worker";
+
+const CONSUMER_TIMEOUT: Duration = Duration::from_millis(500);
 
 impl RabbitmqConsumer {
   pub async fn new(
@@ -62,6 +68,8 @@ impl RabbitmqConsumer {
       loop {
         if optional_consumer.is_some() && !should_consume_clone.load(Ordering::Relaxed) {
           // if should not consume, unregister consumer from channel
+          log::debug!("{} consumer unregisters from channel...", queue_name_clone);
+
           optional_consumer = None;
 
           channel
@@ -71,6 +79,8 @@ impl RabbitmqConsumer {
             .unwrap();
         } else if optional_consumer.is_none() && should_consume_clone.load(Ordering::Relaxed) {
           // if should consume, reset channel consumer
+          log::debug!("{} consumer resume consuming channel...", queue_name_clone);
+
           optional_consumer = Some(
             channel
               .basic_consume(
@@ -85,16 +95,30 @@ impl RabbitmqConsumer {
         }
 
         if let Some(mut consumer) = optional_consumer.clone() {
-          // Consume messages
-          if let Some(delivery) = consumer.next().await {
+          // Consume messages with timeout
+          let next_delivery = timeout(CONSUMER_TIMEOUT, consumer.next()).await;
+
+          if let Ok(Some(delivery)) = next_delivery {
             let (_, delivery) = delivery.expect("error in consumer");
 
             if !should_consume_clone.load(Ordering::Relaxed) {
               // if should have not consumed a message, reject it and unregister from channel
 
+              log::warn!(
+                "{} consumer nacks and requeues received message, and unregisters from channel...",
+                queue_name_clone
+              );
+
               optional_consumer = None;
 
-              Self::reject_delivery(channel.clone(), delivery.delivery_tag)
+              channel
+                .basic_nack(
+                  delivery.delivery_tag,
+                  BasicNackOptions {
+                    requeue: true,
+                    ..Default::default()
+                  },
+                )
                 .await
                 .unwrap();
 
