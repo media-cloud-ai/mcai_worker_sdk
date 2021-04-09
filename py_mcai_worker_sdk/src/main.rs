@@ -63,7 +63,7 @@ impl PythonWorkerEvent {
 
     let response = python_module
       .call0("get_parameters")
-      .unwrap_or_else(|_| panic!("unable to call get_parameters in your module".to_string()))
+      .unwrap_or_else(|_| panic!("unable to call get_parameters in your module"))
       .downcast::<PyList>()
       .unwrap();
 

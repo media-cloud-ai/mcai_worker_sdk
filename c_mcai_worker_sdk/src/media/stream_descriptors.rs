@@ -35,28 +35,28 @@ pub struct CStreamDescriptor {
   pub filters: Vec<GenericFilter>,
 }
 
-impl Into<StreamDescriptor> for Box<CStreamDescriptor> {
-  fn into(self) -> StreamDescriptor {
-    match &self.stream_type {
+impl From<Box<CStreamDescriptor>> for StreamDescriptor {
+  fn from(c_stream_descriptor: Box<CStreamDescriptor>) -> Self {
+    match &c_stream_descriptor.stream_type {
       StreamType::Audio => {
-        let audio_filters = self
+        let audio_filters = c_stream_descriptor
           .filters
           .iter()
           .cloned()
           .map(AudioFilter::Generic)
           .collect();
-        StreamDescriptor::new_audio(self.index as usize, audio_filters)
+        StreamDescriptor::new_audio(c_stream_descriptor.index as usize, audio_filters)
       }
       StreamType::Video => {
-        let video_filters = self
+        let video_filters = c_stream_descriptor
           .filters
           .iter()
           .cloned()
           .map(VideoFilter::Generic)
           .collect();
-        StreamDescriptor::new_video(self.index as usize, video_filters)
+        StreamDescriptor::new_video(c_stream_descriptor.index as usize, video_filters)
       }
-      StreamType::Data => StreamDescriptor::new_data(self.index as usize),
+      StreamType::Data => StreamDescriptor::new_data(c_stream_descriptor.index as usize),
     }
   }
 }

@@ -1,4 +1,4 @@
-use crate::worker::WorkerActivity;
+use crate::message_exchange::message::ResponseMessage;
 use std::fmt;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -24,13 +24,12 @@ impl fmt::Display for JobStatus {
   }
 }
 
-impl Into<WorkerActivity> for JobStatus {
-  fn into(self) -> WorkerActivity {
-    match self {
-      JobStatus::Initialized | JobStatus::Running => WorkerActivity::Busy,
-      JobStatus::Completed | JobStatus::Stopped | JobStatus::Error | JobStatus::Unknown => {
-        WorkerActivity::Idle
-      }
+impl From<ResponseMessage> for JobStatus {
+  fn from(response_message: ResponseMessage) -> Self {
+    match response_message {
+      ResponseMessage::Completed(_) => JobStatus::Completed,
+      ResponseMessage::Error(_) => JobStatus::Error,
+      _ => JobStatus::Unknown,
     }
   }
 }

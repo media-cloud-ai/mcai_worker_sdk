@@ -148,13 +148,11 @@ pub fn get_worker_function_string_value(function_name: &str) -> String {
   match libloading::Library::new(get_library_file_path()) {
     Ok(worker_lib) => unsafe {
       let get_string_func: libloading::Symbol<GetStringFunc> =
-        get_library_function(&worker_lib, function_name).unwrap_or_else(|error| panic!(error));
+        get_library_function(&worker_lib, function_name)
+          .unwrap_or_else(|error| panic!("{}", error));
       get_c_string!(get_string_func())
     },
-    Err(error) => panic!(format!(
-      "Could not load worker dynamic library: {:?}",
-      error
-    )),
+    Err(error) => panic!("Could not load worker dynamic library: {:?}", error),
   }
 }
 
@@ -165,7 +163,7 @@ pub fn get_worker_parameters() -> Vec<WorkerParameter> {
       // Retrieve number of parameters from the worker getter function
       let get_parameters_size_func: libloading::Symbol<GetParametersSizeFunc> =
         get_library_function(&worker_lib, constants::GET_PARAMETERS_SIZE_FUNCTION)
-          .unwrap_or_else(|error| panic!(error));
+          .unwrap_or_else(|error| panic!("{}", error));
       let parameters_size = get_parameters_size_func() as usize;
 
       // Allocate a C array to retrieve the worker parameters
@@ -175,7 +173,7 @@ pub fn get_worker_parameters() -> Vec<WorkerParameter> {
 
       let get_parameters_func: libloading::Symbol<GetParametersFunc> =
         get_library_function(&worker_lib, constants::GET_PARAMETERS_FUNCTION)
-          .unwrap_or_else(|error| panic!(error));
+          .unwrap_or_else(|error| panic!("{}", error));
       get_parameters_func(worker_parameters);
 
       // Convert the retrieved worker parameters to AMQP Parameter instances
@@ -187,10 +185,7 @@ pub fn get_worker_parameters() -> Vec<WorkerParameter> {
       // Free parameters C array
       libc::free(worker_parameters as *mut libc::c_void);
     },
-    Err(error) => panic!(format!(
-      "Could not load worker dynamic library: {:?}",
-      error
-    )),
+    Err(error) => panic!("Could not load worker dynamic library: {:?}", error),
   }
 
   parameters
