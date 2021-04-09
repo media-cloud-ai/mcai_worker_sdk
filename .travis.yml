@@ -91,8 +91,11 @@ script:
 
 before_script:
   - sudo add-apt-repository ppa:jonathonf/ffmpeg-4 -y
+  - sudo add-apt-repository ppa:deadsnakes/ppa -y
   - sudo apt-get update -q
-  - sudo apt-get install ffmpeg libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libavfilter-dev libavresample-dev libpostproc-dev libswscale-dev -y
+  - sudo apt-get install ffmpeg libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libavfilter-dev libavresample-dev libpostproc-dev libswscale-dev python3.7 -y
+  - sudo ln -sf python3.7 /usr/bin/python3
+  - sudo ln -sf python3.7m /usr/bin/python3m
 
 # Need to cache the whole `.cargo` directory to keep .crates.toml for
 # cargo-update to work
