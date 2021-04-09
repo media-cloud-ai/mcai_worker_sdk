@@ -96,7 +96,7 @@ impl Frame {
 
 #[test]
 pub fn test_frame_from_null_avframe() {
-  let sdk_frame = mcai_worker_sdk::Frame {
+  let sdk_frame = mcai_worker_sdk::prelude::Frame {
     name: None,
     frame: std::ptr::null_mut(),
     index: 0,

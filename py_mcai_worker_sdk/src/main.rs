@@ -236,7 +236,7 @@ impl StreamDescriptorHandler {
   }
 }
 
-fn get_python_module<'a>(gil: &'a GILGuard) -> Result<(Python<'a>, &'a PyModule)> {
+fn get_python_module(gil: &GILGuard) -> Result<(Python, &PyModule)> {
   let python_file_content = PythonWorkerEvent::read_python_file();
   let py = gil.python();
   let python_module = PyModule::from_code(py, &python_file_content, "worker.py", "worker")

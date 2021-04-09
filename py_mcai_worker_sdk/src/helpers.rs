@@ -182,7 +182,7 @@ pub fn test_get_stream_indexes_without_list() {
   let py_any: &PyAny = py_string.into();
 
   let expected_error = MessageError::RuntimeError(
-    "unable to access init_process(..) python response: PyDowncastError".to_string(),
+    "unable to access init_process(..) python response: PyDowncastError { from: \'this_is_not_a_list!\', to: \"PyList\" }".to_string(),
   );
 
   let result = get_stream_descriptors(py_any);
