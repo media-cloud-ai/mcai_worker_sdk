@@ -7,16 +7,14 @@ pub fn get_message_death_count(message: &Delivery) -> Option<i64> {
 
 fn get_count_from_header(header: &Option<FieldTable>) -> Option<i64> {
   if let Some(header) = header {
-    if let Some(death) = header.inner().get("x-death") {
-      if let AMQPValue::FieldArray(array) = death {
-        let raw_array = array.as_slice();
-        if raw_array.is_empty() {
-          return None;
-        }
-        if let AMQPValue::FieldTable(params) = &raw_array[0] {
-          if let Some(AMQPValue::LongLongInt(value)) = params.inner().get("count") {
-            return Some(*value);
-          }
+    if let Some(AMQPValue::FieldArray(array)) = header.inner().get("x-death") {
+      let raw_array = array.as_slice();
+      if raw_array.is_empty() {
+        return None;
+      }
+      if let AMQPValue::FieldTable(params) = &raw_array[0] {
+        if let Some(AMQPValue::LongLongInt(value)) = params.inner().get("count") {
+          return Some(*value);
         }
       }
     }

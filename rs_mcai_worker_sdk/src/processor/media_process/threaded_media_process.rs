@@ -167,6 +167,7 @@ impl ThreadedMediaProcess {
     }
   }
 
+  #[allow(clippy::too_many_arguments)]
   pub fn process_frame<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
     &mut self,
     message_event: Arc<Mutex<ME>>,

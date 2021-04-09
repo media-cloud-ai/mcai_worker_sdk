@@ -180,9 +180,9 @@ pub fn test_output() {
   let result = output.complete();
   assert!(result.is_err());
 
-  #[cfg(target_os = "macos")]
+  #[cfg(any(target_os = "macos", target_os = "linux"))]
   let expected_error = MessageError::RuntimeError("Could not write to '/path/to/somewhere' destination: Os { code: 2, kind: NotFound, message: \"No such file or directory\" }".to_string());
-  #[cfg(not(target_os = "macos"))]
+  #[cfg(not(any(target_os = "macos", target_os = "linux")))]
   let expected_error = MessageError::RuntimeError("Could not write to '/path/to/somewhere' destination: Os {{ code: 2, kind: NotFound, message: \"No such file or directory\" }}".to_string());
 
   assert_eq!(expected_error, result.unwrap_err());

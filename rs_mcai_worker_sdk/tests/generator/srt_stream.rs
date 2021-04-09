@@ -3,7 +3,6 @@ use futures::{stream, SinkExt, StreamExt};
 use mcai_worker_sdk::prelude::*;
 use srt_tokio::SrtSocketBuilder;
 use std::{
-  io::Error,
   time::{Duration, Instant},
 };
 use tokio::time::sleep;
