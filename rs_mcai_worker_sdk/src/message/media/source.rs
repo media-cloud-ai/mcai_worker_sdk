@@ -1,6 +1,6 @@
 use super::{
-  ebu_ttml_live::EbuTtmlLiveDecoder, media_stream::MediaStream, srt::SrtStream, AudioFilter,
-  VideoFilter,
+  ebu_ttml_live::EbuTtmlLiveDecoder, json::JsonDecoder, media_stream::MediaStream, srt::SrtStream,
+  AudioFilter, VideoFilter,
 };
 use crate::{
   error::MessageError::RuntimeError, job::JobResult, process_frame::ProcessFrame,
@@ -10,6 +10,7 @@ use bytes::Buf;
 use ringbuf::RingBuffer;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
+use stainless_ffmpeg::prelude::*;
 use stainless_ffmpeg::{
   audio_decoder::AudioDecoder,
   check_result,
@@ -19,10 +20,6 @@ use stainless_ffmpeg::{
   packet::Packet,
   tools::{self, rational::Rational},
   video_decoder::VideoDecoder,
-};
-use stainless_ffmpeg_sys::{
-  av_frame_alloc, av_frame_clone, av_q2d, av_seek_frame, av_strerror, avcodec_receive_frame,
-  avcodec_send_packet, AVSEEK_FLAG_BACKWARD, AV_ERROR_MAX_STRING_SIZE,
 };
 use std::{
   collections::HashMap,
@@ -324,6 +321,8 @@ impl Source {
             Err(message) => {
               if message == "Resource temporarily unavailable" {
                 return Ok(DecodeResult::Nothing);
+              } else if message == "Invalid data found when processing input" {
+                return Ok(DecodeResult::Nothing);
               }
               Err(RuntimeError(message))
             }
@@ -382,6 +381,7 @@ impl Source {
           audio_decoder: Some(audio_decoder),
           video_decoder: None,
           ebu_ttml_live_decoder: None,
+          json_decoder: None,
           graph: audio_graph,
         };
 
@@ -401,6 +401,7 @@ impl Source {
           audio_decoder: None,
           video_decoder: Some(video_decoder),
           ebu_ttml_live_decoder: None,
+          json_decoder: None,
           graph: video_graph,
         };
 
@@ -414,12 +415,34 @@ impl Source {
         }
 
         decoders.insert(selected_stream.index, decoder);
-      } else {
+      } else if let Some(_) = &selected_stream.ebu_ttml_live_configuration {
         let ebu_ttml_live_decoder = EbuTtmlLiveDecoder::new();
         let decoder = Decoder {
           audio_decoder: None,
           video_decoder: None,
           ebu_ttml_live_decoder: Some(ebu_ttml_live_decoder),
+          json_decoder: None,
+          graph: None,
+        };
+
+        decoders.insert(selected_stream.index, decoder);
+      } else if let Some(_) = &selected_stream.json_configuration {
+        let json_decoder = JsonDecoder::new();
+        let decoder = Decoder {
+          audio_decoder: None,
+          video_decoder: None,
+          ebu_ttml_live_decoder: None,
+          json_decoder: Some(json_decoder),
+          graph: None,
+        };
+
+        decoders.insert(selected_stream.index, decoder);
+      } else {
+        let decoder = Decoder {
+          audio_decoder: None,
+          video_decoder: None,
+          ebu_ttml_live_decoder: None,
+          json_decoder: None,
           graph: None,
         };
 
@@ -584,6 +607,7 @@ struct Decoder {
   audio_decoder: Option<AudioDecoder>,
   video_decoder: Option<VideoDecoder>,
   ebu_ttml_live_decoder: Option<EbuTtmlLiveDecoder>,
+  json_decoder: Option<JsonDecoder>,
   graph: Option<FilterGraph>,
 }
 
@@ -669,8 +693,14 @@ impl Decoder {
         None => None,
       };
       Ok(result)
+    } else if let Some(json_decoder) = &mut self.json_decoder {
+      let result = match json_decoder.decode(packet)? {
+        Some(json_value) => Some(ProcessFrame::Json(Box::new(json_value))),
+        None => None,
+      };
+      Ok(result)
     } else {
-      Err("No audio/video decoder found".to_string())
+      Err("No decoder found".to_string())
     }
   }
 }

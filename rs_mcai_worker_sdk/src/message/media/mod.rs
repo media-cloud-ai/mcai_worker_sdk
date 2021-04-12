@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod ebu_ttml_live;
 pub mod filters;
+pub mod json;
 mod media_stream;
 pub mod output;
 pub mod source;
@@ -33,6 +34,8 @@ pub struct StreamDescriptor {
   index: usize,
   audio_configuration: Option<AudioConfiguration>,
   image_configuration: Option<ImageConfiguration>,
+  ebu_ttml_live_configuration: Option<bool>,
+  json_configuration: Option<bool>,
 }
 
 impl StreamDescriptor {
@@ -41,6 +44,8 @@ impl StreamDescriptor {
       index,
       audio_configuration: Some(AudioConfiguration { filters }),
       image_configuration: None,
+      ebu_ttml_live_configuration: None,
+      json_configuration: None,
     }
   }
 
@@ -49,6 +54,28 @@ impl StreamDescriptor {
       index,
       audio_configuration: None,
       image_configuration: Some(ImageConfiguration { filters }),
+      ebu_ttml_live_configuration: None,
+      json_configuration: None,
+    }
+  }
+
+  pub fn new_ebu_ttml_live(index: usize) -> Self {
+    StreamDescriptor {
+      index,
+      audio_configuration: None,
+      image_configuration: None,
+      ebu_ttml_live_configuration: Some(true),
+      json_configuration: None,
+    }
+  }
+
+  pub fn new_json(index: usize) -> Self {
+    StreamDescriptor {
+      index,
+      audio_configuration: None,
+      image_configuration: None,
+      ebu_ttml_live_configuration: None,
+      json_configuration: Some(true),
     }
   }
 
@@ -57,6 +84,8 @@ impl StreamDescriptor {
       index,
       audio_configuration: None,
       image_configuration: None,
+      ebu_ttml_live_configuration: None,
+      json_configuration: None,
     }
   }
 }
