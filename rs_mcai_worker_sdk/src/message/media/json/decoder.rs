@@ -78,11 +78,11 @@ impl JsonDecoder {
 
       let value: Value = result.unwrap();
 
-      if value.is_object() {
-        Some(Json { value: Some(value) })
-      } else {
+      if !value.is_object() {
         return Err(format!("Incorrect JSON content: {}", actual_json));
       }
+
+      Some(Json { value: Some(value) })
     };
 
     Ok(json_value)

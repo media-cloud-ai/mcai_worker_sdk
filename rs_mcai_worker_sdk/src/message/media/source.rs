@@ -1,6 +1,6 @@
 use super::{
   ebu_ttml_live::EbuTtmlLiveDecoder, json::JsonDecoder, media_stream::MediaStream, srt::SrtStream,
-  AudioFilter, VideoFilter,
+  AudioFilter, StreamConfiguration, VideoFilter,
 };
 use crate::{
   error::MessageError::RuntimeError, job::JobResult, process_frame::ProcessFrame,
@@ -30,6 +30,14 @@ use std::{
   },
   thread,
 };
+
+pub enum DecoderType {
+  Audio(Option<AudioDecoder>),
+  Video(Option<VideoDecoder>),
+  EbuTtmlLive(Option<EbuTtmlLiveDecoder>),
+  Json(Option<JsonDecoder>),
+  Data(),
+}
 
 pub enum DecodeResult {
   EndOfStream,
@@ -356,99 +364,100 @@ impl Source {
 
     let mut decoders = HashMap::<usize, Decoder>::new();
     for selected_stream in &selected_streams {
-      if let Some(audio_configuration) = &selected_stream.audio_configuration {
-        // AudioDecoder can decode any codec, not only video
-        let audio_decoder = AudioDecoder::new(
-          format!("decoder_{}", selected_stream.index),
-          &format_context.clone().lock().unwrap(),
-          selected_stream.index as isize,
-        )
-        .map_err(RuntimeError)?;
+      match &selected_stream.configuration {
+        StreamConfiguration::Audio(Some(audio_configuration)) => {
+          // AudioDecoder can decode any codec, not only video
+          let audio_decoder = AudioDecoder::new(
+            format!("decoder_{}", selected_stream.index),
+            &format_context.clone().lock().unwrap(),
+            selected_stream.index as isize,
+          )
+          .map_err(RuntimeError)?;
 
-        let audio_graph =
-          Source::get_audio_filter_graph(&audio_configuration.filters, &audio_decoder)?;
+          let audio_graph =
+            Source::get_audio_filter_graph(&audio_configuration.filters, &audio_decoder)?;
 
-        if let Some(ms) = start_index_ms {
-          Self::seek_in_stream_at(
-            selected_stream.index as i32,
-            ms,
-            format_context.clone(),
-            AVSEEK_FLAG_BACKWARD,
-          )?;
+          if let Some(ms) = start_index_ms {
+            Self::seek_in_stream_at(
+              selected_stream.index as i32,
+              ms,
+              format_context.clone(),
+              AVSEEK_FLAG_BACKWARD,
+            )?;
+          }
+
+          let decoder = Decoder {
+            decoder: DecoderType::Audio(Some(audio_decoder)),
+            graph: audio_graph,
+          };
+
+          decoders.insert(selected_stream.index, decoder);
+        }
+        StreamConfiguration::Image(Some(image_configuration)) => {
+          let video_decoder = VideoDecoder::new(
+            format!("decoder_{}", selected_stream.index),
+            &format_context.clone().lock().unwrap(),
+            selected_stream.index as isize,
+          )
+          .map_err(RuntimeError)?;
+
+          let video_graph =
+            Source::get_video_filter_graph(&image_configuration.filters, &video_decoder)?;
+
+          let decoder = Decoder {
+            decoder: DecoderType::Video(Some(video_decoder)),
+            graph: video_graph,
+          };
+
+          if let Some(ms) = start_index_ms {
+            Self::seek_in_stream_at(
+              selected_stream.index as i32,
+              ms,
+              format_context.clone(),
+              AVSEEK_FLAG_BACKWARD,
+            )?;
+          }
+
+          decoders.insert(selected_stream.index, decoder);
         }
 
-        let decoder = Decoder {
-          audio_decoder: Some(audio_decoder),
-          video_decoder: None,
-          ebu_ttml_live_decoder: None,
-          json_decoder: None,
-          graph: audio_graph,
-        };
+        StreamConfiguration::EbuTtmlLive() => {
+          let ebu_ttml_live_decoder = EbuTtmlLiveDecoder::new();
+          let decoder = Decoder {
+            decoder: DecoderType::EbuTtmlLive(Some(ebu_ttml_live_decoder)),
+            graph: None,
+          };
 
-        decoders.insert(selected_stream.index, decoder);
-      } else if let Some(image_configuration) = &selected_stream.image_configuration {
-        let video_decoder = VideoDecoder::new(
-          format!("decoder_{}", selected_stream.index),
-          &format_context.clone().lock().unwrap(),
-          selected_stream.index as isize,
-        )
-        .map_err(RuntimeError)?;
-
-        let video_graph =
-          Source::get_video_filter_graph(&image_configuration.filters, &video_decoder)?;
-
-        let decoder = Decoder {
-          audio_decoder: None,
-          video_decoder: Some(video_decoder),
-          ebu_ttml_live_decoder: None,
-          json_decoder: None,
-          graph: video_graph,
-        };
-
-        if let Some(ms) = start_index_ms {
-          Self::seek_in_stream_at(
-            selected_stream.index as i32,
-            ms,
-            format_context.clone(),
-            AVSEEK_FLAG_BACKWARD,
-          )?;
+          decoders.insert(selected_stream.index, decoder);
         }
 
-        decoders.insert(selected_stream.index, decoder);
-      } else if let Some(_) = &selected_stream.ebu_ttml_live_configuration {
-        let ebu_ttml_live_decoder = EbuTtmlLiveDecoder::new();
-        let decoder = Decoder {
-          audio_decoder: None,
-          video_decoder: None,
-          ebu_ttml_live_decoder: Some(ebu_ttml_live_decoder),
-          json_decoder: None,
-          graph: None,
-        };
+        StreamConfiguration::Json() => {
+          let json_decoder = JsonDecoder::new();
+          let decoder = Decoder {
+            decoder: DecoderType::Json(Some(json_decoder)),
+            graph: None,
+          };
 
-        decoders.insert(selected_stream.index, decoder);
-      } else if let Some(_) = &selected_stream.json_configuration {
-        let json_decoder = JsonDecoder::new();
-        let decoder = Decoder {
-          audio_decoder: None,
-          video_decoder: None,
-          ebu_ttml_live_decoder: None,
-          json_decoder: Some(json_decoder),
-          graph: None,
-        };
+          decoders.insert(selected_stream.index, decoder);
+        }
 
-        decoders.insert(selected_stream.index, decoder);
-      } else {
-        let decoder = Decoder {
-          audio_decoder: None,
-          video_decoder: None,
-          ebu_ttml_live_decoder: None,
-          json_decoder: None,
-          graph: None,
-        };
+        StreamConfiguration::Data() => {
+          let decoder = Decoder {
+            decoder: DecoderType::Data(),
+            graph: None,
+          };
 
-        decoders.insert(selected_stream.index, decoder);
+          decoders.insert(selected_stream.index, decoder);
+        }
+
+        _ => {
+          return Err(MessageError::RuntimeError(
+            "Unknown stream configuration".to_string(),
+          ));
+        }
       }
     }
+
     Ok(decoders)
   }
 
@@ -604,103 +613,116 @@ impl Source {
 }
 
 struct Decoder {
-  audio_decoder: Option<AudioDecoder>,
-  video_decoder: Option<VideoDecoder>,
-  ebu_ttml_live_decoder: Option<EbuTtmlLiveDecoder>,
-  json_decoder: Option<JsonDecoder>,
+  decoder: DecoderType,
   graph: Option<FilterGraph>,
 }
 
 impl Decoder {
   fn decode(&mut self, packet: &Packet) -> std::result::Result<Option<ProcessFrame>, String> {
-    if let Some(audio_decoder) = &self.audio_decoder {
-      log::trace!("[FFmpeg] Send packet to audio decoder");
+    match &mut self.decoder {
+      DecoderType::Audio(Some(audio_decoder)) => {
+        log::trace!("[FFmpeg] Send packet to audio decoder");
 
-      let av_frame = unsafe {
-        let ret_code = avcodec_send_packet(audio_decoder.codec_context, packet.packet);
-        check_result!(ret_code);
+        let av_frame = unsafe {
+          let ret_code = avcodec_send_packet(audio_decoder.codec_context, packet.packet);
+          check_result!(ret_code);
 
-        let av_frame = av_frame_alloc();
-        let ret_code = avcodec_receive_frame(audio_decoder.codec_context, av_frame);
-        check_result!(ret_code);
+          let av_frame = av_frame_alloc();
+          let ret_code = avcodec_receive_frame(audio_decoder.codec_context, av_frame);
+          check_result!(ret_code);
 
-        let frame = Frame {
-          frame: av_frame,
-          name: Some("audio_source_1".to_string()),
-          index: 1,
-        };
+          let frame = Frame {
+            frame: av_frame,
+            name: Some("audio_source_1".to_string()),
+            index: 1,
+          };
 
-        if let Some(graph) = &self.graph {
-          if let Ok((audio_frames, _video_frames)) = graph.process(&[frame], &[]) {
-            log::trace!("[FFmpeg] Output graph count {} frames", audio_frames.len());
-            let frame = audio_frames.first().unwrap();
-            av_frame_clone((*frame).frame)
+          if let Some(graph) = &self.graph {
+            if let Ok((audio_frames, _video_frames)) = graph.process(&[frame], &[]) {
+              log::trace!("[FFmpeg] Output graph count {} frames", audio_frames.len());
+              let frame = audio_frames.first().unwrap();
+              av_frame_clone((*frame).frame)
+            } else {
+              av_frame
+            }
           } else {
             av_frame
           }
-        } else {
-          av_frame
-        }
-      };
-
-      let frame = Frame {
-        frame: av_frame,
-        name: Some("audio".to_string()),
-        index: 1,
-      };
-
-      Ok(Some(ProcessFrame::AudioVideo(frame)))
-    } else if let Some(video_decoder) = &self.video_decoder {
-      log::trace!("[FFmpeg] Send packet to video decoder");
-
-      let av_frame = unsafe {
-        let ret_code = avcodec_send_packet(video_decoder.codec_context, packet.packet);
-        check_result!(ret_code);
-
-        let av_frame = av_frame_alloc();
-        let ret_code = avcodec_receive_frame(video_decoder.codec_context, av_frame);
-        check_result!(ret_code);
+        };
 
         let frame = Frame {
           frame: av_frame,
-          name: Some("video_source_1".to_string()),
+          name: Some("audio".to_string()),
           index: 1,
         };
 
-        if let Some(graph) = &self.graph {
-          if let Ok((_audio_frames, video_frames)) = graph.process(&[], &[frame]) {
-            log::trace!("[FFmpeg] Output graph count {} frames", video_frames.len());
-            let frame = video_frames.first().unwrap();
-            av_frame_clone((*frame).frame)
+        Ok(Some(ProcessFrame::AudioVideo(frame)))
+      }
+
+      DecoderType::Video(Some(video_decoder)) => {
+        log::trace!("[FFmpeg] Send packet to video decoder");
+
+        let av_frame = unsafe {
+          let ret_code = avcodec_send_packet(video_decoder.codec_context, packet.packet);
+          check_result!(ret_code);
+
+          let av_frame = av_frame_alloc();
+          let ret_code = avcodec_receive_frame(video_decoder.codec_context, av_frame);
+          check_result!(ret_code);
+
+          let frame = Frame {
+            frame: av_frame,
+            name: Some("video_source_1".to_string()),
+            index: 1,
+          };
+
+          if let Some(graph) = &self.graph {
+            if let Ok((_audio_frames, video_frames)) = graph.process(&[], &[frame]) {
+              log::trace!("[FFmpeg] Output graph count {} frames", video_frames.len());
+              let frame = video_frames.first().unwrap();
+              av_frame_clone((*frame).frame)
+            } else {
+              av_frame
+            }
           } else {
             av_frame
           }
-        } else {
-          av_frame
-        }
-      };
+        };
 
-      let frame = Frame {
-        frame: av_frame,
-        name: Some("video".to_string()),
-        index: 1,
-      };
+        let frame = Frame {
+          frame: av_frame,
+          name: Some("video".to_string()),
+          index: 1,
+        };
 
-      Ok(Some(ProcessFrame::AudioVideo(frame)))
-    } else if let Some(ebu_ttml_live_decoder) = &mut self.ebu_ttml_live_decoder {
-      let result = match ebu_ttml_live_decoder.decode(packet)? {
-        Some(ttml_content) => Some(ProcessFrame::EbuTtmlLive(Box::new(ttml_content))),
-        None => None,
-      };
-      Ok(result)
-    } else if let Some(json_decoder) = &mut self.json_decoder {
-      let result = match json_decoder.decode(packet)? {
-        Some(json_value) => Some(ProcessFrame::Json(Box::new(json_value))),
-        None => None,
-      };
-      Ok(result)
-    } else {
-      Err("No decoder found".to_string())
+        Ok(Some(ProcessFrame::AudioVideo(frame)))
+      }
+
+      DecoderType::EbuTtmlLive(Some(ebu_ttml_live_decoder)) => {
+        let result = match ebu_ttml_live_decoder.decode(packet)? {
+          Some(ttml_content) => Some(ProcessFrame::EbuTtmlLive(Box::new(ttml_content))),
+          None => None,
+        };
+        Ok(result)
+      }
+
+      DecoderType::Json(Some(json_decoder)) => {
+        let result = match json_decoder.decode(packet)? {
+          Some(json_value) => Some(ProcessFrame::Json(Box::new(json_value))),
+          None => None,
+        };
+        Ok(result)
+      }
+
+      DecoderType::Data() => {
+        let data_size = unsafe { (*packet.packet).size as usize };
+        let data = unsafe { (*packet.packet).data as *mut u8 };
+        let vec_data = unsafe { Vec::from_raw_parts(data, data_size, data_size) };
+
+        Ok(Some(ProcessFrame::Data(vec_data)))
+      }
+
+      _ => Err("No decoder found".to_string()),
     }
   }
 }

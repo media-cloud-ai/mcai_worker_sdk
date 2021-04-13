@@ -30,62 +30,54 @@ pub const STOP_INDEX_PARAMETER: &str = "sdk_stop_index";
 
 #[cfg(all(feature = "media"))]
 #[derive(Debug, PartialEq)]
+pub enum StreamConfiguration {
+  Audio(Option<AudioConfiguration>),
+  Image(Option<ImageConfiguration>),
+  EbuTtmlLive(),
+  Json(),
+  Data(),
+}
+
+#[cfg(all(feature = "media"))]
+#[derive(Debug, PartialEq)]
 pub struct StreamDescriptor {
   index: usize,
-  audio_configuration: Option<AudioConfiguration>,
-  image_configuration: Option<ImageConfiguration>,
-  ebu_ttml_live_configuration: Option<bool>,
-  json_configuration: Option<bool>,
+  configuration: StreamConfiguration,
 }
 
 impl StreamDescriptor {
   pub fn new_audio(index: usize, filters: Vec<AudioFilter>) -> Self {
     StreamDescriptor {
       index,
-      audio_configuration: Some(AudioConfiguration { filters }),
-      image_configuration: None,
-      ebu_ttml_live_configuration: None,
-      json_configuration: None,
+      configuration: StreamConfiguration::Audio(Some(AudioConfiguration { filters })),
     }
   }
 
   pub fn new_video(index: usize, filters: Vec<VideoFilter>) -> Self {
     StreamDescriptor {
       index,
-      audio_configuration: None,
-      image_configuration: Some(ImageConfiguration { filters }),
-      ebu_ttml_live_configuration: None,
-      json_configuration: None,
+      configuration: StreamConfiguration::Image(Some(ImageConfiguration { filters })),
     }
   }
 
   pub fn new_ebu_ttml_live(index: usize) -> Self {
     StreamDescriptor {
       index,
-      audio_configuration: None,
-      image_configuration: None,
-      ebu_ttml_live_configuration: Some(true),
-      json_configuration: None,
+      configuration: StreamConfiguration::EbuTtmlLive(),
     }
   }
 
   pub fn new_json(index: usize) -> Self {
     StreamDescriptor {
       index,
-      audio_configuration: None,
-      image_configuration: None,
-      ebu_ttml_live_configuration: None,
-      json_configuration: Some(true),
+      configuration: StreamConfiguration::Json(),
     }
   }
 
   pub fn new_data(index: usize) -> Self {
     StreamDescriptor {
       index,
-      audio_configuration: None,
-      image_configuration: None,
-      ebu_ttml_live_configuration: None,
-      json_configuration: None,
+      configuration: StreamConfiguration::Data(),
     }
   }
 }
