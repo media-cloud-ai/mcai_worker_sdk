@@ -59,8 +59,17 @@ async fn rabbitmq_stop_job() -> Result<()> {
   let instance_id = "9876543210";
   let worker = Worker {};
   let worker_configuration = WorkerConfiguration::new("", &worker, instance_id).unwrap();
-  let rabbitmq_exchange = RabbitmqExchange::new(&worker_configuration).await.unwrap();
-  let rabbitmq_exchange = Arc::new(rabbitmq_exchange);
+  let rabbitmq_exchange = RabbitmqExchange::new(&worker_configuration).await;
+
+  if let Err(MessageError::Amqp(lapin::Error::IOError(error))) = rabbitmq_exchange {
+    eprintln!(
+      "Connection to RabbitMQ failure: {}. Skip test.",
+      error.to_string()
+    );
+    return Ok(());
+  }
+
+  let rabbitmq_exchange = Arc::new(rabbitmq_exchange.unwrap());
 
   let cloned_worker_configuration = worker_configuration.clone();
 

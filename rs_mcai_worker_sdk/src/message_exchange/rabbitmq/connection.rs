@@ -53,7 +53,7 @@ impl RabbitmqConnection {
 
     let queue_name = worker_configuration.get_direct_messaging_queue_name();
 
-    let order_consumer = RabbitmqConsumer::new(
+    let mut order_consumer = RabbitmqConsumer::new(
       &channel,
       order_sender,
       &queue_name,
@@ -61,6 +61,8 @@ impl RabbitmqConnection {
       current_orders.clone(),
     )
     .await?;
+
+    order_consumer.connect(&job_consumer);
 
     let response_publisher = RabbitmqPublisher::new(&channel, current_orders.clone()).await?;
 

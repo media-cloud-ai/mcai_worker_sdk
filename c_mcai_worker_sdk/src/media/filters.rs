@@ -90,7 +90,7 @@ mod media_filter_tests {
     add_descriptor_filter, add_filter_parameter, new_filter, new_stream_descriptor,
   };
   use crate::media::stream_descriptors::{CStreamDescriptor, StreamType};
-  use mcai_worker_sdk::GenericFilter;
+  use mcai_worker_sdk::prelude::GenericFilter;
   use std::ffi::CString;
 
   #[test]
@@ -99,10 +99,10 @@ mod media_filter_tests {
     let label = "filter_label".to_string();
 
     unsafe {
-      let c_filter_ptr = new_filter(
-        CString::new(name.clone()).unwrap().as_ptr(),
-        CString::new(label.clone()).unwrap().as_ptr(),
-      );
+      let name_c_str = CString::new(name.clone()).unwrap();
+      let label_c_str = CString::new(label.clone()).unwrap();
+
+      let c_filter_ptr = new_filter(name_c_str.as_ptr(), label_c_str.as_ptr());
       let c_filter = Box::from_raw(c_filter_ptr as *mut GenericFilter);
 
       assert_eq!(name, c_filter.name);
@@ -120,15 +120,15 @@ mod media_filter_tests {
     let label = "filter_label".to_string();
 
     unsafe {
-      let c_filter_ptr = new_filter(
-        CString::new(name.clone()).unwrap().as_ptr(),
-        CString::new(label.clone()).unwrap().as_ptr(),
-      );
-      add_filter_parameter(
-        c_filter_ptr,
-        CString::new(key.clone()).unwrap().as_ptr(),
-        CString::new(value.clone()).unwrap().as_ptr(),
-      );
+      let name_c_str = CString::new(name.clone()).unwrap();
+      let label_c_str = CString::new(label.clone()).unwrap();
+
+      let c_filter_ptr = new_filter(name_c_str.as_ptr(), label_c_str.as_ptr());
+
+      let key_c_str = CString::new(key.clone()).unwrap();
+      let value_c_str = CString::new(value.clone()).unwrap();
+
+      add_filter_parameter(c_filter_ptr, key_c_str.as_ptr(), value_c_str.as_ptr());
       let c_filter = Box::from_raw(c_filter_ptr as *mut GenericFilter);
       assert_eq!(name, c_filter.name);
       assert_eq!(Some(label), c_filter.label);
@@ -154,10 +154,11 @@ mod media_filter_tests {
     let label = "filter_label".to_string();
 
     unsafe {
-      let c_filter_ptr = new_filter(
-        CString::new(name.clone()).unwrap().as_ptr(),
-        CString::new(label.clone()).unwrap().as_ptr(),
-      );
+      let name_c_str = CString::new(name.clone()).unwrap();
+      let label_c_str = CString::new(label.clone()).unwrap();
+
+      let c_filter_ptr = new_filter(name_c_str.as_ptr(), label_c_str.as_ptr());
+
       let descriptor_ptr = new_stream_descriptor(1, 1);
 
       add_descriptor_filter(descriptor_ptr, c_filter_ptr);
@@ -191,32 +192,32 @@ mod media_filter_tests {
     unsafe {
       let descriptor_ptr = new_stream_descriptor(1, 1);
 
-      let c_filter_ptr = new_filter(
-        CString::new(name_1.clone()).unwrap().as_ptr(),
-        CString::new(label_1.clone()).unwrap().as_ptr(),
-      );
-      add_filter_parameter(
-        c_filter_ptr,
-        CString::new(key_1.clone()).unwrap().as_ptr(),
-        CString::new(value_1.clone()).unwrap().as_ptr(),
-      );
-      add_filter_parameter(
-        c_filter_ptr,
-        CString::new(key_2.clone()).unwrap().as_ptr(),
-        CString::new(value_2.clone()).unwrap().as_ptr(),
-      );
+      let name_1_c_str = CString::new(name_1.clone()).unwrap();
+      let label_1_c_str = CString::new(label_1.clone()).unwrap();
+
+      let c_filter_ptr = new_filter(name_1_c_str.as_ptr(), label_1_c_str.as_ptr());
+
+      let key_1_c_str = CString::new(key_1.clone()).unwrap();
+      let value_1_c_str = CString::new(value_1.clone()).unwrap();
+
+      add_filter_parameter(c_filter_ptr, key_1_c_str.as_ptr(), value_1_c_str.as_ptr());
+
+      let key_2_c_str = CString::new(key_2.clone()).unwrap();
+      let value_2_c_str = CString::new(value_2.clone()).unwrap();
+
+      add_filter_parameter(c_filter_ptr, key_2_c_str.as_ptr(), value_2_c_str.as_ptr());
 
       add_descriptor_filter(descriptor_ptr, c_filter_ptr);
 
-      let c_filter_ptr = new_filter(
-        CString::new(name_2.clone()).unwrap().as_ptr(),
-        CString::new(label_2.clone()).unwrap().as_ptr(),
-      );
-      add_filter_parameter(
-        c_filter_ptr,
-        CString::new(key_1.clone()).unwrap().as_ptr(),
-        CString::new(value_1.clone()).unwrap().as_ptr(),
-      );
+      let name_2_c_str = CString::new(name_2.clone()).unwrap();
+      let label_2_c_str = CString::new(label_2.clone()).unwrap();
+
+      let c_filter_ptr = new_filter(name_2_c_str.as_ptr(), label_2_c_str.as_ptr());
+
+      let key_1_c_str = CString::new(key_1.clone()).unwrap();
+      let value_1_c_str = CString::new(value_1.clone()).unwrap();
+
+      add_filter_parameter(c_filter_ptr, key_1_c_str.as_ptr(), value_1_c_str.as_ptr());
 
       add_descriptor_filter(descriptor_ptr, c_filter_ptr);
 

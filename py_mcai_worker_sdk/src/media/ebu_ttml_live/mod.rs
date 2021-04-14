@@ -119,7 +119,7 @@ impl From<Span> for PyTtmlSpan {
 }
 
 #[cfg(test)]
-use mcai_worker_sdk::{TimeExpression, TimeUnit};
+use mcai_worker_sdk::prelude::{TimeExpression, TimeUnit};
 
 #[test]
 pub fn test_py_ttml_paragraph() {

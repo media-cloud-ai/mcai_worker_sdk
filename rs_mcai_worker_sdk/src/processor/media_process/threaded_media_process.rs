@@ -154,10 +154,12 @@ impl ThreadedMediaProcess {
             self.keep_running = false;
             self.get_status_feedback(JobStatus::Running, worker_configuration.clone())
           }
-          OrderMessage::StopConsumingJobs => ResponseMessage::Error(MessageError::RuntimeError(format!(
-            "Cannot handle such a message: {:?}",
-            message
-          ))),
+          OrderMessage::StopConsumingJobs | OrderMessage::ResumeConsumingJobs => {
+            ResponseMessage::Error(MessageError::RuntimeError(format!(
+              "Cannot handle such a message: {:?}",
+              message
+            )))
+          }
         };
 
         response_sender.lock().unwrap().send_response(resp).unwrap();
@@ -165,6 +167,7 @@ impl ThreadedMediaProcess {
     }
   }
 
+  #[allow(clippy::too_many_arguments)]
   pub fn process_frame<P: DeserializeOwned + JsonSchema, ME: 'static + MessageEvent<P> + Send>(
     &mut self,
     message_event: Arc<Mutex<ME>>,

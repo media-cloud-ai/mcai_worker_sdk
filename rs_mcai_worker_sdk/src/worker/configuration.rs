@@ -81,6 +81,7 @@ impl WorkerConfiguration {
   }
 
   #[cfg(not(feature = "media"))]
+  #[allow(clippy::unnecessary_wraps)]
   fn get_parameter_schema<P: JsonSchema>() -> crate::Result<RootSchema> {
     Ok(schema_for!(P))
   }

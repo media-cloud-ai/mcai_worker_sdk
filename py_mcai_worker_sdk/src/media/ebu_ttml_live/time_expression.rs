@@ -53,9 +53,9 @@ impl From<TimeExpression> for PyTtmlTimeExpression {
   }
 }
 
-impl Into<TimeExpression> for PyTtmlTimeExpression {
-  fn into(self) -> TimeExpression {
-    if let Some(clock_time) = self.clock_time {
+impl From<PyTtmlTimeExpression> for TimeExpression {
+  fn from(py_ttml_time_expression: PyTtmlTimeExpression) -> Self {
+    if let Some(clock_time) = py_ttml_time_expression.clock_time {
       return TimeExpression::ClockTime {
         hours: clock_time.hours,
         minutes: clock_time.minutes,
@@ -64,7 +64,7 @@ impl Into<TimeExpression> for PyTtmlTimeExpression {
       };
     }
 
-    if let Some(offset_time) = self.offset_time {
+    if let Some(offset_time) = py_ttml_time_expression.offset_time {
       let unit = match offset_time.unit.to_lowercase().as_str() {
         "t" => TimeUnit::Ticks,
         "f" => TimeUnit::Frames,
@@ -122,12 +122,16 @@ impl From<Frames> for PyTtmlFrames {
   }
 }
 
-impl Into<Frames> for PyTtmlFrames {
-  fn into(self) -> Frames {
-    if self.sub_frames {
-      Frames::SubFrames { value: self.value }
+impl From<PyTtmlFrames> for Frames {
+  fn from(py_ttml_frames: PyTtmlFrames) -> Self {
+    if py_ttml_frames.sub_frames {
+      Frames::SubFrames {
+        value: py_ttml_frames.value,
+      }
     } else {
-      Frames::Frames { value: self.value }
+      Frames::Frames {
+        value: py_ttml_frames.value,
+      }
     }
   }
 }

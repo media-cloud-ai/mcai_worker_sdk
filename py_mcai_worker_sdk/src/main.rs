@@ -63,7 +63,7 @@ impl PythonWorkerEvent {
 
     let response = python_module
       .call0("get_parameters")
-      .unwrap_or_else(|_| panic!("unable to call get_parameters in your module".to_string()))
+      .unwrap_or_else(|_| panic!("unable to call get_parameters in your module"))
       .downcast::<PyList>()
       .unwrap();
 
@@ -236,7 +236,7 @@ impl StreamDescriptorHandler {
   }
 }
 
-fn get_python_module<'a>(gil: &'a GILGuard) -> Result<(Python<'a>, &'a PyModule)> {
+fn get_python_module(gil: &GILGuard) -> Result<(Python, &PyModule)> {
   let python_file_content = PythonWorkerEvent::read_python_file();
   let py = gil.python();
   let python_module = PyModule::from_code(py, &python_file_content, "worker.py", "worker")

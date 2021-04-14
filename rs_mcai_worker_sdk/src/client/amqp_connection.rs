@@ -43,7 +43,6 @@ impl AmqpConnection {
     sender: Sender<T>,
   ) {
     let channel = self.channel.clone();
-    let sender = sender.clone();
     let queue_name = queue_name.to_string();
 
     std::thread::spawn(move || {
