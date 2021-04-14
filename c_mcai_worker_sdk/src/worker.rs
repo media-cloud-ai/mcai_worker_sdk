@@ -261,7 +261,7 @@ pub fn call_worker_process_frame(
 
     debug!("json_ptr: {:?}", json_ptr);
 
-    let return_code = match process_frame {
+    let return_code = match &process_frame {
       ProcessFrame::AudioVideo(frame) => {
         let process_frame_func: libloading::Symbol<ProcessFrameFunc> =
           get_library_function(&worker_lib, constants::PROCESS_FRAME_FUNCTION).map_err(
@@ -286,6 +286,9 @@ pub fn call_worker_process_frame(
         )
       }
       ProcessFrame::EbuTtmlLive(_ebu_ttml_live) => {
+        return Err(MessageError::NotImplemented());
+      }
+      ProcessFrame::Json(_json) => {
         return Err(MessageError::NotImplemented());
       }
       ProcessFrame::Data(_) => {

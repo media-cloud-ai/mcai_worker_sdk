@@ -327,9 +327,9 @@ impl Source {
             }
             Ok(None) => Ok(DecodeResult::WaitMore),
             Err(message) => {
-              if message == "Resource temporarily unavailable" {
-                return Ok(DecodeResult::Nothing);
-              } else if message == "Invalid data found when processing input" {
+              if message == "Resource temporarily unavailable"
+                || message == "Invalid data found when processing input"
+              {
                 return Ok(DecodeResult::Nothing);
               }
               Err(RuntimeError(message))
@@ -449,7 +449,6 @@ impl Source {
 
           decoders.insert(selected_stream.index, decoder);
         }
-
       }
     }
 
@@ -716,7 +715,6 @@ impl Decoder {
 
         Ok(Some(ProcessFrame::Data(vec_data)))
       }
-
     }
   }
 }

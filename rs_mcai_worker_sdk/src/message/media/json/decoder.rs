@@ -41,7 +41,7 @@ impl JsonDecoder {
         let vec: Vec<&str> = json_content.split("}{").collect();
         let first_json = format!("{}}}", vec[0]);
         let last_json = format!("{{{}", vec[1]);
-        self.buffer.push_back(last_json.to_string());
+        self.buffer.push_back(last_json);
         first_json
       } else {
         json_content.to_string()
@@ -65,7 +65,7 @@ impl JsonDecoder {
       };
 
       let result = serde_json::from_str(&actual_json);
-      if let Err(_) = result {
+      if result.is_err() {
         log::debug!(
           "Add incomplete JSON content to buffer (buffer size: {})",
           self.buffer.len()

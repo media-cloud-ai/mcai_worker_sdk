@@ -353,7 +353,7 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
     let gil = Python::acquire_gil();
     let (py, python_module) = get_python_module(&gil)?;
 
-    match process_frame {
+    match &process_frame {
       ProcessFrame::AudioVideo(frame) => {
         let media_frame = media::Frame::from(&frame)?;
 
@@ -390,6 +390,7 @@ impl MessageEvent<PythonWorkerParameters> for PythonWorkerEvent {
 
         Ok(ProcessResult::new_json(&response.to_string()))
       }
+      ProcessFrame::Json(_json) => Err(MessageError::NotImplemented()),
       ProcessFrame::Data(_data) => Err(MessageError::NotImplemented()),
     }
   }
