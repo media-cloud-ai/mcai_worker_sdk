@@ -31,11 +31,11 @@ pub const STOP_INDEX_PARAMETER: &str = "sdk_stop_index";
 #[cfg(all(feature = "media"))]
 #[derive(Debug, PartialEq)]
 pub enum StreamConfiguration {
-  Audio(Option<AudioConfiguration>),
-  Image(Option<ImageConfiguration>),
-  EbuTtmlLive(),
-  Json(),
-  Data(),
+  Audio(AudioConfiguration),
+  Image(ImageConfiguration),
+  EbuTtmlLive,
+  Json,
+  Data,
 }
 
 #[cfg(all(feature = "media"))]
@@ -49,35 +49,35 @@ impl StreamDescriptor {
   pub fn new_audio(index: usize, filters: Vec<AudioFilter>) -> Self {
     StreamDescriptor {
       index,
-      configuration: StreamConfiguration::Audio(Some(AudioConfiguration { filters })),
+      configuration: StreamConfiguration::Audio(AudioConfiguration { filters }),
     }
   }
 
   pub fn new_video(index: usize, filters: Vec<VideoFilter>) -> Self {
     StreamDescriptor {
       index,
-      configuration: StreamConfiguration::Image(Some(ImageConfiguration { filters })),
+      configuration: StreamConfiguration::Image(ImageConfiguration { filters }),
     }
   }
 
   pub fn new_ebu_ttml_live(index: usize) -> Self {
     StreamDescriptor {
       index,
-      configuration: StreamConfiguration::EbuTtmlLive(),
+      configuration: StreamConfiguration::EbuTtmlLive,
     }
   }
 
   pub fn new_json(index: usize) -> Self {
     StreamDescriptor {
       index,
-      configuration: StreamConfiguration::Json(),
+      configuration: StreamConfiguration::Json,
     }
   }
 
   pub fn new_data(index: usize) -> Self {
     StreamDescriptor {
       index,
-      configuration: StreamConfiguration::Data(),
+      configuration: StreamConfiguration::Data,
     }
   }
 }

@@ -32,11 +32,11 @@ use std::{
 };
 
 pub enum DecoderType {
-  Audio(Option<AudioDecoder>),
-  Video(Option<VideoDecoder>),
-  EbuTtmlLive(Option<EbuTtmlLiveDecoder>),
-  Json(Option<JsonDecoder>),
-  Data(),
+  Audio(AudioDecoder),
+  Video(VideoDecoder),
+  EbuTtmlLive(EbuTtmlLiveDecoder),
+  Json(JsonDecoder),
+  Data,
 }
 
 pub enum DecodeResult {
@@ -365,7 +365,7 @@ impl Source {
     let mut decoders = HashMap::<usize, Decoder>::new();
     for selected_stream in &selected_streams {
       match &selected_stream.configuration {
-        StreamConfiguration::Audio(Some(audio_configuration)) => {
+        StreamConfiguration::Audio(audio_configuration) => {
           // AudioDecoder can decode any codec, not only video
           let audio_decoder = AudioDecoder::new(
             format!("decoder_{}", selected_stream.index),
@@ -387,13 +387,13 @@ impl Source {
           }
 
           let decoder = Decoder {
-            decoder: DecoderType::Audio(Some(audio_decoder)),
+            decoder: DecoderType::Audio(audio_decoder),
             graph: audio_graph,
           };
 
           decoders.insert(selected_stream.index, decoder);
         }
-        StreamConfiguration::Image(Some(image_configuration)) => {
+        StreamConfiguration::Image(image_configuration) => {
           let video_decoder = VideoDecoder::new(
             format!("decoder_{}", selected_stream.index),
             &format_context.clone().lock().unwrap(),
@@ -405,7 +405,7 @@ impl Source {
             Source::get_video_filter_graph(&image_configuration.filters, &video_decoder)?;
 
           let decoder = Decoder {
-            decoder: DecoderType::Video(Some(video_decoder)),
+            decoder: DecoderType::Video(video_decoder),
             graph: video_graph,
           };
 
@@ -421,40 +421,35 @@ impl Source {
           decoders.insert(selected_stream.index, decoder);
         }
 
-        StreamConfiguration::EbuTtmlLive() => {
+        StreamConfiguration::EbuTtmlLive => {
           let ebu_ttml_live_decoder = EbuTtmlLiveDecoder::new();
           let decoder = Decoder {
-            decoder: DecoderType::EbuTtmlLive(Some(ebu_ttml_live_decoder)),
+            decoder: DecoderType::EbuTtmlLive(ebu_ttml_live_decoder),
             graph: None,
           };
 
           decoders.insert(selected_stream.index, decoder);
         }
 
-        StreamConfiguration::Json() => {
+        StreamConfiguration::Json => {
           let json_decoder = JsonDecoder::new();
           let decoder = Decoder {
-            decoder: DecoderType::Json(Some(json_decoder)),
+            decoder: DecoderType::Json(json_decoder),
             graph: None,
           };
 
           decoders.insert(selected_stream.index, decoder);
         }
 
-        StreamConfiguration::Data() => {
+        StreamConfiguration::Data => {
           let decoder = Decoder {
-            decoder: DecoderType::Data(),
+            decoder: DecoderType::Data,
             graph: None,
           };
 
           decoders.insert(selected_stream.index, decoder);
         }
 
-        _ => {
-          return Err(MessageError::RuntimeError(
-            "Unknown stream configuration".to_string(),
-          ));
-        }
       }
     }
 
@@ -620,7 +615,7 @@ struct Decoder {
 impl Decoder {
   fn decode(&mut self, packet: &Packet) -> std::result::Result<Option<ProcessFrame>, String> {
     match &mut self.decoder {
-      DecoderType::Audio(Some(audio_decoder)) => {
+      DecoderType::Audio(audio_decoder) => {
         log::trace!("[FFmpeg] Send packet to audio decoder");
 
         let av_frame = unsafe {
@@ -659,7 +654,7 @@ impl Decoder {
         Ok(Some(ProcessFrame::AudioVideo(frame)))
       }
 
-      DecoderType::Video(Some(video_decoder)) => {
+      DecoderType::Video(video_decoder) => {
         log::trace!("[FFmpeg] Send packet to video decoder");
 
         let av_frame = unsafe {
@@ -698,7 +693,7 @@ impl Decoder {
         Ok(Some(ProcessFrame::AudioVideo(frame)))
       }
 
-      DecoderType::EbuTtmlLive(Some(ebu_ttml_live_decoder)) => {
+      DecoderType::EbuTtmlLive(ebu_ttml_live_decoder) => {
         let result = match ebu_ttml_live_decoder.decode(packet)? {
           Some(ttml_content) => Some(ProcessFrame::EbuTtmlLive(Box::new(ttml_content))),
           None => None,
@@ -706,7 +701,7 @@ impl Decoder {
         Ok(result)
       }
 
-      DecoderType::Json(Some(json_decoder)) => {
+      DecoderType::Json(json_decoder) => {
         let result = match json_decoder.decode(packet)? {
           Some(json_value) => Some(ProcessFrame::Json(Box::new(json_value))),
           None => None,
@@ -714,7 +709,7 @@ impl Decoder {
         Ok(result)
       }
 
-      DecoderType::Data() => {
+      DecoderType::Data => {
         let data_size = unsafe { (*packet.packet).size as usize };
         let data = unsafe { (*packet.packet).data as *mut u8 };
         let vec_data = unsafe { Vec::from_raw_parts(data, data_size, data_size) };
@@ -722,7 +717,6 @@ impl Decoder {
         Ok(Some(ProcessFrame::Data(vec_data)))
       }
 
-      _ => Err("No decoder found".to_string()),
     }
   }
 }
