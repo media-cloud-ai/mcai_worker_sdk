@@ -44,10 +44,11 @@ pub fn get_amqp_queue() -> String {
 }
 
 pub fn get_store_hostname(store_code: &str) -> String {
-  get_env_value!(
-    &format!("{}_HOSTNAME", store_code),
-    "http://127.0.0.1:4000/api"
-  )
+  get_store_hostname_with_default(store_code, "http://127.0.0.1:4000/api")
+}
+
+pub fn get_store_hostname_with_default(store_code: &str, default: &str) -> String {
+  get_env_value!(&format!("{}_HOSTNAME", store_code), default)
 }
 
 pub fn get_store_username(store_code: &str) -> String {
@@ -56,6 +57,10 @@ pub fn get_store_username(store_code: &str) -> String {
 
 pub fn get_store_password(store_code: &str) -> String {
   get_env_value!(&format!("{}_PASSWORD", store_code), "")
+}
+
+pub fn get_store_token(store_code: &str) -> String {
+  get_env_value!(&format!("{}_TOKEN", store_code), "")
 }
 
 pub fn get_amqp_uri() -> AMQPUri {
