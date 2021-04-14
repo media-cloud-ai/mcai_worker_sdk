@@ -592,3 +592,67 @@ fn test_string_credential_request_value_with_invalid_store() {
     Err(MessageError::ParameterValueError(error_message))
   );
 }
+
+#[test]
+fn test_string_credential_request_value_from_vault_store() {
+  use mockito::mock;
+  use serde::Deserialize;
+  use std::collections::HashMap;
+
+  std::env::set_var("VAULT_HOSTNAME", mockito::server_url());
+  let vault_token = "s.123456789abcdefghijklmnop";
+  std::env::set_var("VAULT_TOKEN", vault_token);
+
+  let _m = mock("GET", "/secret/data/TEST_CREDENTIAL_KEY")
+    .with_header("X-Vault-Token", vault_token)
+    .with_body(
+      r#"{
+      "some_field": 123,
+      "data": {
+        "data": {
+          "key_1": "value_1",
+          "key_2": "value_2",
+          "key_3": "value_3"
+        },
+        "metadata": {
+          "some": "metadata"
+        }
+      },
+      "some_other_field": "some_value"
+      }"#,
+    )
+    .create();
+
+  let message = r#"{
+    "job_id": 123,
+    "parameters": [
+      { "id":"test_credential",
+        "type":"string",
+        "store":"VAULT",
+        "value":"TEST_CREDENTIAL_KEY"
+      }
+    ]
+  }"#;
+
+  #[derive(Deserialize)]
+  struct JobParameters {
+    test_credential: HashMap<String, String>,
+  }
+
+  let job = Job::new(message).unwrap();
+
+  let job_parameters = job.get_parameters::<JobParameters>().unwrap();
+
+  assert_eq!(
+    Some(&"value_1".to_string()),
+    job_parameters.test_credential.get("key_1")
+  );
+  assert_eq!(
+    Some(&"value_2".to_string()),
+    job_parameters.test_credential.get("key_2")
+  );
+  assert_eq!(
+    Some(&"value_3".to_string()),
+    job_parameters.test_credential.get("key_3")
+  );
+}

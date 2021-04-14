@@ -1,6 +1,7 @@
 pub mod container;
 pub mod media_segment;
 pub mod store;
+mod vault;
 
 use crate::{MessageError, Result};
 pub use media_segment::{MediaSegment, MediaSegments};

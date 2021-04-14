@@ -1,6 +1,7 @@
 use crate::{
   config::*,
   job::{Session, SessionBody, SessionResponseBody, ValueResponseBody},
+  parameter::vault::VaultSecretResponse,
 };
 use reqwest::{
   blocking::Client,
@@ -14,6 +15,28 @@ pub fn request_value(credential_key: &str, store_code: &str) -> Result<Value, St
     "env" | "environment" => var(credential_key)
       .map_err(|error| error.to_string())
       .map(|value| serde_json::from_str(&value).unwrap_or(Value::String(value))),
+    "vault" => {
+      let vault_endpoint = get_store_hostname_with_default(store_code, "http://127.0.0.1:8200/v1");
+      let vault_token = get_store_token(store_code);
+
+      let credential_url = format!("{}/secret/data/{}", vault_endpoint, credential_key);
+
+      let client = Client::builder().build().map_err(|e| format!("{:?}", e))?;
+
+      // retrieve the secret indicated by the credential key
+      let response: VaultSecretResponse = client
+        .get(credential_url)
+        .header("X-Vault-Token", vault_token)
+        .send()
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?
+        .json()
+        .map_err(|e| e.to_string())?;
+
+      // return the secret content as a JSON value
+      Ok(response.data.data)
+    }
     _ => {
       let backend_endpoint = get_store_hostname(store_code);
       let backend_username = get_store_username(store_code);
