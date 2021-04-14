@@ -25,7 +25,8 @@ use std::{
 
 pub struct RabbitmqConsumer {
   handle: Option<JoinHandle<()>>,
-  pub should_consume: Arc<AtomicBool>,
+  should_consume: Arc<AtomicBool>,
+  consumer_triggers: Arc<Mutex<Vec<Arc<AtomicBool>>>>,
 }
 
 pub const RABBITMQ_CONSUMER_TAG_JOB: &str = "amqp_worker";
@@ -40,10 +41,53 @@ impl RabbitmqConsumer {
     queue_name: &str,
     consumer_tag: &str,
     current_orders: Arc<Mutex<CurrentOrders>>,
-    job_consumer_triggers: Vec<Arc<AtomicBool>>,
   ) -> Result<Self> {
     log::debug!("Start RabbitMQ consumer on queue {:?}", queue_name);
 
+    let channel = Arc::new(channel.clone());
+
+    let should_consume = Arc::new(AtomicBool::new(true));
+    let consumer_triggers = Arc::new(Mutex::new(vec![]));
+
+    let handle = Self::start_consumer(
+      channel,
+      queue_name,
+      consumer_tag,
+      sender,
+      current_orders,
+      should_consume.clone(),
+      consumer_triggers.clone(),
+    )
+    .await?;
+
+    Ok(RabbitmqConsumer {
+      handle,
+      should_consume,
+      consumer_triggers,
+    })
+  }
+
+  pub fn connect(&mut self, rabbitmq_consumer: &RabbitmqConsumer) {
+    self
+      .consumer_triggers
+      .lock()
+      .unwrap()
+      .push(rabbitmq_consumer.get_trigger());
+  }
+
+  fn get_trigger(&self) -> Arc<AtomicBool> {
+    self.should_consume.clone()
+  }
+
+  async fn start_consumer(
+    channel: Arc<Channel>,
+    queue_name: &str,
+    consumer_tag: &str,
+    sender: Sender<OrderMessage>,
+    current_orders: Arc<Mutex<CurrentOrders>>,
+    should_consume: Arc<AtomicBool>,
+    consumer_triggers: Arc<Mutex<Vec<Arc<AtomicBool>>>>,
+  ) -> Result<Option<JoinHandle<()>>> {
     let mut optional_consumer = Some(
       channel
         .basic_consume(
@@ -55,43 +99,41 @@ impl RabbitmqConsumer {
         .await?,
     );
 
-    let channel = Arc::new(channel.clone());
-    let queue_name_clone = queue_name.to_string();
-    let consumer_tag_clone = consumer_tag.to_string();
+    let queue_name = queue_name.to_string();
+    let consumer_tag = consumer_tag.to_string();
 
-    let should_consume = Arc::new(AtomicBool::new(true));
-    let should_consume_clone = should_consume.clone();
-
-    let job_consumer_triggers_clone = job_consumer_triggers.clone();
-
-    let handle = Some(task::spawn(async move {
+    let handle = task::spawn(async move {
       loop {
-        if optional_consumer.is_some() && !should_consume_clone.load(Ordering::Relaxed) {
-          // if should not consume, unregister consumer from channel
-          log::debug!("{} consumer unregisters from channel...", queue_name_clone);
+        match (&optional_consumer, should_consume.load(Ordering::Relaxed)) {
+          (Some(_), false) => {
+            // if should not consume, unregister consumer from channel
+            log::debug!("{} consumer unregisters from channel...", queue_name);
 
-          optional_consumer = None;
+            optional_consumer = None;
 
-          channel
-            .basic_cancel(&consumer_tag_clone, BasicCancelOptions::default())
-            .await
-            .map_err(MessageError::Amqp)
-            .unwrap();
-        } else if optional_consumer.is_none() && should_consume_clone.load(Ordering::Relaxed) {
-          // if should consume, reset channel consumer
-          log::debug!("{} consumer resume consuming channel...", queue_name_clone);
-
-          optional_consumer = Some(
             channel
-              .basic_consume(
-                &queue_name_clone,
-                &consumer_tag_clone,
-                BasicConsumeOptions::default(),
-                FieldTable::default(),
-              )
+              .basic_cancel(&consumer_tag, BasicCancelOptions::default())
               .await
-              .unwrap(),
-          );
+              .map_err(MessageError::Amqp)
+              .unwrap();
+          }
+          (None, true) => {
+            // if should consume, reset channel consumer
+            log::debug!("{} consumer resume consuming channel...", queue_name);
+
+            optional_consumer = Some(
+              channel
+                .basic_consume(
+                  &queue_name,
+                  &consumer_tag,
+                  BasicConsumeOptions::default(),
+                  FieldTable::default(),
+                )
+                .await
+                .unwrap(),
+            );
+          }
+          _ => {}
         }
 
         if let Some(mut consumer) = optional_consumer.clone() {
@@ -101,12 +143,12 @@ impl RabbitmqConsumer {
           if let Ok(Some(delivery)) = next_delivery {
             let (_, delivery) = delivery.expect("error in consumer");
 
-            if !should_consume_clone.load(Ordering::Relaxed) {
+            if !should_consume.load(Ordering::Relaxed) {
               // if should have not consumed a message, reject it and unregister from channel
 
               log::warn!(
                 "{} consumer nacks and requeues received message, and unregisters from channel...",
-                queue_name_clone
+                queue_name
               );
 
               optional_consumer = None;
@@ -123,7 +165,7 @@ impl RabbitmqConsumer {
                 .unwrap();
 
               channel
-                .basic_cancel(&consumer_tag_clone, BasicCancelOptions::default())
+                .basic_cancel(&consumer_tag, BasicCancelOptions::default())
                 .await
                 .map_err(MessageError::Amqp)
                 .unwrap();
@@ -133,9 +175,9 @@ impl RabbitmqConsumer {
                 sender.clone(),
                 channel.clone(),
                 &delivery,
-                &queue_name_clone.clone(),
+                &queue_name.clone(),
                 current_orders.clone(),
-                job_consumer_triggers_clone.clone(),
+                consumer_triggers.clone(),
               )
               .await
               {
@@ -148,12 +190,9 @@ impl RabbitmqConsumer {
           }
         }
       }
-    }));
+    });
 
-    Ok(RabbitmqConsumer {
-      handle,
-      should_consume,
-    })
+    Ok(Some(handle))
   }
 
   async fn process_delivery(
@@ -162,7 +201,7 @@ impl RabbitmqConsumer {
     delivery: &Delivery,
     queue_name: &str,
     current_orders: Arc<Mutex<CurrentOrders>>,
-    job_consumer_triggers: Vec<Arc<AtomicBool>>,
+    consumer_triggers: Arc<Mutex<Vec<Arc<AtomicBool>>>>,
   ) -> Result<()> {
     let count = helpers::get_message_death_count(&delivery);
     let message_data = std::str::from_utf8(&delivery.data).map_err(|e| {
@@ -237,7 +276,7 @@ impl RabbitmqConsumer {
       }
       OrderMessage::StopConsumingJobs => {
         // Stop consuming jobs queues
-        for trigger in job_consumer_triggers {
+        for trigger in consumer_triggers.lock().unwrap().iter() {
           trigger.store(false, Ordering::Relaxed);
         }
 
@@ -248,7 +287,7 @@ impl RabbitmqConsumer {
       }
       OrderMessage::ResumeConsumingJobs => {
         // Resume consuming jobs queues
-        for trigger in job_consumer_triggers {
+        for trigger in consumer_triggers.lock().unwrap().iter() {
           trigger.store(true, Ordering::Relaxed);
         }
 

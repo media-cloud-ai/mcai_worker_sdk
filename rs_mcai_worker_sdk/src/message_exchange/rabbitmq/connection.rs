@@ -48,23 +48,21 @@ impl RabbitmqConnection {
       &queue_name,
       RABBITMQ_CONSUMER_TAG_JOB,
       current_orders.clone(),
-      vec![],
     )
     .await?;
 
     let queue_name = worker_configuration.get_direct_messaging_queue_name();
 
-    let job_consumer_triggers = vec![job_consumer.should_consume.clone()];
-
-    let order_consumer = RabbitmqConsumer::new(
+    let mut order_consumer = RabbitmqConsumer::new(
       &channel,
       order_sender,
       &queue_name,
       RABBITMQ_CONSUMER_TAG_DIRECT,
       current_orders.clone(),
-      job_consumer_triggers,
     )
     .await?;
+
+    order_consumer.connect(&job_consumer);
 
     let response_publisher = RabbitmqPublisher::new(&channel, current_orders.clone()).await?;
 
