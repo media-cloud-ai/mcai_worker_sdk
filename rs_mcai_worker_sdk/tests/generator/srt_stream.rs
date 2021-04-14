@@ -7,7 +7,7 @@ use std::{
 };
 use tokio::time::sleep;
 
-pub struct SrtStreamGenerator {}
+pub struct SrtStreamGenerator;
 
 impl SrtStreamGenerator {
   pub async fn new_json(port: u16) -> Result<()> {

@@ -1,6 +1,5 @@
 use mcai_worker_sdk::message::media::source::Source;
-use stainless_ffmpeg::{format_context::FormatContext, tools::rational::Rational};
-use stainless_ffmpeg_sys::*;
+use stainless_ffmpeg::{format_context::FormatContext, prelude::*, tools::rational::Rational};
 use std::sync::{Arc, Mutex};
 
 #[test]
