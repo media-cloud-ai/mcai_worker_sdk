@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate serde_derive;
 #[cfg(feature = "media")]
-extern crate stainless_ffmpeg_sys;
+extern crate stainless_ffmpeg;
 
 #[cfg(not(feature = "media"))]
 mod processor {

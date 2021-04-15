@@ -113,7 +113,7 @@ Do no use in production, just for developments."#
     stream_index: usize,
     frame: ProcessFrame,
   ) -> Result<ProcessResult> {
-    match frame {
+    match &frame {
       ProcessFrame::AudioVideo(frame) => {
         unsafe {
           let width = (*frame.frame).width;

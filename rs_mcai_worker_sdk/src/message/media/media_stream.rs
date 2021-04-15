@@ -1,10 +1,8 @@
 use ringbuf::Consumer;
-use stainless_ffmpeg::{audio_decoder::AudioDecoder, filter_graph::FilterGraph};
-use stainless_ffmpeg_sys::*;
+use stainless_ffmpeg::prelude::*;
 use std::collections::HashMap;
 use std::ffi::{c_void, CStr, CString};
-use std::io::{Cursor, Error, ErrorKind, Result};
-use std::mem;
+use std::io::{Error, ErrorKind, Result};
 use std::ptr::null_mut;
 use std::str::from_utf8_unchecked;
 
@@ -20,7 +18,7 @@ macro_rules! check_result {
     let errnum = $condition;
     if errnum < 0 {
       let mut data = [0i8; AV_ERROR_MAX_STRING_SIZE];
-      av_strerror(errnum, data.as_mut_ptr(), AV_ERROR_MAX_STRING_SIZE as u64);
+      av_strerror(errnum, data.as_mut_ptr(), AV_ERROR_MAX_STRING_SIZE);
       $block;
       return Err(Error::new(
         ErrorKind::InvalidInput,
@@ -32,7 +30,7 @@ macro_rules! check_result {
     let errnum = $condition;
     if errnum < 0 {
       let mut data = [0i8; AV_ERROR_MAX_STRING_SIZE];
-      av_strerror(errnum, data.as_mut_ptr(), AV_ERROR_MAX_STRING_SIZE as u64);
+      av_strerror(errnum, data.as_mut_ptr(), AV_ERROR_MAX_STRING_SIZE);
       return Err(Error::new(
         ErrorKind::InvalidInput,
         to_string(data.as_ptr()),
@@ -65,14 +63,12 @@ unsafe extern "C" fn read_data(opaque: *mut c_void, raw_buffer: *mut u8, buf_siz
     return 0;
   }
 
-  let vec = Vec::from_raw_parts(raw_buffer, buf_size as usize, buf_size as usize);
+  let mut vec = std::slice::from_raw_parts_mut(raw_buffer, buf_size as usize);
 
-  let mut buffer = Cursor::new(vec);
   let size = consumer
-    .write_into(&mut buffer, Some(buf_size as usize))
+    .write_into(&mut vec, Some(buf_size as usize))
     .unwrap();
 
-  mem::forget(buffer);
   size as i32
 }
 
