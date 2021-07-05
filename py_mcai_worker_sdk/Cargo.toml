@@ -24,7 +24,7 @@ media = [
 [dependencies]
 dict_derive = "^0.3.0"
 mcai_worker_sdk = { version = "0.11.11", path = "../rs_mcai_worker_sdk" }
-pyo3 = "0.11"
+pyo3 = "0.14"
 schemars = "0.8.0"
 serde = "^1.0"
 serde_derive = "^1.0"
